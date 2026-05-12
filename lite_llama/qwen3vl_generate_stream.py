@@ -43,7 +43,12 @@ class Qwen3VLGeneratorStream:
             device=device,
         )
         self.tokenizer = self.load_tokenizer(tokenizer_path)
-        self.processor = AutoProcessor.from_pretrained(checkpoints_dir)
+        try:
+            self.processor = AutoProcessor.from_pretrained(checkpoints_dir)
+        except ImportError:
+            # NPU may lack torchvision for VideoProcessor; load image-only
+            from transformers import AutoImageProcessor
+            self.processor = AutoImageProcessor.from_pretrained(checkpoints_dir)
         self.image_token_id = self.model_executor.model_config.image_token_id
         self.vision_start_token_id = self.model_executor.model_config.vision_start_token_id
         self.vision_end_token_id = self.model_executor.model_config.vision_end_token_id
@@ -113,9 +118,9 @@ class Qwen3VLGeneratorStream:
             (bsz, total_seq_len), pad_id, dtype=torch.long, device=self.device
         )
         for seq_id, token_ids in enumerate(prompt_tokens):
-            tokens[seq_id, : len(token_ids)] = (
-                token_ids.clone().detach().to(dtype=torch.long, device=self.device)
-            )
+            if isinstance(token_ids, list):
+                token_ids = torch.tensor(token_ids, dtype=torch.long, device=self.device)
+            tokens[seq_id, : len(token_ids)] = token_ids
 
         input_text_mask = tokens != pad_id
         eos_reached = torch.tensor([False] * bsz, device=self.device)
