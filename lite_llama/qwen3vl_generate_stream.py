@@ -169,12 +169,10 @@ class Qwen3VLGeneratorStream:
                 mask & (next_token == self.tokenizer.eos_token_id)
             )
 
-            # Yield decoded text for this step
+            # Yield only the new token for this step (incremental)
+            next_tokens = next_token.reshape(-1)
             batch_outputs = [
-                self.tokenizer.decode(
-                    tokens[i, max_prompt_len:cur_pos + 1].tolist(),
-                    skip_special_tokens=True,
-                )
+                self.tokenizer.decode([next_tokens[i].item()], skip_special_tokens=True)
                 for i in range(bsz)
             ]
             yield batch_outputs
