@@ -12,7 +12,7 @@ from .req_tokens_manager import ReqTokensManager
 
 from .cuda_graph import ModelRunner
 from .executor_struct import AttentionInfo, CONFIG_CLASS_MAP
-from ..models.model_config import LlamaConfig
+from ..models.model_config import LlamaConfig, Qwen3VLConfig
 from ..kernels import update_kv_index
 from ..utils.device import get_device
 from ..utils.logger import get_logger
@@ -190,7 +190,8 @@ class ModelExecutor:
         self.model_config = model_config
         if isinstance(model_config, LlavaConfig):
             self.llm_config = LlamaConfig.from_dict(model_config.text_config.to_dict())
-            print(f"self.llm_config.max_seq_len: {self.llm_config.max_seq_len}")
+        elif isinstance(model_config, Qwen3VLConfig):
+            self.llm_config = model_config.text_config
         else:
             self.llm_config = model_config
 
