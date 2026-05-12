@@ -101,6 +101,12 @@ class ModelExecutor:
         device=None,
     ):
         device = get_device(device)
+        # Set as current device before any allocations
+        if "npu" in device:
+            torch.npu.set_device(device)
+        elif "cuda" in device and device != "cuda":
+            torch.cuda.set_device(device)
+
         start_time = time.time()
 
         # 初始化模型
@@ -125,8 +131,8 @@ class ModelExecutor:
         model.eval()
         logger.info(f"Loaded state dict in {time.time() - start_time:.2f}s")
 
-        # 将模型转换为半精度, 并验证转换
-        model.half().to(device)
+        # 先移到目标设备，再转换半精度（避免中间分配落在错误的设备上）
+        model.to(device).half()
         for param in model.parameters():
             assert param.dtype == torch.float16, "Model parameters are not in FP16"
         logger.info("Converted model to half precision (FP16)")
