@@ -276,6 +276,71 @@ class LlavaConfig(BaseConfig):
             return cls.from_dict(json.load(f))
 
 
+# ---------------------------------------------------------------------------- #
+@dataclass
+class Qwen3VLVisionConfig(BaseConfig):
+    """Vision encoder configuration for Qwen3-VL."""
+
+    depth: int = 27
+    hidden_size: int = 1152
+    hidden_act: str = "gelu_pytorch_tanh"
+    intermediate_size: int = 4304
+    num_heads: int = 16
+    in_channels: int = 3
+    patch_size: int = 16
+    spatial_merge_size: int = 2
+    temporal_patch_size: int = 2
+    out_hidden_size: int = 3584
+    num_position_embeddings: int = 2304
+    deepstack_visual_indexes: tuple[int, ...] = (8, 16, 24)
+    initializer_range: float = 0.02
+    model_type: str = "qwen3_vl_vision"
+
+    _ALIASES = {
+        "num_hidden_layers": "depth",
+    }
+
+
+# ---------------------------------------------------------------------------- #
+@dataclass
+class Qwen3VLConfig(BaseConfig):
+    """Top-level configuration for Qwen3-VL multimodal model."""
+
+    architectures: list[str] = field(default_factory=lambda: ["Qwen3VLForConditionalGeneration"])
+    model_type: str = "qwen3_vl"
+    text_config: Qwen3Config = field(default_factory=Qwen3Config)
+    vision_config: Qwen3VLVisionConfig = field(default_factory=Qwen3VLVisionConfig)
+    image_token_id: int = 151655
+    video_token_id: int = 151656
+    vision_start_token_id: int = 151652
+    vision_end_token_id: int = 151653
+    tie_word_embeddings: bool = False
+    torch_dtype: str = "bfloat16"
+    vocab_size: int = 151936
+    max_batch_size: int = 64
+    max_seq_len: int = 2048
+    device: str = "cuda"
+
+    @staticmethod
+    def from_dict(data: Mapping[str, Any]) -> "Qwen3VLConfig":
+        text_cfg = Qwen3Config.from_dict(data.get("text_config", {}))
+        vision_cfg = Qwen3VLVisionConfig.from_dict(data.get("vision_config", {}))
+
+        kwargs = _filter_fields(data, Qwen3VLConfig)
+        kwargs.pop("text_config", None)
+        kwargs.pop("vision_config", None)
+
+        kwargs.setdefault("tie_word_embeddings", False)
+        kwargs.setdefault("torch_dtype", "bfloat16")
+
+        return Qwen3VLConfig(text_config=text_cfg, vision_config=vision_cfg, **kwargs)
+
+    @classmethod
+    def from_json(cls, json_path: os.PathLike | str) -> "Qwen3VLConfig":
+        with open(json_path, "r", encoding="utf-8") as f:
+            return cls.from_dict(json.load(f))
+
+
 # ----------------------------------------------------------------------------- #
 #                                    Tests                                      #
 # ----------------------------------------------------------------------------- #
@@ -326,3 +391,45 @@ def test_llava_roundtrip(tmp_path):
     cfg = LlavaConfig.from_json(json_path)
     assert cfg.text_config.hidden_size == 1024
     assert cfg.vision_config.hidden_size == 384
+
+
+def test_qwen3vl_vision_config_defaults():
+    cfg = Qwen3VLVisionConfig()
+    assert cfg.depth == 27
+    assert cfg.hidden_size == 1152
+    assert cfg.out_hidden_size == 3584
+    assert cfg.spatial_merge_size == 2
+    assert cfg.deepstack_visual_indexes == (8, 16, 24)
+
+
+def test_qwen3vl_config_from_dict():
+    data = {
+        "model_type": "qwen3_vl",
+        "text_config": {
+            "hidden_size": 4096,
+            "num_attention_heads": 32,
+            "num_hidden_layers": 36,
+        },
+        "vision_config": {
+            "depth": 27,
+            "hidden_size": 1152,
+            "out_hidden_size": 3584,
+        },
+        "vocab_size": 151936,
+    }
+    cfg = Qwen3VLConfig.from_dict(data)
+    assert cfg.text_config.hidden_size == 4096
+    assert cfg.text_config.num_heads == 32
+    assert cfg.vision_config.depth == 27
+    assert cfg.vision_config.out_hidden_size == 3584
+    assert cfg.image_token_id == 151655
+
+
+def test_qwen3vl_config_defaults():
+    cfg = Qwen3VLConfig()
+    assert cfg.model_type == "qwen3_vl"
+    assert cfg.image_token_id == 151655
+    assert cfg.vision_start_token_id == 151652
+    assert cfg.vision_end_token_id == 151653
+    assert isinstance(cfg.text_config, Qwen3Config)
+    assert isinstance(cfg.vision_config, Qwen3VLVisionConfig)

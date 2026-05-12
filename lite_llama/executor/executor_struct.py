@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 import torch
 from typing import Type
-from ..models.model_config import LlamaConfig, Qwen2Config, Qwen3Config
+from ..models.model_config import LlamaConfig, Qwen2Config, Qwen3Config, Qwen3VLConfig
 from transformers import LlavaConfig
 
 CONFIG_CLASS_MAP: dict[str, Type] = {
@@ -9,6 +9,7 @@ CONFIG_CLASS_MAP: dict[str, Type] = {
     "qwen2": Qwen2Config,
     "qwen3": Qwen3Config,
     "llava": LlavaConfig,
+    "qwen3_vl": Qwen3VLConfig,
 }
 
 @dataclass
