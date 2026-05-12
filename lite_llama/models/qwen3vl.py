@@ -309,6 +309,11 @@ class Qwen3VLModel(nn.Module):
                 visual_pos_masks = image_mask[..., 0]
                 deepstack_visual_embeds = deepstack_feats
 
+            # Auto-generate mm_token_type_ids if processor didn't provide them
+            if mm_token_type_ids is None and image_grid_thw is not None:
+                mm_token_type_ids = torch.zeros_like(input_ids, dtype=torch.long)
+                mm_token_type_ids[input_ids == self.image_token_id] = 1
+
             # Compute 3D position IDs for M-RoPE
             position_ids = self.compute_3d_position_ids(
                 input_ids=input_ids,
@@ -318,6 +323,13 @@ class Qwen3VLModel(nn.Module):
                 attention_mask=None,
                 mm_token_type_ids=mm_token_type_ids,
             )
+
+        # --- Fallback: simple 1D position IDs if M-RoPE unavailable ---
+        if position_ids is None:
+            batch_size, seq_len = input_ids.shape
+            position_ids = torch.arange(
+                0, seq_len, device=input_ids.device
+            ).unsqueeze(0).expand(batch_size, -1)
 
         # --- Run language model ---
         output = self.language_model(
