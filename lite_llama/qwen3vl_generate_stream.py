@@ -220,7 +220,7 @@ class Qwen3VLGeneratorStream:
         if max_gen_len is None:
             max_gen_len = self.max_seq_len - 1
 
-        # Process inputs with Qwen3VL chat template
+        # Build multimodal messages and tokenize
         messages_list = []
         for prompt, img in zip(prompts, image_items):
             messages_list.append([
@@ -230,17 +230,9 @@ class Qwen3VLGeneratorStream:
                 ]}
             ])
 
-        # Apply chat template to get formatted text
-        formatted_prompts = []
-        for messages in messages_list:
-            text = self.processor.apply_chat_template(
-                messages, tokenize=False, add_generation_prompt=True
-            )
-            formatted_prompts.append(text)
-
-        # Tokenize and get multimodal inputs
+        # Pass messages directly to processor (it applies chat template internally)
         inputs = self.processor(
-            text=formatted_prompts,
+            text=messages_list,
             images=image_items,
             return_tensors="pt",
             padding=True,
