@@ -180,7 +180,7 @@ class Qwen3Config(BaseConfig):
     num_layers: int = 32
     num_heads: int = 32
     num_kv_heads: Optional[int] = 32
-    head_dim: Optional[int] = 128
+    head_dim: Optional[int] = None
     hidden_act: str = "silu"
     max_position_embeddings: int = 32_768
     initializer_range: float = 0.02
