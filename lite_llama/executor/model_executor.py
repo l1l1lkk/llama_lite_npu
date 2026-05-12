@@ -159,6 +159,9 @@ class ModelExecutor:
         elif model_type == "llava":
             from ..models.llava import LlavaLlama
             model = LlavaLlama(model_config)
+        elif model_type == "qwen3_vl":
+            from ..models.qwen3vl import Qwen3VLModel
+            model = Qwen3VLModel(model_config)
         else:
             raise ValueError(f"Unsupported model type: {model_type}")
 
@@ -360,10 +363,10 @@ class ModelExecutor:
 
         return self.atten_info.cur_select_index  # shape [batch_size,]
 
-    def forward(self, input_ids, position_ids, image_tensor=None):
-        if self.model_type == "llava":
+    def forward(self, input_ids, position_ids, image_tensor=None, **kwargs):
+        if self.model_type in ("llava", "qwen3_vl"):
             logits = self.model.forward(
-                input_ids, position_ids, self.atten_info, image_tensor
+                input_ids, position_ids, self.atten_info, image_tensor=image_tensor, **kwargs
             )
         else:
             logits = self.model.forward(input_ids, position_ids, self.atten_info)
