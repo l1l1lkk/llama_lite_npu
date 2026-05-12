@@ -285,6 +285,8 @@ class Qwen3Model(nn.Module):
         position_ids: torch.Tensor,
         atten_info,
         inputs_embeds: Optional[torch.Tensor] = None,
+        deepstack_visual_embeds: Optional[list[torch.Tensor]] = None,
+        visual_pos_masks: Optional[torch.Tensor] = None,
     ):
         # self.hidden_states = []
         batch_size, seq_len = input_ids.shape
@@ -308,6 +310,12 @@ class Qwen3Model(nn.Module):
             h, residual = layer(
                 h, atten_info, i, position_embeddings, qk_scale, residual
             )  # h.shape [batch_size, seq_len, hidden_dim]
+
+            # DeepStack: inject visual features into early LLM layers
+            if deepstack_visual_embeds is not None and i < len(deepstack_visual_embeds):
+                vis_embeds = deepstack_visual_embeds[i].to(h.device, h.dtype)
+                h = h.clone()
+                h[visual_pos_masks, :] = h[visual_pos_masks, :] + vis_embeds
 
         h, _ = skip_rmsnorm(h, residual, self.norm_weight.data, self.rmsnorm_eps)
         output = F.linear(h, self.lm_head_weight.data)
