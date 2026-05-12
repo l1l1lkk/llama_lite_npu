@@ -241,7 +241,18 @@ class Qwen3VLGeneratorStream:
         input_ids = inputs["input_ids"]
         pixel_values = inputs.get("pixel_values")
         image_grid_thw = inputs.get("image_grid_thw")
-        mm_token_type_ids = inputs.get("token_type_ids")  # Qwen3VL-specific
+        # Qwen3VL processor may output token_type_ids under different keys
+        mm_token_type_ids = (
+            inputs.get("token_type_ids")
+            or inputs.get("mm_token_type_ids")
+        )
+        # Log available keys for debugging
+        import logging
+        logging.getLogger(__name__).info("Processor output keys: %s", list(inputs.keys()))
+        if mm_token_type_ids is not None:
+            logging.getLogger(__name__).info("mm_token_type_ids found, shape=%s", mm_token_type_ids.shape)
+        else:
+            logging.getLogger(__name__).warning("mm_token_type_ids NOT in processor output, will auto-generate")
 
         if pixel_values is not None:
             pixel_values = pixel_values.to(self.device, dtype=torch.float16)

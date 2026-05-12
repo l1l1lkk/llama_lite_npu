@@ -312,7 +312,10 @@ class Qwen3VLModel(nn.Module):
             # Auto-generate mm_token_type_ids if processor didn't provide them
             if mm_token_type_ids is None and image_grid_thw is not None:
                 mm_token_type_ids = torch.zeros_like(input_ids, dtype=torch.long)
+                # Mark image tokens and vision boundary tokens as modality=1 (image)
                 mm_token_type_ids[input_ids == self.image_token_id] = 1
+                mm_token_type_ids[input_ids == self.vision_start_token_id] = 1
+                mm_token_type_ids[input_ids == self.vision_end_token_id] = 1
 
             # Compute 3D position IDs for M-RoPE
             position_ids = self.compute_3d_position_ids(
