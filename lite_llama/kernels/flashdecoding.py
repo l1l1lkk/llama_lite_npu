@@ -193,8 +193,6 @@ def flash_decode_stage1(
         BLOCK_SEQ=PARTITION_SIZE,
         BLOCK_N=BLOCK_N_SIZE,
         BLOCK_DMODEL=head_dim,
-        num_warps=1,
-        num_stages=2,
     )
 
 
@@ -290,8 +288,6 @@ def flash_decode_stage2(
         b_seq_len,  # TODO 支持 PagedAttention 和连续批处理
         BLOCK_DMODEL=HEAD_DIM,
         BLOCK_SEQ=PARTITION_SIZE,  # type: ignore
-        num_warps=4,
-        num_stages=2,
     )
 
 

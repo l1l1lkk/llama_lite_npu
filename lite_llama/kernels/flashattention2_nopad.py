@@ -188,8 +188,6 @@ def flash_attention2_no_pad(
     n_heads, HEAD_DIM = q.shape[1], q.shape[2]
 
     BLOCK_SIZE = 64  # For Ampere Architecture, 3090ti, set 128
-    num_warps = 4 if HEAD_DIM <= 64 else 8
-    num_stages = 1
 
     num_kv_groups = q.shape[1] // k.shape[1]  # num_q_heads // num_k_heads
     grid = (triton.cdiv(max_seq_len, BLOCK_SIZE), batchs * n_heads, 1)
@@ -217,10 +215,8 @@ def flash_attention2_no_pad(
         output.stride(1),
         output.stride(2),
         HEAD_DIM=HEAD_DIM,
-        BLOCK_M_SIZE=BLOCK_SIZE,  # 使用或者关闭 autotune 针对不同机器和上下文长度自动优化内核配置
+        BLOCK_M_SIZE=BLOCK_SIZE,
         BLOCK_N_SIZE=BLOCK_SIZE,
-        num_warps=num_warps,
-        num_stages=num_stages,
     )
     return output
 
