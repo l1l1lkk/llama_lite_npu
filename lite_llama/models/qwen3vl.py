@@ -327,6 +327,19 @@ class Qwen3VLModel(nn.Module):
                 mm_token_type_ids=mm_token_type_ids,
             )
 
+        # --- Decode: offset 2D position with rope_deltas for M-RoPE ---
+        if position_ids is not None and position_ids.ndim == 2 and self.rope_deltas is not None:
+            position_ids = position_ids[None, ...].expand(3, position_ids.shape[0], -1)
+            delta = self.rope_deltas.to(device=position_ids.device)
+            position_ids = position_ids + delta
+
+        # --- Decode: compute 3D position IDs from cached rope_deltas ---
+        if position_ids is None and self.rope_deltas is not None:
+            position_ids = self.compute_3d_position_ids(
+                input_ids=input_ids,
+                inputs_embeds=inputs_embeds,
+            )
+
         # --- Fallback: simple 1D position IDs if M-RoPE unavailable ---
         if position_ids is None:
             batch_size, seq_len = input_ids.shape

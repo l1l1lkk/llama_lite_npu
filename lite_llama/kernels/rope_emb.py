@@ -127,6 +127,5 @@ def rope_emb_forward(q, k, cos, sin, batch_size, seq_len):
         pad_n_kh,
         pad_hd,
         BLOCK_SIZE=BLOCK_SIZE,
-        num_stages=1,
     )
     return q, k

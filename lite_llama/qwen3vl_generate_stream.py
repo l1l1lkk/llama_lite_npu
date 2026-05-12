@@ -133,22 +133,32 @@ class Qwen3VLGeneratorStream:
         all_select_index_list.append(prefill_select_index)
 
         position_ids = None
-        start_pos = 0
+        prev_pos = 0
         input_ids = tokens[:, :max_prompt_len]
         for cur_pos in range(max_prompt_len, total_seq_len):
             batch_size, seq_len = input_ids.shape
+
+            # Compute position_ids for this step
+            if seq_len > 1:
+                # Prefill: let model compute M-RoPE internally
+                step_position_ids = None
+            else:
+                # Decode: pass incrementing 1D position
+                step_position_ids = torch.tensor(
+                    [[prev_pos]], dtype=torch.long, device=self.device
+                )
 
             # Prefill step: pass pixel_values for vision encoding
             if cur_pos == max_prompt_len and pixel_values is not None:
                 logits = self.model_executor.forward(
                     input_ids,
-                    position_ids,
+                    step_position_ids,
                     pixel_values=pixel_values,
                     image_grid_thw=image_grid_thw,
                     mm_token_type_ids=mm_token_type_ids,
                 )
             else:
-                logits = self.model_executor.forward(input_ids, position_ids)
+                logits = self.model_executor.forward(input_ids, step_position_ids)
 
             decode_select_index = self.model_executor.decode_alloc_kv_cache(bsz)
             all_select_index_list.append(decode_select_index)
@@ -177,7 +187,7 @@ class Qwen3VLGeneratorStream:
             ]
             yield batch_outputs
 
-            start_pos += bsz
+            prev_pos += 1
 
             if eos_reached.all():
                 break
