@@ -166,8 +166,9 @@ class Qwen2Config(BaseConfig):
             self.num_kv_heads = self.num_heads
         if self.intermediate_size is None:
             self.intermediate_size = self.hidden_size * 4
-        if self.head_dim is None:
-            self.head_dim = self.hidden_size // self.num_heads
+        computed_head_dim = self.hidden_size // self.num_heads
+        if self.head_dim is None or self.head_dim * self.num_heads != self.hidden_size:
+            self.head_dim = computed_head_dim
         assert self.hidden_size == self.head_dim * self.num_heads
 
 
@@ -212,8 +213,9 @@ class Qwen3Config(BaseConfig):
             self.num_kv_heads = self.num_heads
         if self.intermediate_size is None:
             self.intermediate_size = self.hidden_size * 4
-        if self.head_dim is None:
-            self.head_dim = self.hidden_size // self.num_heads
+        computed_head_dim = self.hidden_size // self.num_heads
+        if self.head_dim is None or self.head_dim * self.num_heads != self.hidden_size:
+            self.head_dim = computed_head_dim
         assert self.hidden_size == self.head_dim * self.num_heads
 
 
