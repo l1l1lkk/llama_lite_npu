@@ -1,6 +1,8 @@
 import torch
 import logging
 
+from ..utils.device import get_device
+
 logger = logging.getLogger(__name__)
 
 
@@ -10,7 +12,8 @@ class ReqTokensManager:
     TokenTable 将一系列 kv tokens 映射到一组token 表中, 每个 token 表代表请求序列分配的 kv cache 内存空间。
     """
 
-    def __init__(self, max_request_num, max_seq_len, mem_manager=None, device="npu:6"):
+    def __init__(self, max_request_num, max_seq_len, mem_manager=None, device=None):
+        self.device = get_device(device)
         self.max_can_use_req_size = max_request_num
         self.can_use_req_size = max_request_num
         self.max_seq_len = max_seq_len
@@ -68,7 +71,7 @@ import torch
 
 class TestReqTokensManager(unittest.TestCase):
     def setUp(self):
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = get_device()
         self.mem_manager_mock = unittest.mock.MagicMock()
         self.table = ReqTokensManager(
             max_request_num=10,

@@ -4,6 +4,7 @@ from typing import Dict
 from .executor_struct import AttentionInfo
 from .mem_manager import KVCacheMemoryManager
 from ..models.utils import weak_ref_tensor
+from ..utils.device import get_device
 
 _BATCH_SIZE_ALIGNMENT = 8
 _BATCH_SIZES_TO_CAPTURE = [1, 2, 4] + [
@@ -110,8 +111,9 @@ class ModelRunner:
 
         self.graph_runners = {}
 
-    def build_atten_info(self, batch_size, atten_info, device="npu:6"):
+    def build_atten_info(self, batch_size, atten_info, device=None):
         """针对 decode 阶段, 构建 attention 输入信息结构体"""
+        device = get_device(device)
         atten_info.kv_buffer = self.kv_mem_manager.gpu_kv_buffer  # torch.Tensor
         atten_info.b_req_tokens_table = (
             self.req_tokens_manager.b_req_tokens_table
@@ -119,7 +121,7 @@ class ModelRunner:
 
         atten_info.b_req_idx = torch.arange(batch_size, device=device)  # torch.Tensor
         atten_info.b_seq_len = torch.ones(
-            batch_size, dtype=torch.int32, device="npu:6"
+            batch_size, dtype=torch.int32, device=device
         )  # torch.Tensor
         atten_info.cur_select_index,_ = self.kv_mem_manager.alloc_kvcache_index(
             batch_size

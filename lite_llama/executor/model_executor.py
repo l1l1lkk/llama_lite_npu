@@ -14,6 +14,7 @@ from .cuda_graph import ModelRunner
 from .executor_struct import AttentionInfo, CONFIG_CLASS_MAP
 from ..models.model_config import LlamaConfig
 from ..kernels import update_kv_index
+from ..utils.device import get_device
 from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -35,7 +36,7 @@ class ModelExecutor:
         max_seq_len: int,
         max_gpu_num_blocks: None,
         compiled_model: bool = False,
-        device: str = "cuda",
+        device: str = None,
     ):
         """
         构建 ModelExecutor 实例, 加载模型、分词器和初始化推理信息结构体 atten_info。
@@ -44,11 +45,12 @@ class ModelExecutor:
             checkpoints_dir (str): 模型检查点目录路径。
             load_model (bool): 是否加载模型权重。
             max_seq_len (int): 最大序列长度。
-            device (str): 设备类型（'cuda'或'cpu'）。
+            device (str): 设备类型（'npu:6'、'cuda'或'cpu'），None 为自动检测。
 
         返回:
             ModelExecutor: 初始化后的 ModelExecutor 实例。
         """
+        device = get_device(device)
         model_config = ModelExecutor._load_model_config(checkpoints_dir, max_seq_len)
         model = ModelExecutor._load_model_weight(model_config, checkpoints_dir, device=device)
     
@@ -74,12 +76,11 @@ class ModelExecutor:
     def _accelerate_load_weight(
         model_config,
         checkpoints_dir,
-        device="npu:6",
+        device=None,
     ):
+        device = get_device(device)
         with init_empty_weights():
             model = ModelExecutor._initialize_model(model_config, device=device)
-
-        # 假设 model 是使用 init_empty_weights 初始化的空模型
         model = load_checkpoint_and_dispatch(
             model, checkpoints_dir, device_map="auto", dtype=torch.float16
         )
@@ -97,8 +98,9 @@ class ModelExecutor:
     def _load_model_weight(
         model_config,
         checkpoints_dir,
-        device="npu:6",
+        device=None,
     ):
+        device = get_device(device)
         start_time = time.time()
 
         # 初始化模型
@@ -175,11 +177,11 @@ class ModelExecutor:
         model,
         max_gpu_num_blocks=None,
         compiled_model=False,
-        device="npu:6",
+        device=None,
     ):
+        self.device = get_device(device)
         self.checkpoints_dir = checkpoints_dir
         self.model_config = model_config
-        self.device = device
         if isinstance(model_config, LlavaConfig):
             self.llm_config = LlamaConfig.from_dict(model_config.text_config.to_dict())
             print(f"self.llm_config.max_seq_len: {self.llm_config.max_seq_len}")
@@ -232,7 +234,7 @@ class ModelExecutor:
         return max_gpu_num_blocks, max_gpu_num_tokens
 
     def _init_mem_manager(
-        self, gpu_num_blocks, block_size=1, dtype=torch.float16, device="npu:6"
+        self, gpu_num_blocks, block_size=1, dtype=torch.float16, device=None
     ):
         kv_mem_manager = KVCacheMemoryManager(
             num_layers=self.llm_config.num_layers,

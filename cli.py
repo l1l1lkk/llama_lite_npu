@@ -1,6 +1,8 @@
 import torch
+import argparse
 from typing import Optional
 from lite_llama.utils.prompt_templates import get_prompter
+from lite_llama.utils.device import get_device
 from lite_llama.generate_stream import GenerateStreamText  # 导入 GenerateText 类
 
 import warnings
@@ -15,11 +17,9 @@ def main(
     max_gpu_num_blocks=None,
     max_gen_len: Optional[int] = 1024,
     compiled_model: bool = False,
+    device: str = None,
 ):
-    device_id = 6
-    torch.npu.set_device(device_id)
-    device = torch.device(f"npu:{device_id}")
-    # device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = get_device(device)
     if max_seq_len <= 1024:
         short_prompt = True
     else:
@@ -66,4 +66,18 @@ def main(
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="LiteLlama CLI chat")
+    parser.add_argument("--device", type=str, default=None,
+                        help="Device to use (e.g. 'npu:6', 'cuda', 'cpu'). "
+                             "Auto-detect if not set. Env: LITE_LLAMA_DEVICE")
+    parser.add_argument("--checkpoints_dir", type=str, default=checkpoints_dir)
+    parser.add_argument("--temperature", type=float, default=0.6)
+    parser.add_argument("--top_p", type=float, default=0.9)
+    parser.add_argument("--max_seq_len", type=int, default=2048)
+    parser.add_argument("--max_gen_len", type=int, default=1024)
+    args = parser.parse_args()
+    main(
+        temperature=args.temperature, top_p=args.top_p,
+        max_seq_len=args.max_seq_len, max_gen_len=args.max_gen_len,
+        device=args.device,
+    )

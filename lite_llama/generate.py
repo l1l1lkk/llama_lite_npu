@@ -4,6 +4,7 @@ from typing import List, Optional, Tuple, TypedDict
 from transformers import AutoTokenizer
 
 from .executor.model_executor import ModelExecutor
+from .utils.device import get_device
 from .utils.file_interface import get_model_name_from_path
 
 
@@ -59,11 +60,11 @@ class GenerateText:
         max_seq_len=1024,
         max_gpu_num_blocks=None,
         compiled_model=False,
-        device="npu:6",
+        device=None,
     ):
         self.checkpoints_dir = checkpoints_dir
         self.compiled_model = compiled_model
-        self.device = device
+        self.device = get_device(device)
 
         self.model_executor = ModelExecutor.build(
             checkpoints_dir=checkpoints_dir,

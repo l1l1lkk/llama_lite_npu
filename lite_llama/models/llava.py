@@ -8,6 +8,7 @@ from transformers import AutoModel, LlavaConfig
 from .llama import LlamaModel
 from .model_config import LlamaConfig
 from ..kernels import gelu
+from ..utils.device import get_device
 from .utils import merge_input_ids_with_image_features
 
 
@@ -33,7 +34,7 @@ class LlavaMultiModalProjector(nn.Module):
 class LlavaLlama(nn.Module):
     def __init__(self, llava_config: LlavaConfig):
         super().__init__()
-        self.device = "cuda"
+        self.device = get_device()
         self.llava_config = llava_config
         text_config = (
             self.llava_config.text_config

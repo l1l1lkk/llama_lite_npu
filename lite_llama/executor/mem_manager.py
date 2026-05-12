@@ -3,6 +3,7 @@ import json, gc
 from pathlib import Path
 
 from ..utils.dummy_data import DummyInputGenerator
+from ..utils.device import get_device
 from .executor_struct import AttentionInfo, CONFIG_CLASS_MAP
 from ..utils.logger import get_logger
 
@@ -19,17 +20,18 @@ class ComputeMaxAvailableBlocks:
     if not execute dummy forward run, it should be run after cuda graph!
     """
     def __init__(
-        self, 
-        num_layers, 
-        hidden_size, 
-        num_heads, 
-        num_kv_heads, 
-        head_dim, 
-        gpu_memory_utilization=0.9, 
-        block_size=1, 
+        self,
+        num_layers,
+        hidden_size,
+        num_heads,
+        num_kv_heads,
+        head_dim,
+        gpu_memory_utilization=0.9,
+        block_size=1,
         dtype=torch.float16,
-        device="npu:6"
+        device=None
     ):
+        self.device = get_device(device)
         self.hidden_size = hidden_size
         self.num_heads = num_heads
         self.num_kv_heads = num_kv_heads
@@ -39,7 +41,6 @@ class ComputeMaxAvailableBlocks:
         self.gpu_memory_utilization = gpu_memory_utilization
         self.block_size = block_size # 一个 block 表示多少个 tokens
         self.dtype = dtype
-        self.device = device
         self.dtype_size = get_dtype_size(dtype)
         
     def compute_cache_block_size_bytes(self):
@@ -80,19 +81,19 @@ class ComputeMaxAvailableBlocks:
                 # 创建虚拟输入 
                 batch_size = 1
                 seq_len = 32  # 使用较小的序列长度进行内存评估
-                dummy_generator = DummyInputGenerator(device="npu:6")
+                dummy_generator = DummyInputGenerator(device=self.device)
                 dummy_input, dummy_position_ids = dummy_generator.generate_dummy_input(model_config, batch_size, seq_len)
-                    
+
                 # 创建虚拟的 atten_info 对象
                 dummy_atten_info = AttentionInfo()
-                
+
                 dummy_atten_info.kv_buffer = [
                     torch.empty((seq_len, 2 * self.num_kv_heads, self.head_dim), dtype=self.dtype, device=self.device) for _ in range(self.num_layers)
                 ]
-                
-                dummy_atten_info.cur_select_index = torch.arange(seq_len, dtype=torch.int32, device="npu:6")
-                dummy_atten_info.b_start_loc = torch.tensor([0], dtype=torch.int32, device="npu:6")
-                dummy_atten_info.b_seq_len = torch.tensor([1], device="npu:6")
+
+                dummy_atten_info.cur_select_index = torch.arange(seq_len, dtype=torch.int32, device=self.device)
+                dummy_atten_info.b_start_loc = torch.tensor([0], dtype=torch.int32, device=self.device)
+                dummy_atten_info.b_seq_len = torch.tensor([1], device=self.device)
                 dummy_atten_info.max_actual_seq_len=seq_len
                 # 执行前向传播
                 with torch.no_grad():
@@ -152,7 +153,8 @@ class KVCacheMemoryManager:
         gpu_num_blocks: int, 用户自行设置的最大可用 blocks(tokens), 如果设置该值， kv cache 内存管理器的最大可用内存-tokens 由该值决定。
         block_size: int, 每个 block 的大小，默认为 1
     """
-    def __init__(self, num_layers, num_kv_heads, head_dim, gpu_num_blocks, block_size=1, dtype=torch.float16, device="npu:6"):
+    def __init__(self, num_layers, num_kv_heads, head_dim, gpu_num_blocks, block_size=1, dtype=torch.float16, device=None):
+        self.device = get_device(device)
         self.num_layers = num_layers
         self.num_kv_heads = num_kv_heads
         self.head_dim = head_dim
@@ -161,12 +163,11 @@ class KVCacheMemoryManager:
         self.max_num_tokens = gpu_num_blocks * block_size
 
         self.dtype = dtype
-        self.device = device
         self.can_use_mem_size = gpu_num_blocks # 可用的 kv cache tokens 数量
 
         # 定义 kv 内存位置索引和内存使用状态变量
-        self.kv_mem_pos_indexs = torch.arange(0, self.max_num_tokens, dtype=torch.long, device="npu:6")
-        self.kv_mem_use_state = torch.zeros(self.max_num_tokens, dtype = torch.int32, device="npu:6")
+        self.kv_mem_pos_indexs = torch.arange(0, self.max_num_tokens, dtype=torch.long, device=self.device)
+        self.kv_mem_use_state = torch.zeros(self.max_num_tokens, dtype=torch.int32, device=self.device)
 
         # Initialize the gpu_kv_buffer
         self.init_kv_buffers(
@@ -179,7 +180,7 @@ class KVCacheMemoryManager:
         max_num_tokens,
         head_dim, num_kv_heads, num_layers,
         dtype,
-        device: str="npu:6"
+        device: Optional[str]=None
     )-> list[torch.Tensor]:
         # kv cache shape: config.max_batch_size, config.max_seq_len, self.num_kv_heads, self.head_dim
         # max_num_tokens = max_num_blocks * self.block_size

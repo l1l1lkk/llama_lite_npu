@@ -2,6 +2,7 @@ from typing import Optional
 import torch
 from typing import Optional, TypedDict, Generator
 from .executor.model_executor import ModelExecutor
+from .utils.device import get_device
 from .utils.file_interface import get_model_name_from_path
 from .kernels.softmax_split import softmax_split
 
@@ -61,8 +62,9 @@ class GenerateStreamText:
         max_gpu_num_blocks=None,
         max_seq_len=1024,
         compiled_model=False,
-        device="npu:6",
+        device=None,
     ):
+        self.device = get_device(device)
         self.checkpoints_dir = checkpoints_dir
 
         self.model_executor = ModelExecutor.build(
@@ -98,8 +100,10 @@ class GenerateStreamText:
         temperature: float = 0.6,
         top_p: float = 0.9,
         echo: bool = False,
-        device="npu:6",
+        device=None,
     ) -> Generator[tuple[list[str], Optional[list[float]]], None, None]:
+        if device is None:
+            device = self.device
         """
         基于提供的 prompt_tokens, 使用语言生成模型逐个生成 token, 并在生成时立即输出。
 
@@ -131,9 +135,9 @@ class GenerateStreamText:
         )
 
         # 预分配tokens张量
-        tokens = torch.full((bsz, total_len), pad_id, dtype=torch.long, device="npu:6")
+        tokens = torch.full((bsz, total_len), pad_id, dtype=torch.long, device=device)
         input_text_mask = tokens != pad_id
-        eos_reached = torch.tensor([False] * bsz, device="npu:6")
+        eos_reached = torch.tensor([False] * bsz, device=device)
         prev_pos = 0
         last_yielded_pos = [
             len(prompt_tokens[i]) if not echo else 0 for i in range(bsz)
@@ -141,7 +145,7 @@ class GenerateStreamText:
 
         # 填充提示词到 tokens 张量
         for k, t in enumerate(prompt_tokens):
-            tokens[k, : len(t)] = torch.tensor(t, dtype=torch.long, device="npu:6")
+            tokens[k, : len(t)] = torch.tensor(t, dtype=torch.long, device=device)
 
         b_req_idx = torch.arange(bsz, device=self.device) # batch_size 个请求索引 [0, 1, 2, ..., bsz-1]
         all_select_index_list = []

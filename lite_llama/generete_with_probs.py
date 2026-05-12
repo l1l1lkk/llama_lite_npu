@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from transformers import AutoTokenizer
 
 from .executor.model_executor import ModelExecutor
+from .utils.device import get_device
 from .utils.file_interface import get_model_name_from_path
 from .utils.logger import get_logger
 
@@ -62,11 +63,11 @@ class GenerateText:
         max_seq_len=1024,
         max_gpu_num_blocks=None,
         compiled_model=False,
-        device="npu:6",
+        device=None,
     ):
         self.checkpoints_dir = checkpoints_dir
         self.compiled_model = compiled_model
-        self.device = device
+        self.device = get_device(device)
 
         self.model_executor = ModelExecutor.build(
             checkpoints_dir=checkpoints_dir,
@@ -97,7 +98,7 @@ class GenerateText:
         top_p: float = 0.9,
         logprobs: bool = True,
         echo: bool = False,
-        device="npu:6",
+        device=self.device,
     ) -> tuple[list[list[int]], Optional[list[list[float]]]]:
         """
         基于提供的提示词 (prompts) 使用语言生成模型生成文本序列。
@@ -238,7 +239,7 @@ class GenerateText:
         max_gen_len: Optional[int] = None,
         logprobs: bool = False,
         echo: bool = False,
-        device="npu:6",
+        device=self.device,
     ) -> list[CompletionPrediction]:
         if max_gen_len is None:
             max_gen_len = self.model_config.max_seq_len - 1

@@ -3,6 +3,7 @@ import torch
 
 import time
 
+from .utils.device import get_device
 from .utils.prompt_templates import get_prompter
 from .generate import GenerateText
 
@@ -15,14 +16,14 @@ class Inference(object):
         max_seq_len: int,
         max_gen_len: Optional[int],
         lite_llama_ckpt_dir: str,
-        device: str = "cuda",
+        device: str = None,
     ):
         self.temperature = temperature
         self.top_p = top_p
         self.max_seq_len = max_seq_len
         self.max_gen_len = max_gen_len
         self.lite_llama_ckpt_dir = lite_llama_ckpt_dir
-        self.device = device
+        self.device = get_device(device)
 
     def load_generator(self, max_gpu_num_blocks=None) -> GenerateText:
         """

@@ -1,4 +1,5 @@
 import torch
+import argparse
 from typing import Optional
 
 from rich.console import Console
@@ -10,6 +11,7 @@ warnings.filterwarnings("ignore", category=UserWarning, module="torch._utils")
 
 from lite_llama.llava_generate_stream import LlavaGeneratorStream
 from lite_llama.utils.image_process import vis_images
+from lite_llama.utils.device import get_device
 from lite_llama.utils.prompt_templates import get_prompter, get_image_token
 
 # 模型检查点目录，请根据实际情况修改
@@ -22,22 +24,10 @@ def main(
     max_gpu_num_blocks=None,
     max_gen_len: Optional[int] = 512,
     compiled_model: bool = False,
+    device: str = None,
 ):
-    """
-    主函数，处理用户输入并生成响应。
-
-    Args:
-        temperature (float, optional): 生成文本的温度。默认值为 0.6。
-        top_p (float, optional): 生成文本的top-p值。默认值为 0.9。
-        max_seq_len (int, optional): 最大序列长度。默认值为 2048。
-        max_gpu_num_blocks: 用户自行设置的最大可用 blocks(tokens), 如果设置该值， kv cache 内存管理器的最大可用内存-tokens 由该值决定。
-        max_gen_len (Optional[int], optional): 生成文本的最大长度。默认值为 512。
-        load_model (bool, optional): 是否加载模型。默认值为True。
-        compiled_model (bool, optional): 是否使用编译模型。默认值为True。
-        triton_weight (bool, optional): 是否使用Triton权重。默认值为True。
-    """
     console = Console()
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = get_device(device)
     if max_seq_len <= 1024:
         short_prompt = True
     else:
@@ -117,4 +107,8 @@ def main(
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="LiteLlama Llava CLI")
+    parser.add_argument("--device", type=str, default=None,
+                        help="Device (e.g. 'npu:6', 'cuda', 'cpu'). Auto-detect if not set.")
+    args = parser.parse_args()
+    main(device=args.device)

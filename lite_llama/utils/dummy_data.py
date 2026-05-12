@@ -1,11 +1,13 @@
 import torch
 
+from .device import get_device
+
 
 class DummyInputGenerator:
     """A class to generate dummy inputs for memory profiling."""
-    
-    def __init__(self, device="cuda:5"):
-        self.device = device
+
+    def __init__(self, device=None):
+        self.device = get_device(device)
 
     
     def generate_dummy_input(self, model_config, batch_size=1, seq_len=32):

@@ -1,6 +1,7 @@
 """Interactive CLI for Qwen3-VL multimodal model."""
 
 import torch
+import argparse
 from typing import Optional
 
 from rich.console import Console
@@ -12,6 +13,7 @@ warnings.filterwarnings("ignore", category=UserWarning, module="torch._utils")
 
 from lite_llama.qwen3vl_generate_stream import Qwen3VLGeneratorStream
 from lite_llama.utils.image_process import vis_images
+from lite_llama.utils.device import get_device
 
 # Update this path to your Qwen3-VL model checkpoint
 checkpoints_dir = "/path/Qwen/Qwen3-VL-4B-Instruct"
@@ -24,9 +26,10 @@ def main(
     max_gpu_num_blocks=None,
     max_gen_len: Optional[int] = 512,
     compiled_model: bool = False,
+    device: str = None,
 ):
     console = Console()
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = get_device(device)
 
     try:
         generator = Qwen3VLGeneratorStream(
@@ -90,4 +93,8 @@ def main(
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="LiteLlama Qwen3VL CLI")
+    parser.add_argument("--device", type=str, default=None,
+                        help="Device (e.g. 'npu:6', 'cuda', 'cpu'). Auto-detect if not set.")
+    args = parser.parse_args()
+    main(device=args.device)

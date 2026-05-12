@@ -5,6 +5,7 @@ from PIL import Image
 from typing import Optional, TypedDict, Generator, Union
 from .executor.model_executor import ModelExecutor
 from .utils.constants import *
+from .utils.device import get_device
 from .utils.file_interface import get_model_name_from_path
 
 from transformers import AutoTokenizer, AutoProcessor
@@ -85,12 +86,12 @@ class LlavaGeneratorStream:
         max_gpu_num_blocks=None,
         max_seq_len=2048,
         compiled_model=False,
-        device="npu:6",
+        device=None,
     ):
         self.checkpoints_dir = checkpoints_dir
         self.compiled_model = compiled_model
         self.max_seq_len = max_seq_len
-        self.device = device
+        self.device = get_device(device)
 
         self.model_executor = ModelExecutor.build(
             checkpoints_dir=checkpoints_dir,
