@@ -2,6 +2,7 @@
 
 import torch
 import argparse
+import traceback
 from typing import Optional
 
 from rich.console import Console
@@ -15,9 +16,6 @@ from lite_llama.qwen3vl_generate_stream import Qwen3VLGeneratorStream
 from lite_llama.utils.image_process import vis_images
 from lite_llama.utils.device import get_device
 
-# Update this path to your Qwen3-VL model checkpoint
-checkpoints_dir = "/path/Qwen/Qwen3-VL-4B-Instruct"
-
 
 def main(
     temperature: float = 0.6,
@@ -27,9 +25,24 @@ def main(
     max_gen_len: Optional[int] = 512,
     compiled_model: bool = False,
     device: str = None,
+    checkpoints_dir: str = None,
 ):
     console = Console()
     device = get_device(device)
+
+    if checkpoints_dir is None:
+        # Try common paths
+        candidates = [
+            "my_weight/Qwen3-vl-4B",
+            "/path/Qwen/Qwen3-VL-4B-Instruct",
+        ]
+        for c in candidates:
+            if os.path.isdir(c):
+                checkpoints_dir = c
+                break
+        if checkpoints_dir is None:
+            console.print("[red]请指定 --checkpoints_dir 路径[/red]")
+            sys.exit(1)
 
     try:
         generator = Qwen3VLGeneratorStream(
@@ -41,7 +54,8 @@ def main(
             device=device,
         )
     except Exception as e:
-        console.print(f"[red]Model load failed: {e}[/red]")
+        console.print(f"[red]模型加载失败: {e}[/red]")
+        traceback.print_exc()
         sys.exit(1)
 
     while True:
@@ -96,5 +110,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="LiteLlama Qwen3VL CLI")
     parser.add_argument("--device", type=str, default=None,
                         help="Device (e.g. 'npu:6', 'cuda', 'cpu'). Auto-detect if not set.")
+    parser.add_argument("--checkpoints_dir", type=str, default=None,
+                        help="Path to converted model weights (e.g. my_weight/Qwen3-vl-4B)")
     args = parser.parse_args()
-    main(device=args.device)
+    main(device=args.device, checkpoints_dir=args.checkpoints_dir)
