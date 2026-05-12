@@ -1,0 +1,26 @@
+From 710fea5dd1b4351d4c73474de7b518eb65c9e8f4 Mon Sep 17 00:00:00 2001
+From: l1l1lkk <2016895486@qq.com>
+Date: Tue, 12 May 2026 14:17:16 +0800
+Subject: [PATCH 09/13] @ Fix: add missing Optional import in mem_manager.py
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+@
+---
+ lite_llama/executor/mem_manager.py | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/lite_llama/executor/mem_manager.py b/lite_llama/executor/mem_manager.py
+index b56405f..a145c24 100644
+--- a/lite_llama/executor/mem_manager.py
++++ b/lite_llama/executor/mem_manager.py
+@@ -1,6 +1,7 @@
+ import torch
+ import json, gc
+ from pathlib import Path
++from typing import Optional
+ 
+ from ..utils.dummy_data import DummyInputGenerator
+ from ..utils.device import get_device
+-- 
+2.52.0.windows.1
+

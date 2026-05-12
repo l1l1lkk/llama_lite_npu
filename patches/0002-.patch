@@ -1,0 +1,145 @@
+From 1333d2ac39a8274bbd7b2cff8a274e570a8f9deb Mon Sep 17 00:00:00 2001
+From: l1l1lkk <2016895486@qq.com>
+Date: Tue, 12 May 2026 11:09:10 +0800
+Subject: [PATCH 02/13] @ Phase 2: Add M-RoPE support for Qwen3VL
+
+- Add Qwen3VLTextRotaryEmbedding with 3D position encoding
+- Support interleaved M-RoPE frequency pattern [THWTHWTHW...]
+- 2D position ID fallback for pure-text/decode stages
+- Add unit tests for M-RoPE shapes and interleaving
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+@
+---
+ lite_llama/models/RotaryEmbedding.py | 108 +++++++++++++++++++++++++++
+ 1 file changed, 108 insertions(+)
+
+diff --git a/lite_llama/models/RotaryEmbedding.py b/lite_llama/models/RotaryEmbedding.py
+index b00e929..5c0a6f7 100644
+--- a/lite_llama/models/RotaryEmbedding.py
++++ b/lite_llama/models/RotaryEmbedding.py
+@@ -212,6 +212,68 @@ class Qwen3RotaryEmbedding(RotaryEmbedding):
+     def __init__(self, config: Qwen2Config, **kw):  # type: ignore[override]
+         super().__init__(config=config, **kw)
+ 
++
++# -----------------------------------------------------------------------------
++# M-RoPE (Multimodal Rotary Position Embedding) for Qwen3VL
++# -----------------------------------------------------------------------------
++class Qwen3VLTextRotaryEmbedding(RotaryEmbedding):
++    """M-RoPE for Qwen3-VL text model.
++
++    Uses 3D position IDs of shape (3, batch, seq_len) representing
++    temporal, height, and width dimensions for multimodal inputs.
++    Frequencies are arranged in an interleaved [THWTHWTHW...] pattern.
++    """
++
++    def __init__(self, config=None, **kw):
++        super().__init__(config=config, **kw)
++        cfg = _to_map(config) if config is not None else {}
++        self.mrope_section = cfg.get("mrope_section", [24, 20, 20])
++
++    @torch.no_grad()
++    def forward(self, x: torch.Tensor, position_ids: torch.Tensor):
++        if "dynamic" in self.rope_type or self.rope_type == "longrope":
++            max_pos = int(position_ids.max()) + 1
++            self._update_dynamic(max_pos, x.device)
++
++        # Expand to 3D if position_ids is 2D (e.g. pure-text or decode)
++        if position_ids.ndim == 2:
++            position_ids = position_ids[None, ...].expand(3, position_ids.shape[0], -1)
++
++        batch = position_ids.shape[1]
++        inv = self.inv_freq.to(x.device, dtype=torch.float32)
++
++        # inv_freq_expanded: (3, batch, 1, head_dim//2)
++        inv_exp = inv[None, None, :, None].expand(3, batch, -1, 1)
++        pos_exp = position_ids[:, :, None, :].to(dtype=torch.float32)  # (3, bs, 1, seq)
++
++        dev_type = x.device.type if x.device.type != "mps" else "cpu"
++        with torch.autocast(device_type=dev_type, enabled=False):
++            freqs = (inv_exp.float() @ pos_exp.float()).transpose(2, 3)  # (3, bs, seq, hd/2)
++            freqs = self.apply_interleaved_mrope(freqs, self.mrope_section)  # (bs, seq, hd/2)
++            emb = torch.cat((freqs, freqs), dim=-1)  # (bs, seq, hd)
++            cos, sin = emb.cos(), emb.sin()
++
++        cos = cos * self.attention_scaling
++        sin = sin * self.attention_scaling
++        return cos.to(dtype=x.dtype), sin.to(dtype=x.dtype)
++
++    def apply_interleaved_mrope(self, freqs, mrope_section):
++        """Reorganize frequency layout from chunked [TTT...HHH...WWW] to
++        interleaved [THWTHWTHW...TT].
++
++        args:
++            freqs: (3, bs, seq_len, head_dim // 2)
++            mrope_section: (3,) e.g. [24, 20, 20]
++        returns:
++            freqs_t: (bs, seq_len, head_dim // 2)
++        """
++        freqs_t = freqs[0].clone()  # start with T dimension
++        for dim, offset in enumerate((1, 2), start=1):  # H, W
++            length = mrope_section[dim] * 3
++            idx = slice(offset, length, 3)
++            freqs_t[..., idx] = freqs[dim, ..., idx]
++        return freqs_t
++
+ # -----------------------------------------------------------------------------
+ # Tests
+ # -----------------------------------------------------------------------------
+@@ -249,6 +311,52 @@ def test_forward_shapes():
+     assert sin.shape == (2, 16, cfg.head_dim)
+ 
+ 
++def test_mrope_3d_position_ids():
++    """Test M-RoPE with 3D position IDs."""
++    from .model_config import LlamaConfig
++    cfg = LlamaConfig(hidden_size=1024, num_heads=8, head_dim=64, max_position_embeddings=128)
++    rope = Qwen3VLTextRotaryEmbedding(config=cfg)
++    x = torch.randn(2, 16, cfg.hidden_size)
++    pos = torch.randint(0, 64, (3, 2, 16))  # (3, batch, seq)
++    cos, sin = rope(x, pos)
++    assert cos.shape == (2, 16, cfg.head_dim)
++    assert sin.shape == (2, 16, cfg.head_dim)
++
++
++def test_mrope_2d_fallback():
++    """Test M-RoPE falls back to 2D position IDs (e.g. decode stage)."""
++    from .model_config import LlamaConfig
++    cfg = LlamaConfig(hidden_size=1024, num_heads=8, head_dim=64, max_position_embeddings=128)
++    rope = Qwen3VLTextRotaryEmbedding(config=cfg)
++    x = torch.randn(4, 1, cfg.hidden_size)  # decode: seq_len=1
++    pos = torch.tensor([[5], [10], [15], [20]])  # (batch, seq_len)
++    cos, sin = rope(x, pos)
++    assert cos.shape == (4, 1, cfg.head_dim)
++    assert sin.shape == (4, 1, cfg.head_dim)
++
++
++def test_mrope_interleaving():
++    """Test apply_interleaved_mrope produces correct pattern."""
++    from .model_config import LlamaConfig
++    cfg = LlamaConfig(hidden_size=1024, num_heads=8, head_dim=64, max_position_embeddings=128)
++    rope = Qwen3VLTextRotaryEmbedding(config=cfg)
++    # Create dummy freqs: T=0, H=1, W=2
++    freqs = torch.zeros(3, 1, 4, 6)  # (3, bs, seq, hd/2)
++    freqs[0] = 0  # T
++    freqs[1] = 1  # H
++    freqs[2] = 2  # W
++    mrope_section = [2, 2, 2]  # each dim has 2 freqs
++    result = rope.apply_interleaved_mrope(freqs, mrope_section)
++    # Pattern: THWTHW → indices 0,1,2,3,4,5
++    # T at positions 0,3; H at 1,4; W at 2,5
++    assert result[0, 0, 0] == 0  # T
++    assert result[0, 0, 1] == 1  # H
++    assert result[0, 0, 2] == 2  # W
++    assert result[0, 0, 3] == 0  # T
++    assert result[0, 0, 4] == 1  # H
++    assert result[0, 0, 5] == 2  # W
++
++
+ if __name__ == "__main__":
+     import sys, pytest
+     sys.exit(pytest.main(sys.argv[1:]))
+-- 
+2.52.0.windows.1
+

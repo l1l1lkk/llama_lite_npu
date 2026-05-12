@@ -1,0 +1,37 @@
+From 170664ba282933ab8302a423651d7932a27d8535 Mon Sep 17 00:00:00 2001
+From: l1l1lkk <2016895486@qq.com>
+Date: Tue, 12 May 2026 11:50:40 +0800
+Subject: [PATCH 07/13] @ Fix: handle tied lm_head/embed_tokens weights for
+ Qwen3VL
+
+Qwen3VL uses tie_word_embeddings=True, so lm_head.weight may not
+exist in safetensors files. Auto-copy from embed_tokens.weight.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+@
+---
+ apply_weight_convert.py | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/apply_weight_convert.py b/apply_weight_convert.py
+index d59c508..5f60502 100644
+--- a/apply_weight_convert.py
++++ b/apply_weight_convert.py
+@@ -328,6 +328,14 @@ def convert(checkpoints_dir: Path,
+             prefix = f"{llm_prefix}layers.{i}.self_attn"
+             merge_kv_weights(new_sd, prefix, with_bias=spec["merge_bias"])
+ 
++    # ---------- 2b. 处理 tie_word_embeddings ----------
++    if model_type == "qwen3_vl":
++        lm_head_key = "language_model.lm_head_weight"
++        embed_key = "language_model.embed_tokens.weight"
++        if lm_head_key not in new_sd and embed_key in new_sd:
++            logger.info("lm_head 与 embed_tokens 权重绑定，从 embed_tokens 复制")
++            new_sd[lm_head_key] = new_sd[embed_key].clone()
++
+     # ---------- 3. 保存 ----------
+     script_root = Path(__file__).resolve().parent
+     out_dir = ensure_dir(script_root / "my_weight" / checkpoints_dir.name)
+-- 
+2.52.0.windows.1
+

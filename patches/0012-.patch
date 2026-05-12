@@ -1,0 +1,32 @@
+From 24bf4bc4bea6480a519b7373ba64abbad0d3fe7e Mon Sep 17 00:00:00 2001
+From: l1l1lkk <2016895486@qq.com>
+Date: Tue, 12 May 2026 14:38:28 +0800
+Subject: [PATCH 12/13] @ Fix: Qwen3Config head_dim default to None
+ (auto-compute)
+
+head_dim=128 was hardcoded, causing assertion failure for models
+with different hidden_size/num_heads ratios (e.g. Qwen3-VL-4B).
+Now auto-computed as hidden_size // num_heads when not specified.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+@
+---
+ lite_llama/models/model_config.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/lite_llama/models/model_config.py b/lite_llama/models/model_config.py
+index 0969bfa..b6c1d8d 100644
+--- a/lite_llama/models/model_config.py
++++ b/lite_llama/models/model_config.py
+@@ -180,7 +180,7 @@ class Qwen3Config(BaseConfig):
+     num_layers: int = 32
+     num_heads: int = 32
+     num_kv_heads: Optional[int] = 32
+-    head_dim: Optional[int] = 128
++    head_dim: Optional[int] = None
+     hidden_act: str = "silu"
+     max_position_embeddings: int = 32_768
+     initializer_range: float = 0.02
+-- 
+2.52.0.windows.1
+

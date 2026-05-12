@@ -1,0 +1,243 @@
+From c2a5469184e03b81589b8759ef3b5266ce4bd3cd Mon Sep 17 00:00:00 2001
+From: l1l1lkk <2016895486@qq.com>
+Date: Tue, 12 May 2026 11:49:37 +0800
+Subject: [PATCH 06/13] @ Phase 8 (complete): Qwen3VL weight conversion +
+ safetensors support
+
+apply_weight_convert.py changes:
+- Add qwen3_vl weight mapping spec with:
+  - LLM common keys (embed_tokens, norm, lm_head)
+  - LLM decoder layer keys (Qwen3-style: q/k/v proj, q/k norm, o_proj, MLP)
+  - Vision encoder keys (patch_embed, pos_embed, blocks x27, merger)
+  - Vision layer template (norm1/2, attn.qkv, attn.proj, mlp.linear_fc1/2)
+  - Deepstack merger mapping (3 mergers from vision layers 8/16/24)
+- Add safetensors loading: priority check for *.safetensors files
+  using safetensors.torch.load_file, fallback to HF from_pretrained
+- Update detect_model_type() to recognize qwen3_vl
+- Update get_num_layers() to return dict with vision_depth + deepstack_indexes
+- Update convert() to expand vision layers and deepstack mergers
+- KV merge applies to language_model layers for qwen3_vl
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+@
+---
+ apply_weight_convert.py | 144 +++++++++++++++++++++++++++++++++-------
+ 1 file changed, 121 insertions(+), 23 deletions(-)
+
+diff --git a/apply_weight_convert.py b/apply_weight_convert.py
+index e312ba8..d59c508 100644
+--- a/apply_weight_convert.py
++++ b/apply_weight_convert.py
+@@ -161,6 +161,57 @@ _SPEC = {
+         "merge_bias": False,
+     },
+ 
++    # Qwen3-VL (vision encoder + Qwen3 language model)
++    "qwen3_vl": {
++        "common": {
++            # --- language model (Qwen3-based) ---
++            "model.language_model.embed_tokens.weight":     "language_model.embed_tokens.weight",
++            "model.language_model.norm.weight":              "language_model.norm_weight",
++            "lm_head.weight":                                "language_model.lm_head_weight",
++            # --- vision encoder ---
++            "model.visual.patch_embed.proj.weight":          "visual.patch_embed.proj.weight",
++            "model.visual.patch_embed.proj.bias":            "visual.patch_embed.proj.bias",
++            "model.visual.pos_embed.weight":                 "visual.pos_embed.weight",
++            "model.visual.merger.norm.weight":               "visual.merger.norm.weight",
++            "model.visual.merger.norm.bias":                 "visual.merger.norm.bias",
++            "model.visual.merger.linear_fc1.weight":         "visual.merger.linear_fc1.weight",
++            "model.visual.merger.linear_fc1.bias":           "visual.merger.linear_fc1.bias",
++            "model.visual.merger.linear_fc2.weight":         "visual.merger.linear_fc2.weight",
++            "model.visual.merger.linear_fc2.bias":           "visual.merger.linear_fc2.bias",
++        },
++        "layer": {
++            # --- language model decoder layers ---
++            "model.language_model.layers.{i}.self_attn.q_proj.weight":   "language_model.layers.{i}.self_attn.q_proj_weight",
++            "model.language_model.layers.{i}.self_attn.k_proj.weight":   "language_model.layers.{i}.self_attn.k_proj_weight",
++            "model.language_model.layers.{i}.self_attn.v_proj.weight":   "language_model.layers.{i}.self_attn.v_proj_weight",
++            "model.language_model.layers.{i}.self_attn.q_norm.weight":   "language_model.layers.{i}.self_attn.q_norm_weight",
++            "model.language_model.layers.{i}.self_attn.k_norm.weight":   "language_model.layers.{i}.self_attn.k_norm_weight",
++            "model.language_model.layers.{i}.self_attn.o_proj.weight":   "language_model.layers.{i}.self_attn.o_proj_weight",
++            "model.language_model.layers.{i}.mlp.gate_proj.weight":      "language_model.layers.{i}.mlp.gate_proj.weight",
++            "model.language_model.layers.{i}.mlp.up_proj.weight":        "language_model.layers.{i}.mlp.up_proj.weight",
++            "model.language_model.layers.{i}.mlp.down_proj.weight":      "language_model.layers.{i}.mlp.down_proj.weight",
++            "model.language_model.layers.{i}.input_layernorm.weight":    "language_model.layers.{i}.input_layernorm_weight",
++            "model.language_model.layers.{i}.post_attention_layernorm.weight": "language_model.layers.{i}.post_attention_layernorm_weight",
++        },
++        "vision_layer": {
++            # --- vision encoder blocks ---
++            "model.visual.blocks.{v}.norm1.weight":         "visual.blocks.{v}.norm1.weight",
++            "model.visual.blocks.{v}.norm1.bias":           "visual.blocks.{v}.norm1.bias",
++            "model.visual.blocks.{v}.norm2.weight":         "visual.blocks.{v}.norm2.weight",
++            "model.visual.blocks.{v}.norm2.bias":           "visual.blocks.{v}.norm2.bias",
++            "model.visual.blocks.{v}.attn.qkv.weight":      "visual.blocks.{v}.attn.qkv.weight",
++            "model.visual.blocks.{v}.attn.qkv.bias":        "visual.blocks.{v}.attn.qkv.bias",
++            "model.visual.blocks.{v}.attn.proj.weight":     "visual.blocks.{v}.attn.proj.weight",
++            "model.visual.blocks.{v}.attn.proj.bias":       "visual.blocks.{v}.attn.proj.bias",
++            "model.visual.blocks.{v}.mlp.linear_fc1.weight": "visual.blocks.{v}.mlp.linear_fc1.weight",
++            "model.visual.blocks.{v}.mlp.linear_fc1.bias":  "visual.blocks.{v}.mlp.linear_fc1.bias",
++            "model.visual.blocks.{v}.mlp.linear_fc2.weight": "visual.blocks.{v}.mlp.linear_fc2.weight",
++            "model.visual.blocks.{v}.mlp.linear_fc2.bias":  "visual.blocks.{v}.mlp.linear_fc2.bias",
++        },
++        "deepstack_visual_indexes": (8, 16, 24),
++        "merge_bias": False,
++    },
++
+     # Llama-HF
+     "llama": {
+         "common": {
+@@ -231,23 +282,50 @@ _SPEC = {
+ def convert(checkpoints_dir: Path,
+             hf_state: dict[str, torch.Tensor],
+             model_type: str,
+-            num_layers: int) -> dict[str, torch.Tensor]:
++            layers_info: dict) -> dict[str, torch.Tensor]:
+     """执行主转换流程并把结果保存到 my_weight/<model_id>/ 目录。"""
+     spec = _SPEC[model_type]
++    num_layers = layers_info["num_layers"]
+     mapping = build_mapping(spec["common"], spec["layer"], num_layers)
+     new_sd: dict[str, torch.Tensor] = {}
+ 
+-    # ---------- 1. 重映射 ----------
++    # ---------- 1a. 重映射 LLM layers ----------
+     for k, v in tqdm(hf_state.items(), desc=f"[{model_type}] 权重重映射"):
+         if (ck := mapping.get(k)) is not None:
+             new_sd[ck] = v
+         else:
+             logger.debug("忽略未映射参数 %s", k)
+ 
+-    # ---------- 2. 仅对 *Qwen* 系列执行 KV 合并 ----------
+-    if model_type.startswith("qwen") or model_type.startswith("llama"):              # 只处理 Qwen-2 / Qwen-3 等
++    # ---------- 1b. Qwen3VL: 映射 vision encoder ----------
++    if model_type == "qwen3_vl":
++        vision_depth = layers_info.get("vision_depth", 27)
++        deepstack_indexes = layers_info.get("deepstack_indexes", [8, 16, 24])
++
++        # Vision blocks
++        for v_idx in range(vision_depth):
++            for hf_pat, lit_pat in spec["vision_layer"].items():
++                hf_key = hf_pat.format(v=v_idx)
++                lit_key = lit_pat.format(v=v_idx)
++                if hf_key in hf_state:
++                    new_sd[lit_key] = hf_state[hf_key]
++
++        # Deepstack mergers
++        for ds_idx, vis_layer in enumerate(deepstack_indexes):
++            for suffix in ("norm.weight", "norm.bias",
++                           "linear_fc1.weight", "linear_fc1.bias",
++                           "linear_fc2.weight", "linear_fc2.bias"):
++                hf_key = f"model.visual.deepstack_merger_list.{ds_idx}.{suffix}"
++                lit_key = f"visual.deepstack_merger_list.{ds_idx}.{suffix}"
++                if hf_key in hf_state:
++                    new_sd[lit_key] = hf_state[hf_key]
++
++        logger.info("Vision blocks: %d, deepstack mergers: %d", vision_depth, len(deepstack_indexes))
++
++    # ---------- 2. 对 LLM 部分执行 KV 合并 ----------
++    if model_type.startswith("qwen") or model_type.startswith("llama"):
++        llm_prefix = "language_model." if model_type == "qwen3_vl" else ""
+         for i in range(num_layers):
+-            prefix = f"layers.{i}.self_attn"       # Qwen 无额外前缀
++            prefix = f"{llm_prefix}layers.{i}.self_attn"
+             merge_kv_weights(new_sd, prefix, with_bias=spec["merge_bias"])
+ 
+     # ---------- 3. 保存 ----------
+@@ -256,7 +334,7 @@ def convert(checkpoints_dir: Path,
+     save_state_dict(out_dir, checkpoints_dir.name, new_sd)
+     copy_metadata(checkpoints_dir, out_dir)
+ 
+-    logger.info("🎉 转换完成，共 %d 个参数", len(new_sd))
++    logger.info("转换完成，共 %d 个参数", len(new_sd))
+     return new_sd
+ 
+ 
+@@ -273,10 +351,11 @@ def detect_model_type(checkpoints_dir: Path) -> str:
+     mtype = cfg.model_type.lower()
+     # 某些模型可能需要额外归一化 / 映射
+     alias = {
+-        "qwen2":   "qwen2",
+-        "qwen3":   "qwen3",
+-        "llama":   "llama",
+-        "llava":   "llava",
++        "qwen2":     "qwen2",
++        "qwen3":     "qwen3",
++        "llama":     "llama",
++        "llava":     "llava",
++        "qwen3_vl":  "qwen3_vl",
+     }.get(mtype, mtype)      # 默认原样返回
+     if alias not in _SPEC:
+         raise ValueError(f"暂不支持的 model_type '{mtype}'，请检查映射表")
+@@ -286,25 +365,44 @@ def detect_model_type(checkpoints_dir: Path) -> str:
+ def load_hf_state(checkpoints_dir: Path,
+                   model_type: str,
+                   device: str = "cpu") -> dict[str, torch.Tensor]:
+-    """加载 HF / bin 权重到 state_dict。"""
+-    if model_type == "llava":
+-        model = (LlavaForConditionalGeneration
+-                 .from_pretrained(checkpoints_dir, torch_dtype=torch.float16, low_cpu_mem_usage=True)
++    """加载 HF / safetensors / bin 权重到 state_dict。"""
++    # 优先尝试 safetensors 直接加载（速度更快、内存更低）
++    safetensor_files = sorted(checkpoints_dir.glob("*.safetensors"))
++    if safetensor_files:
++        logger.info("检测到 %d 个 safetensors 文件，直接加载...", len(safetensor_files))
++        from safetensors.torch import load_file as safetensors_load
++        state_dict = {}
++        for sf in tqdm(safetensor_files, desc="加载 safetensors"):
++            state_dict.update(safetensors_load(str(sf), device=device))
++        return state_dict
++
++    # 回退到 HuggingFace 加载
++    if model_type == "llava" or model_type == "qwen3_vl":
++        model = (AutoModelForCausalLM
++                 .from_pretrained(checkpoints_dir, torch_dtype=torch.float16,
++                                  low_cpu_mem_usage=True, trust_remote_code=True)
+                  .to(device))
+     else:
+         model = (AutoModelForCausalLM
+-                 .from_pretrained(checkpoints_dir, torch_dtype=torch.float16, low_cpu_mem_usage=True)
++                 .from_pretrained(checkpoints_dir, torch_dtype=torch.float16,
++                                  low_cpu_mem_usage=True)
+                  .to(device))
+     return model.state_dict()
+ 
+ 
+-def get_num_layers(checkpoints_dir: Path, model_type: str) -> int:
+-    """从 config 中提取 Transformer 层数。"""
++def get_num_layers(checkpoints_dir: Path, model_type: str) -> dict:
++    """从 config 中提取层数信息。返回 dict 包含 num_layers (LLM) 和 vision_depth (ViT)。"""
+     if model_type == "llava":
+         cfg = LlavaConfig.from_pretrained(checkpoints_dir)
+-        return cfg.text_config.num_hidden_layers
+-    cfg = AutoConfig.from_pretrained(checkpoints_dir)
+-    return cfg.num_hidden_layers
++        return {"num_layers": cfg.text_config.num_hidden_layers}
++    cfg = AutoConfig.from_pretrained(checkpoints_dir, trust_remote_code=True)
++    if model_type == "qwen3_vl":
++        return {
++            "num_layers": cfg.text_config.num_hidden_layers,
++            "vision_depth": cfg.vision_config.depth,
++            "deepstack_indexes": cfg.vision_config.get("deepstack_visual_indexes", [8, 16, 24]),
++        }
++    return {"num_layers": cfg.num_hidden_layers}
+ 
+ 
+ def main() -> None:
+@@ -325,12 +423,12 @@ def main() -> None:
+     logger.info("检测到 model_type = %s", model_type)
+ 
+     # 2️⃣ 获取层数
+-    num_layers = get_num_layers(ckpt_dir, model_type)
+-    logger.info("Transformer 层数 %d", num_layers)
++    layers_info = get_num_layers(ckpt_dir, model_type)
++    logger.info("层数信息 %s", layers_info)
+ 
+     # 3️⃣ 加载权重并执行转换
+     hf_sd = load_hf_state(ckpt_dir, model_type, device=args.device)
+-    convert(ckpt_dir, hf_sd, model_type, num_layers)
++    convert(ckpt_dir, hf_sd, model_type, layers_info)
+ 
+ # tests/test_convert.py
+ import torch
+-- 
+2.52.0.windows.1
+

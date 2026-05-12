@@ -1,0 +1,759 @@
+From e7584846cbc4eda878972c4d41cde82ca0aac940 Mon Sep 17 00:00:00 2001
+From: l1l1lkk <2016895486@qq.com>
+Date: Tue, 12 May 2026 12:04:39 +0800
+Subject: [PATCH 08/13] @ Refactor: extract hardcoded device strings into
+ centralized config
+
+- Add lite_llama/utils/device.py with get_device() function
+  Resolution order: explicit param > LITE_LLAMA_DEVICE env var > auto-detect
+  Auto-detection: NPU (torch.npu) > CUDA > CPU
+- Replace all hardcoded "npu:6"/"cuda" defaults with get_device()
+  in 15 production files:
+  - executor: model_executor, mem_manager, req_tokens_manager, cuda_graph
+  - generation: generate, generate_stream, generete_with_probs
+  - multimodal: llava_generate_stream, qwen3vl_generate_stream
+  - models: llava
+  - utils: dummy_data
+  - inference
+- Add --device CLI argument to cli.py, cli_llava.py, cli_qwen3vl.py
+
+Usage:
+  # Auto-detect
+  python cli.py
+  # Explicit device
+  python cli.py --device npu:6
+  # Environment variable
+  LITE_LLAMA_DEVICE=npu:6 python cli.py
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+@
+---
+ cli.py                                    | 24 ++++++++---
+ cli_llava.py                              | 24 ++++-------
+ cli_qwen3vl.py                            | 11 ++++-
+ lite_llama/executor/cuda_graph.py         |  6 ++-
+ lite_llama/executor/mem_manager.py        | 45 ++++++++++----------
+ lite_llama/executor/model_executor.py     | 20 +++++----
+ lite_llama/executor/req_tokens_manager.py |  7 +++-
+ lite_llama/generate.py                    |  5 ++-
+ lite_llama/generate_stream.py             | 14 ++++---
+ lite_llama/generete_with_probs.py         |  9 ++--
+ lite_llama/inference.py                   |  5 ++-
+ lite_llama/llava_generate_stream.py       |  5 ++-
+ lite_llama/models/llava.py                |  3 +-
+ lite_llama/qwen3vl_generate_stream.py     |  5 ++-
+ lite_llama/utils/device.py                | 51 +++++++++++++++++++++++
+ lite_llama/utils/dummy_data.py            |  8 ++--
+ 16 files changed, 164 insertions(+), 78 deletions(-)
+ create mode 100644 lite_llama/utils/device.py
+
+diff --git a/cli.py b/cli.py
+index c372162..aab36f6 100644
+--- a/cli.py
++++ b/cli.py
+@@ -1,6 +1,8 @@
+ import torch
++import argparse
+ from typing import Optional
+ from lite_llama.utils.prompt_templates import get_prompter
++from lite_llama.utils.device import get_device
+ from lite_llama.generate_stream import GenerateStreamText  # 导入 GenerateText 类
+ 
+ import warnings
+@@ -15,11 +17,9 @@ def main(
+     max_gpu_num_blocks=None,
+     max_gen_len: Optional[int] = 1024,
+     compiled_model: bool = False,
++    device: str = None,
+ ):
+-    device_id = 6
+-    torch.npu.set_device(device_id)
+-    device = torch.device(f"npu:{device_id}")
+-    # device = "cuda" if torch.cuda.is_available() else "cpu"
++    device = get_device(device)
+     if max_seq_len <= 1024:
+         short_prompt = True
+     else:
+@@ -66,4 +66,18 @@ def main(
+ 
+ 
+ if __name__ == "__main__":
+-    main()
++    parser = argparse.ArgumentParser(description="LiteLlama CLI chat")
++    parser.add_argument("--device", type=str, default=None,
++                        help="Device to use (e.g. 'npu:6', 'cuda', 'cpu'). "
++                             "Auto-detect if not set. Env: LITE_LLAMA_DEVICE")
++    parser.add_argument("--checkpoints_dir", type=str, default=checkpoints_dir)
++    parser.add_argument("--temperature", type=float, default=0.6)
++    parser.add_argument("--top_p", type=float, default=0.9)
++    parser.add_argument("--max_seq_len", type=int, default=2048)
++    parser.add_argument("--max_gen_len", type=int, default=1024)
++    args = parser.parse_args()
++    main(
++        temperature=args.temperature, top_p=args.top_p,
++        max_seq_len=args.max_seq_len, max_gen_len=args.max_gen_len,
++        device=args.device,
++    )
+diff --git a/cli_llava.py b/cli_llava.py
+index ac8e0a1..b14e02c 100644
+--- a/cli_llava.py
++++ b/cli_llava.py
+@@ -1,4 +1,5 @@
+ import torch
++import argparse
+ from typing import Optional
+ 
+ from rich.console import Console
+@@ -10,6 +11,7 @@ warnings.filterwarnings("ignore", category=UserWarning, module="torch._utils")
+ 
+ from lite_llama.llava_generate_stream import LlavaGeneratorStream
+ from lite_llama.utils.image_process import vis_images
++from lite_llama.utils.device import get_device
+ from lite_llama.utils.prompt_templates import get_prompter, get_image_token
+ 
+ # 模型检查点目录，请根据实际情况修改
+@@ -22,22 +24,10 @@ def main(
+     max_gpu_num_blocks=None,
+     max_gen_len: Optional[int] = 512,
+     compiled_model: bool = False,
++    device: str = None,
+ ):
+-    """
+-    主函数，处理用户输入并生成响应。
+-
+-    Args:
+-        temperature (float, optional): 生成文本的温度。默认值为 0.6。
+-        top_p (float, optional): 生成文本的top-p值。默认值为 0.9。
+-        max_seq_len (int, optional): 最大序列长度。默认值为 2048。
+-        max_gpu_num_blocks: 用户自行设置的最大可用 blocks(tokens), 如果设置该值， kv cache 内存管理器的最大可用内存-tokens 由该值决定。
+-        max_gen_len (Optional[int], optional): 生成文本的最大长度。默认值为 512。
+-        load_model (bool, optional): 是否加载模型。默认值为True。
+-        compiled_model (bool, optional): 是否使用编译模型。默认值为True。
+-        triton_weight (bool, optional): 是否使用Triton权重。默认值为True。
+-    """
+     console = Console()
+-    device = "cuda" if torch.cuda.is_available() else "cpu"
++    device = get_device(device)
+     if max_seq_len <= 1024:
+         short_prompt = True
+     else:
+@@ -117,4 +107,8 @@ def main(
+ 
+ 
+ if __name__ == "__main__":
+-    main()
++    parser = argparse.ArgumentParser(description="LiteLlama Llava CLI")
++    parser.add_argument("--device", type=str, default=None,
++                        help="Device (e.g. 'npu:6', 'cuda', 'cpu'). Auto-detect if not set.")
++    args = parser.parse_args()
++    main(device=args.device)
+diff --git a/cli_qwen3vl.py b/cli_qwen3vl.py
+index 9e10e16..39eefd7 100644
+--- a/cli_qwen3vl.py
++++ b/cli_qwen3vl.py
+@@ -1,6 +1,7 @@
+ """Interactive CLI for Qwen3-VL multimodal model."""
+ 
+ import torch
++import argparse
+ from typing import Optional
+ 
+ from rich.console import Console
+@@ -12,6 +13,7 @@ warnings.filterwarnings("ignore", category=UserWarning, module="torch._utils")
+ 
+ from lite_llama.qwen3vl_generate_stream import Qwen3VLGeneratorStream
+ from lite_llama.utils.image_process import vis_images
++from lite_llama.utils.device import get_device
+ 
+ # Update this path to your Qwen3-VL model checkpoint
+ checkpoints_dir = "/path/Qwen/Qwen3-VL-4B-Instruct"
+@@ -24,9 +26,10 @@ def main(
+     max_gpu_num_blocks=None,
+     max_gen_len: Optional[int] = 512,
+     compiled_model: bool = False,
++    device: str = None,
+ ):
+     console = Console()
+-    device = "cuda" if torch.cuda.is_available() else "cpu"
++    device = get_device(device)
+ 
+     try:
+         generator = Qwen3VLGeneratorStream(
+@@ -90,4 +93,8 @@ def main(
+ 
+ 
+ if __name__ == "__main__":
+-    main()
++    parser = argparse.ArgumentParser(description="LiteLlama Qwen3VL CLI")
++    parser.add_argument("--device", type=str, default=None,
++                        help="Device (e.g. 'npu:6', 'cuda', 'cpu'). Auto-detect if not set.")
++    args = parser.parse_args()
++    main(device=args.device)
+diff --git a/lite_llama/executor/cuda_graph.py b/lite_llama/executor/cuda_graph.py
+index 1c3365e..62296c3 100644
+--- a/lite_llama/executor/cuda_graph.py
++++ b/lite_llama/executor/cuda_graph.py
+@@ -4,6 +4,7 @@ from typing import Dict
+ from .executor_struct import AttentionInfo
+ from .mem_manager import KVCacheMemoryManager
+ from ..models.utils import weak_ref_tensor
++from ..utils.device import get_device
+ 
+ _BATCH_SIZE_ALIGNMENT = 8
+ _BATCH_SIZES_TO_CAPTURE = [1, 2, 4] + [
+@@ -110,8 +111,9 @@ class ModelRunner:
+ 
+         self.graph_runners = {}
+ 
+-    def build_atten_info(self, batch_size, atten_info, device="npu:6"):
++    def build_atten_info(self, batch_size, atten_info, device=None):
+         """针对 decode 阶段, 构建 attention 输入信息结构体"""
++        device = get_device(device)
+         atten_info.kv_buffer = self.kv_mem_manager.gpu_kv_buffer  # torch.Tensor
+         atten_info.b_req_tokens_table = (
+             self.req_tokens_manager.b_req_tokens_table
+@@ -119,7 +121,7 @@ class ModelRunner:
+ 
+         atten_info.b_req_idx = torch.arange(batch_size, device=device)  # torch.Tensor
+         atten_info.b_seq_len = torch.ones(
+-            batch_size, dtype=torch.int32, device="npu:6"
++            batch_size, dtype=torch.int32, device=device
+         )  # torch.Tensor
+         atten_info.cur_select_index,_ = self.kv_mem_manager.alloc_kvcache_index(
+             batch_size
+diff --git a/lite_llama/executor/mem_manager.py b/lite_llama/executor/mem_manager.py
+index 77ad8dc..b56405f 100644
+--- a/lite_llama/executor/mem_manager.py
++++ b/lite_llama/executor/mem_manager.py
+@@ -3,6 +3,7 @@ import json, gc
+ from pathlib import Path
+ 
+ from ..utils.dummy_data import DummyInputGenerator
++from ..utils.device import get_device
+ from .executor_struct import AttentionInfo, CONFIG_CLASS_MAP
+ from ..utils.logger import get_logger
+ 
+@@ -19,17 +20,18 @@ class ComputeMaxAvailableBlocks:
+     if not execute dummy forward run, it should be run after cuda graph!
+     """
+     def __init__(
+-        self, 
+-        num_layers, 
+-        hidden_size, 
+-        num_heads, 
+-        num_kv_heads, 
+-        head_dim, 
+-        gpu_memory_utilization=0.9, 
+-        block_size=1, 
++        self,
++        num_layers,
++        hidden_size,
++        num_heads,
++        num_kv_heads,
++        head_dim,
++        gpu_memory_utilization=0.9,
++        block_size=1,
+         dtype=torch.float16,
+-        device="npu:6"
++        device=None
+     ):
++        self.device = get_device(device)
+         self.hidden_size = hidden_size
+         self.num_heads = num_heads
+         self.num_kv_heads = num_kv_heads
+@@ -39,7 +41,6 @@ class ComputeMaxAvailableBlocks:
+         self.gpu_memory_utilization = gpu_memory_utilization
+         self.block_size = block_size # 一个 block 表示多少个 tokens
+         self.dtype = dtype
+-        self.device = device
+         self.dtype_size = get_dtype_size(dtype)
+         
+     def compute_cache_block_size_bytes(self):
+@@ -80,19 +81,19 @@ class ComputeMaxAvailableBlocks:
+                 # 创建虚拟输入 
+                 batch_size = 1
+                 seq_len = 32  # 使用较小的序列长度进行内存评估
+-                dummy_generator = DummyInputGenerator(device="npu:6")
++                dummy_generator = DummyInputGenerator(device=self.device)
+                 dummy_input, dummy_position_ids = dummy_generator.generate_dummy_input(model_config, batch_size, seq_len)
+-                    
++
+                 # 创建虚拟的 atten_info 对象
+                 dummy_atten_info = AttentionInfo()
+-                
++
+                 dummy_atten_info.kv_buffer = [
+                     torch.empty((seq_len, 2 * self.num_kv_heads, self.head_dim), dtype=self.dtype, device=self.device) for _ in range(self.num_layers)
+                 ]
+-                
+-                dummy_atten_info.cur_select_index = torch.arange(seq_len, dtype=torch.int32, device="npu:6")
+-                dummy_atten_info.b_start_loc = torch.tensor([0], dtype=torch.int32, device="npu:6")
+-                dummy_atten_info.b_seq_len = torch.tensor([1], device="npu:6")
++
++                dummy_atten_info.cur_select_index = torch.arange(seq_len, dtype=torch.int32, device=self.device)
++                dummy_atten_info.b_start_loc = torch.tensor([0], dtype=torch.int32, device=self.device)
++                dummy_atten_info.b_seq_len = torch.tensor([1], device=self.device)
+                 dummy_atten_info.max_actual_seq_len=seq_len
+                 # 执行前向传播
+                 with torch.no_grad():
+@@ -152,7 +153,8 @@ class KVCacheMemoryManager:
+         gpu_num_blocks: int, 用户自行设置的最大可用 blocks(tokens), 如果设置该值， kv cache 内存管理器的最大可用内存-tokens 由该值决定。
+         block_size: int, 每个 block 的大小，默认为 1
+     """
+-    def __init__(self, num_layers, num_kv_heads, head_dim, gpu_num_blocks, block_size=1, dtype=torch.float16, device="npu:6"):
++    def __init__(self, num_layers, num_kv_heads, head_dim, gpu_num_blocks, block_size=1, dtype=torch.float16, device=None):
++        self.device = get_device(device)
+         self.num_layers = num_layers
+         self.num_kv_heads = num_kv_heads
+         self.head_dim = head_dim
+@@ -161,12 +163,11 @@ class KVCacheMemoryManager:
+         self.max_num_tokens = gpu_num_blocks * block_size
+ 
+         self.dtype = dtype
+-        self.device = device
+         self.can_use_mem_size = gpu_num_blocks # 可用的 kv cache tokens 数量
+ 
+         # 定义 kv 内存位置索引和内存使用状态变量
+-        self.kv_mem_pos_indexs = torch.arange(0, self.max_num_tokens, dtype=torch.long, device="npu:6")
+-        self.kv_mem_use_state = torch.zeros(self.max_num_tokens, dtype = torch.int32, device="npu:6")
++        self.kv_mem_pos_indexs = torch.arange(0, self.max_num_tokens, dtype=torch.long, device=self.device)
++        self.kv_mem_use_state = torch.zeros(self.max_num_tokens, dtype=torch.int32, device=self.device)
+ 
+         # Initialize the gpu_kv_buffer
+         self.init_kv_buffers(
+@@ -179,7 +180,7 @@ class KVCacheMemoryManager:
+         max_num_tokens,
+         head_dim, num_kv_heads, num_layers,
+         dtype,
+-        device: str="npu:6"
++        device: Optional[str]=None
+     )-> list[torch.Tensor]:
+         # kv cache shape: config.max_batch_size, config.max_seq_len, self.num_kv_heads, self.head_dim
+         # max_num_tokens = max_num_blocks * self.block_size
+diff --git a/lite_llama/executor/model_executor.py b/lite_llama/executor/model_executor.py
+index 04abf87..296d395 100644
+--- a/lite_llama/executor/model_executor.py
++++ b/lite_llama/executor/model_executor.py
+@@ -14,6 +14,7 @@ from .cuda_graph import ModelRunner
+ from .executor_struct import AttentionInfo, CONFIG_CLASS_MAP
+ from ..models.model_config import LlamaConfig
+ from ..kernels import update_kv_index
++from ..utils.device import get_device
+ from ..utils.logger import get_logger
+ 
+ logger = get_logger(__name__)
+@@ -35,7 +36,7 @@ class ModelExecutor:
+         max_seq_len: int,
+         max_gpu_num_blocks: None,
+         compiled_model: bool = False,
+-        device: str = "cuda",
++        device: str = None,
+     ):
+         """
+         构建 ModelExecutor 实例, 加载模型、分词器和初始化推理信息结构体 atten_info。
+@@ -44,11 +45,12 @@ class ModelExecutor:
+             checkpoints_dir (str): 模型检查点目录路径。
+             load_model (bool): 是否加载模型权重。
+             max_seq_len (int): 最大序列长度。
+-            device (str): 设备类型（'cuda'或'cpu'）。
++            device (str): 设备类型（'npu:6'、'cuda'或'cpu'），None 为自动检测。
+ 
+         返回:
+             ModelExecutor: 初始化后的 ModelExecutor 实例。
+         """
++        device = get_device(device)
+         model_config = ModelExecutor._load_model_config(checkpoints_dir, max_seq_len)
+         model = ModelExecutor._load_model_weight(model_config, checkpoints_dir, device=device)
+     
+@@ -74,12 +76,11 @@ class ModelExecutor:
+     def _accelerate_load_weight(
+         model_config,
+         checkpoints_dir,
+-        device="npu:6",
++        device=None,
+     ):
++        device = get_device(device)
+         with init_empty_weights():
+             model = ModelExecutor._initialize_model(model_config, device=device)
+-
+-        # 假设 model 是使用 init_empty_weights 初始化的空模型
+         model = load_checkpoint_and_dispatch(
+             model, checkpoints_dir, device_map="auto", dtype=torch.float16
+         )
+@@ -97,8 +98,9 @@ class ModelExecutor:
+     def _load_model_weight(
+         model_config,
+         checkpoints_dir,
+-        device="npu:6",
++        device=None,
+     ):
++        device = get_device(device)
+         start_time = time.time()
+ 
+         # 初始化模型
+@@ -175,11 +177,11 @@ class ModelExecutor:
+         model,
+         max_gpu_num_blocks=None,
+         compiled_model=False,
+-        device="npu:6",
++        device=None,
+     ):
++        self.device = get_device(device)
+         self.checkpoints_dir = checkpoints_dir
+         self.model_config = model_config
+-        self.device = device
+         if isinstance(model_config, LlavaConfig):
+             self.llm_config = LlamaConfig.from_dict(model_config.text_config.to_dict())
+             print(f"self.llm_config.max_seq_len: {self.llm_config.max_seq_len}")
+@@ -232,7 +234,7 @@ class ModelExecutor:
+         return max_gpu_num_blocks, max_gpu_num_tokens
+ 
+     def _init_mem_manager(
+-        self, gpu_num_blocks, block_size=1, dtype=torch.float16, device="npu:6"
++        self, gpu_num_blocks, block_size=1, dtype=torch.float16, device=None
+     ):
+         kv_mem_manager = KVCacheMemoryManager(
+             num_layers=self.llm_config.num_layers,
+diff --git a/lite_llama/executor/req_tokens_manager.py b/lite_llama/executor/req_tokens_manager.py
+index 6a7eca4..8d41810 100644
+--- a/lite_llama/executor/req_tokens_manager.py
++++ b/lite_llama/executor/req_tokens_manager.py
+@@ -1,6 +1,8 @@
+ import torch
+ import logging
+ 
++from ..utils.device import get_device
++
+ logger = logging.getLogger(__name__)
+ 
+ 
+@@ -10,7 +12,8 @@ class ReqTokensManager:
+     TokenTable 将一系列 kv tokens 映射到一组token 表中, 每个 token 表代表请求序列分配的 kv cache 内存空间。
+     """
+ 
+-    def __init__(self, max_request_num, max_seq_len, mem_manager=None, device="npu:6"):
++    def __init__(self, max_request_num, max_seq_len, mem_manager=None, device=None):
++        self.device = get_device(device)
+         self.max_can_use_req_size = max_request_num
+         self.can_use_req_size = max_request_num
+         self.max_seq_len = max_seq_len
+@@ -68,7 +71,7 @@ import torch
+ 
+ class TestReqTokensManager(unittest.TestCase):
+     def setUp(self):
+-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
++        self.device = get_device()
+         self.mem_manager_mock = unittest.mock.MagicMock()
+         self.table = ReqTokensManager(
+             max_request_num=10,
+diff --git a/lite_llama/generate.py b/lite_llama/generate.py
+index 41b1c16..c9132cf 100644
+--- a/lite_llama/generate.py
++++ b/lite_llama/generate.py
+@@ -4,6 +4,7 @@ from typing import List, Optional, Tuple, TypedDict
+ from transformers import AutoTokenizer
+ 
+ from .executor.model_executor import ModelExecutor
++from .utils.device import get_device
+ from .utils.file_interface import get_model_name_from_path
+ 
+ 
+@@ -59,11 +60,11 @@ class GenerateText:
+         max_seq_len=1024,
+         max_gpu_num_blocks=None,
+         compiled_model=False,
+-        device="npu:6",
++        device=None,
+     ):
+         self.checkpoints_dir = checkpoints_dir
+         self.compiled_model = compiled_model
+-        self.device = device
++        self.device = get_device(device)
+ 
+         self.model_executor = ModelExecutor.build(
+             checkpoints_dir=checkpoints_dir,
+diff --git a/lite_llama/generate_stream.py b/lite_llama/generate_stream.py
+index 0cda741..5918aa9 100644
+--- a/lite_llama/generate_stream.py
++++ b/lite_llama/generate_stream.py
+@@ -2,6 +2,7 @@ from typing import Optional
+ import torch
+ from typing import Optional, TypedDict, Generator
+ from .executor.model_executor import ModelExecutor
++from .utils.device import get_device
+ from .utils.file_interface import get_model_name_from_path
+ from .kernels.softmax_split import softmax_split
+ 
+@@ -61,8 +62,9 @@ class GenerateStreamText:
+         max_gpu_num_blocks=None,
+         max_seq_len=1024,
+         compiled_model=False,
+-        device="npu:6",
++        device=None,
+     ):
++        self.device = get_device(device)
+         self.checkpoints_dir = checkpoints_dir
+ 
+         self.model_executor = ModelExecutor.build(
+@@ -98,8 +100,10 @@ class GenerateStreamText:
+         temperature: float = 0.6,
+         top_p: float = 0.9,
+         echo: bool = False,
+-        device="npu:6",
++        device=None,
+     ) -> Generator[tuple[list[str], Optional[list[float]]], None, None]:
++        if device is None:
++            device = self.device
+         """
+         基于提供的 prompt_tokens, 使用语言生成模型逐个生成 token, 并在生成时立即输出。
+ 
+@@ -131,9 +135,9 @@ class GenerateStreamText:
+         )
+ 
+         # 预分配tokens张量
+-        tokens = torch.full((bsz, total_len), pad_id, dtype=torch.long, device="npu:6")
++        tokens = torch.full((bsz, total_len), pad_id, dtype=torch.long, device=device)
+         input_text_mask = tokens != pad_id
+-        eos_reached = torch.tensor([False] * bsz, device="npu:6")
++        eos_reached = torch.tensor([False] * bsz, device=device)
+         prev_pos = 0
+         last_yielded_pos = [
+             len(prompt_tokens[i]) if not echo else 0 for i in range(bsz)
+@@ -141,7 +145,7 @@ class GenerateStreamText:
+ 
+         # 填充提示词到 tokens 张量
+         for k, t in enumerate(prompt_tokens):
+-            tokens[k, : len(t)] = torch.tensor(t, dtype=torch.long, device="npu:6")
++            tokens[k, : len(t)] = torch.tensor(t, dtype=torch.long, device=device)
+ 
+         b_req_idx = torch.arange(bsz, device=self.device) # batch_size 个请求索引 [0, 1, 2, ..., bsz-1]
+         all_select_index_list = []
+diff --git a/lite_llama/generete_with_probs.py b/lite_llama/generete_with_probs.py
+index a1088ce..bec162d 100644
+--- a/lite_llama/generete_with_probs.py
++++ b/lite_llama/generete_with_probs.py
+@@ -5,6 +5,7 @@ import torch.nn.functional as F
+ from transformers import AutoTokenizer
+ 
+ from .executor.model_executor import ModelExecutor
++from .utils.device import get_device
+ from .utils.file_interface import get_model_name_from_path
+ from .utils.logger import get_logger
+ 
+@@ -62,11 +63,11 @@ class GenerateText:
+         max_seq_len=1024,
+         max_gpu_num_blocks=None,
+         compiled_model=False,
+-        device="npu:6",
++        device=None,
+     ):
+         self.checkpoints_dir = checkpoints_dir
+         self.compiled_model = compiled_model
+-        self.device = device
++        self.device = get_device(device)
+ 
+         self.model_executor = ModelExecutor.build(
+             checkpoints_dir=checkpoints_dir,
+@@ -97,7 +98,7 @@ class GenerateText:
+         top_p: float = 0.9,
+         logprobs: bool = True,
+         echo: bool = False,
+-        device="npu:6",
++        device=self.device,
+     ) -> tuple[list[list[int]], Optional[list[list[float]]]]:
+         """
+         基于提供的提示词 (prompts) 使用语言生成模型生成文本序列。
+@@ -238,7 +239,7 @@ class GenerateText:
+         max_gen_len: Optional[int] = None,
+         logprobs: bool = False,
+         echo: bool = False,
+-        device="npu:6",
++        device=self.device,
+     ) -> list[CompletionPrediction]:
+         if max_gen_len is None:
+             max_gen_len = self.model_config.max_seq_len - 1
+diff --git a/lite_llama/inference.py b/lite_llama/inference.py
+index 48defc9..3ac4614 100644
+--- a/lite_llama/inference.py
++++ b/lite_llama/inference.py
+@@ -3,6 +3,7 @@ import torch
+ 
+ import time
+ 
++from .utils.device import get_device
+ from .utils.prompt_templates import get_prompter
+ from .generate import GenerateText
+ 
+@@ -15,14 +16,14 @@ class Inference(object):
+         max_seq_len: int,
+         max_gen_len: Optional[int],
+         lite_llama_ckpt_dir: str,
+-        device: str = "cuda",
++        device: str = None,
+     ):
+         self.temperature = temperature
+         self.top_p = top_p
+         self.max_seq_len = max_seq_len
+         self.max_gen_len = max_gen_len
+         self.lite_llama_ckpt_dir = lite_llama_ckpt_dir
+-        self.device = device
++        self.device = get_device(device)
+ 
+     def load_generator(self, max_gpu_num_blocks=None) -> GenerateText:
+         """
+diff --git a/lite_llama/llava_generate_stream.py b/lite_llama/llava_generate_stream.py
+index 3e7961f..a971cf0 100644
+--- a/lite_llama/llava_generate_stream.py
++++ b/lite_llama/llava_generate_stream.py
+@@ -5,6 +5,7 @@ from PIL import Image
+ from typing import Optional, TypedDict, Generator, Union
+ from .executor.model_executor import ModelExecutor
+ from .utils.constants import *
++from .utils.device import get_device
+ from .utils.file_interface import get_model_name_from_path
+ 
+ from transformers import AutoTokenizer, AutoProcessor
+@@ -85,12 +86,12 @@ class LlavaGeneratorStream:
+         max_gpu_num_blocks=None,
+         max_seq_len=2048,
+         compiled_model=False,
+-        device="npu:6",
++        device=None,
+     ):
+         self.checkpoints_dir = checkpoints_dir
+         self.compiled_model = compiled_model
+         self.max_seq_len = max_seq_len
+-        self.device = device
++        self.device = get_device(device)
+ 
+         self.model_executor = ModelExecutor.build(
+             checkpoints_dir=checkpoints_dir,
+diff --git a/lite_llama/models/llava.py b/lite_llama/models/llava.py
+index bfb5410..a6fd6b6 100644
+--- a/lite_llama/models/llava.py
++++ b/lite_llama/models/llava.py
+@@ -8,6 +8,7 @@ from transformers import AutoModel, LlavaConfig
+ from .llama import LlamaModel
+ from .model_config import LlamaConfig
+ from ..kernels import gelu
++from ..utils.device import get_device
+ from .utils import merge_input_ids_with_image_features
+ 
+ 
+@@ -33,7 +34,7 @@ class LlavaMultiModalProjector(nn.Module):
+ class LlavaLlama(nn.Module):
+     def __init__(self, llava_config: LlavaConfig):
+         super().__init__()
+-        self.device = "cuda"
++        self.device = get_device()
+         self.llava_config = llava_config
+         text_config = (
+             self.llava_config.text_config
+diff --git a/lite_llama/qwen3vl_generate_stream.py b/lite_llama/qwen3vl_generate_stream.py
+index 96b91a6..a17b987 100644
+--- a/lite_llama/qwen3vl_generate_stream.py
++++ b/lite_llama/qwen3vl_generate_stream.py
+@@ -13,6 +13,7 @@ import torch
+ from PIL import Image
+ 
+ from .executor.model_executor import ModelExecutor
++from .utils.device import get_device
+ from .utils.file_interface import get_model_name_from_path
+ 
+ from transformers import AutoTokenizer, AutoProcessor
+@@ -28,12 +29,12 @@ class Qwen3VLGeneratorStream:
+         max_gpu_num_blocks=None,
+         max_seq_len=2048,
+         compiled_model=False,
+-        device="npu:6",
++        device=None,
+     ):
+         self.checkpoints_dir = checkpoints_dir
+         self.compiled_model = compiled_model
+         self.max_seq_len = max_seq_len
+-        self.device = device
++        self.device = get_device(device)
+ 
+         self.model_executor = ModelExecutor.build(
+             checkpoints_dir=checkpoints_dir,
+diff --git a/lite_llama/utils/device.py b/lite_llama/utils/device.py
+new file mode 100644
+index 0000000..d60482b
+--- /dev/null
++++ b/lite_llama/utils/device.py
+@@ -0,0 +1,51 @@
++"""Centralized device configuration.
++
++Usage:
++    from lite_llama.utils.device import get_device
++    device = get_device()  # respects LITE_LLAMA_DEVICE env var
++"""
++
++import os
++from typing import Optional
++
++
++def get_device(device: Optional[str] = None) -> str:
++    """Return the device string for the current environment.
++
++    Resolution order:
++    1. Explicit `device` parameter (if not None)
++    2. Environment variable `LITE_LLAMA_DEVICE`
++    3. Auto-detect: NPU > CUDA > CPU
++
++    Returns:
++        str: e.g. "npu:6", "npu", "cuda", "cpu"
++    """
++    if device is not None:
++        return device
++
++    env_device = os.environ.get("LITE_LLAMA_DEVICE")
++    if env_device:
++        return env_device
++
++    return auto_detect_device()
++
++
++def auto_detect_device() -> str:
++    """Auto-detect the best available device."""
++    try:
++        import torch
++        if hasattr(torch, "npu") and torch.npu.is_available():
++            # Return the first available NPU
++            npu_count = torch.npu.device_count()
++            return f"npu:{npu_count - 1}" if npu_count > 1 else "npu:0"
++    except Exception:
++        pass
++
++    try:
++        import torch
++        if torch.cuda.is_available():
++            return "cuda"
++    except Exception:
++        pass
++
++    return "cpu"
+diff --git a/lite_llama/utils/dummy_data.py b/lite_llama/utils/dummy_data.py
+index 2bfed00..9fe1b80 100644
+--- a/lite_llama/utils/dummy_data.py
++++ b/lite_llama/utils/dummy_data.py
+@@ -1,11 +1,13 @@
+ import torch
+ 
++from .device import get_device
++
+ 
+ class DummyInputGenerator:
+     """A class to generate dummy inputs for memory profiling."""
+-    
+-    def __init__(self, device="cuda:5"):
+-        self.device = device
++
++    def __init__(self, device=None):
++        self.device = get_device(device)
+ 
+     
+     def generate_dummy_input(self, model_config, batch_size=1, seq_len=32):
+-- 
+2.52.0.windows.1
+
