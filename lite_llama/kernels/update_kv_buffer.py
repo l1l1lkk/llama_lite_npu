@@ -63,7 +63,6 @@ def update_kv_buffer(KV_Values, Select_Index, KV_Buffer):
     )
     BLOCK_HEAD = triton.next_power_of_2(head_num)
     grid = (seq_len,)
-    num_warps = 1
 
     _fwd_kernel_update_kv[grid](
         KV_Values,
@@ -78,8 +77,6 @@ def update_kv_buffer(KV_Values, Select_Index, KV_Buffer):
         head_num,
         BLOCK_DMODEL=head_dim,
         BLOCK_HEAD=BLOCK_HEAD,
-        num_warps=num_warps,
-        num_stages=1,
     )
     return
 

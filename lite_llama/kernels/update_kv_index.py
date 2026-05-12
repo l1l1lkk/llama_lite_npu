@@ -62,9 +62,6 @@ def update_kv_index(req_to_token_indexs, b_req_idx, b_seq_len, select_index):
     # 定义 Triton 内核的网格大小（1D 网格）
     grid = (seq_len,)
 
-    # 定义每个 block 使用的 warp 数量
-    num_warps = 1
-
     # 启动 Triton 内核
     _fwd_kernel_update_kv_index[grid](
         req_to_token_indexs,  # 输出张量的指针
@@ -73,7 +70,5 @@ def update_kv_index(req_to_token_indexs, b_req_idx, b_seq_len, select_index):
         select_index,  # 令牌索引张量的指针
         req_to_token_indexs.stride(0),  # req_to_token_indexs 在第一个维度上的步幅
         req_to_token_indexs.stride(1),  # req_to_token_indexs 在第二个维度上的步幅
-        num_warps=num_warps,  # 使用的 warp 数量
-        num_stages=1,  # 使用的流水线阶段数量
     )
     return

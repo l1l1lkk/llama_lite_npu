@@ -79,7 +79,7 @@ def swiglu_forward(a, b):
     c = torch.empty_like(a)
     n_rows = a.shape[0]
 
-    BLOCK_SIZE, num_warps = calculate_settings(n_cols)
+    BLOCK_SIZE, _ = calculate_settings(n_cols)
 
     _swiglu_forward_kernel[(n_rows,)](
         a,
@@ -88,6 +88,5 @@ def swiglu_forward(a, b):
         c.stride(-2),  # c.stride(-2) = n_cols
         n_cols=n_cols,
         BLOCK_SIZE=BLOCK_SIZE,
-        num_warps=num_warps,
     )
     return c.view(*ori_shape)

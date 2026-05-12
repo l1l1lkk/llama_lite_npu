@@ -102,11 +102,6 @@ def rope_emb_forward(q, k, cos, sin, batch_size, seq_len):
     pad_n_kh = triton.next_power_of_2(n_kh)
     BLOCK_SIZE = max(pad_n_qh, pad_n_kh)
 
-    if HEAD_DIM >= 128:
-        num_warps = 8
-    else:
-        num_warps = 4
-
     q = q.contiguous()
     k = k.contiguous()
     cos = cos.contiguous()
@@ -132,7 +127,6 @@ def rope_emb_forward(q, k, cos, sin, batch_size, seq_len):
         pad_n_kh,
         pad_hd,
         BLOCK_SIZE=BLOCK_SIZE,
-        num_warps=num_warps,
         num_stages=1,
     )
     return q, k

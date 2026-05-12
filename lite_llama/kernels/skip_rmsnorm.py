@@ -186,7 +186,7 @@ def skip_rmsnorm(X, residual, weight, eps=1e-5):
     X = X.contiguous().view(-1, orig_shape[-1])
 
     M, N = X.shape  # n_rows, n_cols
-    BLOCK_SIZE, num_warps = calculate_settings(N)
+    BLOCK_SIZE, _ = calculate_settings(N)
     Y = torch.empty_like(X)
 
     if residual is not None:
@@ -205,7 +205,6 @@ def skip_rmsnorm(X, residual, weight, eps=1e-5):
             N,
             eps,
             BLOCK_SIZE=BLOCK_SIZE,
-            num_warps=num_warps,
         )
         return Y.view(orig_shape), residual.view(orig_shape)
     else:
@@ -220,7 +219,6 @@ def skip_rmsnorm(X, residual, weight, eps=1e-5):
             N,
             eps,
             BLOCK_SIZE=BLOCK_SIZE,
-            num_warps=num_warps,
         )
         return Y.view(orig_shape), X.view(orig_shape)
 
