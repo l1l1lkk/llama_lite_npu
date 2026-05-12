@@ -1,6 +1,7 @@
 import torch
 import json, gc
 from pathlib import Path
+from typing import Optional
 
 from ..utils.dummy_data import DummyInputGenerator
 from ..utils.device import get_device
