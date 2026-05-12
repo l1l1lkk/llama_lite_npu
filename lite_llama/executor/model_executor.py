@@ -51,6 +51,12 @@ class ModelExecutor:
             ModelExecutor: 初始化后的 ModelExecutor 实例。
         """
         device = get_device(device)
+        # Set as current device before any allocations
+        if "npu" in device:
+            torch.npu.set_device(device)
+        elif "cuda" in device and device != "cuda":
+            torch.cuda.set_device(device)
+
         model_config = ModelExecutor._load_model_config(checkpoints_dir, max_seq_len)
         model = ModelExecutor._load_model_weight(model_config, checkpoints_dir, device=device)
     
@@ -201,20 +207,20 @@ class ModelExecutor:
         self.model_runner = None
 
         if max_gpu_num_blocks:
-            self.kv_mem_manager = self._init_mem_manager(max_gpu_num_blocks)
+            self.kv_mem_manager = self._init_mem_manager(max_gpu_num_blocks, device=self.device)
             self.max_gpu_num_tokens = max_gpu_num_blocks
         else:
             max_gpu_num_blocks, self.max_gpu_num_tokens = (
                 self._get_max_avaliable_tokens(model,gpu_memory_utilization=0.9, block_size=1)
             )
             self.kv_mem_manager = self._init_mem_manager(
-                max_gpu_num_blocks, block_size=1
+                max_gpu_num_blocks, block_size=1, device=self.device
             )
 
         self.max_request_num = max_gpu_num_blocks // self.max_seq_len
 
         self.req_tokens_manager = ReqTokensManager(
-            self.max_request_num, self.max_seq_len
+            self.max_request_num, self.max_seq_len, device=self.device
         )
         self.atten_info = AttentionInfo()  # 创建 AttentionInfo 实例
         self.atten_info.kv_buffer = self.kv_mem_manager.gpu_kv_buffer
@@ -234,6 +240,7 @@ class ModelExecutor:
             head_dim=self.llm_config.head_dim,
             gpu_memory_utilization=gpu_memory_utilization,
             block_size=block_size,
+            device=self.device,
         )
         max_gpu_num_blocks = avaliable_blocks.compute_num_available_blocks(model, model_path=self.checkpoints_dir)
         max_gpu_num_tokens = max_gpu_num_blocks * block_size
