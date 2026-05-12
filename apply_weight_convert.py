@@ -405,10 +405,12 @@ def get_num_layers(checkpoints_dir: Path, model_type: str) -> dict:
         return {"num_layers": cfg.text_config.num_hidden_layers}
     cfg = AutoConfig.from_pretrained(checkpoints_dir, trust_remote_code=True)
     if model_type == "qwen3_vl":
+        vis_cfg = cfg.vision_config
+        deepstack = getattr(vis_cfg, "deepstack_visual_indexes", None) or [8, 16, 24]
         return {
             "num_layers": cfg.text_config.num_hidden_layers,
-            "vision_depth": cfg.vision_config.depth,
-            "deepstack_indexes": cfg.vision_config.get("deepstack_visual_indexes", [8, 16, 24]),
+            "vision_depth": getattr(vis_cfg, "depth", 27),
+            "deepstack_indexes": list(deepstack),
         }
     return {"num_layers": cfg.num_hidden_layers}
 
