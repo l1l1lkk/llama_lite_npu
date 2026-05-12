@@ -146,10 +146,8 @@ class Qwen3Attention(nn.Module):
                 qk_scale,
             )
             attn_output = attn_output.view(
-                batch_size, seq_len, self.hidden_size
-            )  # 输出张量 seq_len = 1
-            # if torch.isnan(attn_output).any(): # 检查 NaNs
-            #     raise ValueError(f"NaNs detected in context_forward output at layer {layer_index}")
+                batch_size, seq_len, self.num_heads * self.head_dim
+            )
         else:
             attn_output = self.attn.token_forward(
                 xq,
@@ -160,8 +158,8 @@ class Qwen3Attention(nn.Module):
                 qk_scale,
             )
             attn_output = attn_output.view(
-                batch_size, seq_len, self.hidden_size
-            )  # 输出张量 seq_len = 1
+                batch_size, seq_len, self.num_heads * self.head_dim
+            )
             # if torch.isnan(attn_output).any(): # 检查 NaNs
             #     raise ValueError(f"NaNs detected in token_forward output at layer {layer_index}")
 
