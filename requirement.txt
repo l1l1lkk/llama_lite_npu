@@ -1,0 +1,17 @@
+tokenizers==0.20.3
+huggingface-hub==0.24.6
+transformers==4.46.3
+torch>=2.2.1
+triton>=2.2.0
+tqdm==4.65.0
+pytest==8.3.3
+pynvml==11.5.0
+protobuf==3.20.0
+numpy==1.26.4
+aiohttp==3.9.5
+termvisage==0.2.0
+rich==13.7.1
+termvisage==0.2.0
+accelerate==1.6.0
+sentence-transformers==4.0.2
+jsonargparse==4.38.0
