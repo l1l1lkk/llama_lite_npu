@@ -328,6 +328,14 @@ def convert(checkpoints_dir: Path,
             prefix = f"{llm_prefix}layers.{i}.self_attn"
             merge_kv_weights(new_sd, prefix, with_bias=spec["merge_bias"])
 
+    # ---------- 2b. 处理 tie_word_embeddings ----------
+    if model_type == "qwen3_vl":
+        lm_head_key = "language_model.lm_head_weight"
+        embed_key = "language_model.embed_tokens.weight"
+        if lm_head_key not in new_sd and embed_key in new_sd:
+            logger.info("lm_head 与 embed_tokens 权重绑定，从 embed_tokens 复制")
+            new_sd[lm_head_key] = new_sd[embed_key].clone()
+
     # ---------- 3. 保存 ----------
     script_root = Path(__file__).resolve().parent
     out_dir = ensure_dir(script_root / "my_weight" / checkpoints_dir.name)
