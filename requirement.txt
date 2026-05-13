@@ -1,17 +1,48 @@
-tokenizers==0.20.3
-huggingface-hub==0.24.6
-transformers==4.46.3
+# ============================================================================
+# lite_llama 依赖清单
+# 支持: CUDA (NVIDIA) 和 NPU (Ascend 910B)
+# Python >= 3.10
+# ============================================================================
+
+# ---------- 核心框架 ----------
 torch>=2.2.1
-triton>=2.2.0
-tqdm==4.65.0
-pytest==8.3.3
-pynvml==11.5.0
-protobuf==3.20.0
-numpy==1.26.4
-aiohttp==3.9.5
-termvisage==0.2.0
-rich==13.7.1
-termvisage==0.2.0
-accelerate==1.6.0
-sentence-transformers==4.0.2
-jsonargparse==4.38.0
+triton>=2.2.0          # Triton DSL 写 GPU kernel（CUDA/NPU 均需）
+transformers>=4.45.0   # Qwen3-VL 需要较新版本
+
+# ---------- 模型加载 ----------
+safetensors>=0.4.0     # 直接加载 .safetensors 权重，比 HF from_pretrained 更快
+accelerate>=1.0.0      # init_empty_weights + load_checkpoint（可选回退加载路径）
+
+# ---------- 多模态（Qwen3-VL） ----------
+torchvision>=0.17.0    # Qwen3VLVideoProcessor 需要，CPU 预处理用
+Pillow>=10.0.0         # 图片加载
+
+# ---------- 工具 ----------
+tqdm>=4.65.0           # 进度条
+rich>=13.0.0           # CLI 美化输出
+numpy>=1.26.0
+protobuf>=3.20.0
+
+# ---------- 可选 ----------
+# pytest>=8.0.0        # 运行测试
+# termvisage==0.2.0    # 终端显示图片（CLI 可选，需要 imagemagick）
+
+# ---------- NPU 用户额外安装（以下为华为昇腾配套） ----------
+# torch_npu              # 华为 torch NPU 插件
+# torch-npu              # pip install torch-npu (版本需匹配 CANN)
+# HCCL                   # 多卡通信库（随 CANN 安装）
+
+# ============================================================================
+# 安装示例
+# ============================================================================
+# CUDA (NVIDIA):
+#   pip install -r requirement.txt
+#
+# NPU (Ascend 910B):
+#   1. 先安装 CANN 和 torch_npu（参考华为官方文档）
+#   2. pip install -r requirement.txt
+#   3. export LITE_LLAMA_DEVICE=npu:0
+#
+# ROCm (AMD):
+#   pip install -r requirement.txt
+#   export LITE_LLAMA_DEVICE=cuda
