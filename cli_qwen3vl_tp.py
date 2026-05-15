@@ -64,6 +64,8 @@ def main(
 
     # Same seed on all ranks for deterministic sampling
     torch.manual_seed(42)
+    torch.npu.manual_seed(42)
+    torch.npu.manual_seed_all(42) if hasattr(torch.npu, "manual_seed_all") else None
 
     console = Console() if rank == 0 else None
 

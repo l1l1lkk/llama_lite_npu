@@ -58,7 +58,10 @@ def main(
             traceback.print_exc()
         sys.exit(1)
 
+    # Sync random seeds across ranks to ensure identical sampling
     torch.manual_seed(42)
+    torch.npu.manual_seed(42)
+    torch.npu.manual_seed_all(42) if hasattr(torch.npu, "manual_seed_all") else None
     console = Console() if rank == 0 else None
 
     while True:
