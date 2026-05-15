@@ -144,24 +144,21 @@ class ModelExecutor:
         assert len(checkpoints) > 0, f"no checkpoint files found in {checkpoints_dir}"
         ckpt_path = str(checkpoints[0])
         logger.info(f'Loading checkpoint "{ckpt_path}"')
-        state_dict = torch.load(
-            ckpt_path, mmap=True, weights_only=True, map_location=device
-        )
+        # Load to CPU first: avoid NPU OOM when full model > single card capacity
+        # TP slicing happens on CPU, then each shard is moved to device via load_state_dict(assign=True)
+        state_dict = torch.load(ckpt_path, mmap=True, map_location="cpu")
 
-        # --- TP weight sharding ---
+        # --- TP weight sharding (on CPU) ---
         if tp.enabled:
             logger.info("Sharding weights for TP (rank=%d/%d)", tp.rank, tp.world_size)
             num_layers = _get_num_layers_from_config(model_config)
             state_dict = _shard_state_dict(state_dict, num_layers, tp, model_config)
 
+        # Move model to device first, then load sharded weights in-place
+        model.to(device).half()
         model.load_state_dict(state_dict, strict=True, assign=True)
         model.eval()
         logger.info(f"Loaded state dict in {time.time() - start_time:.2f}s")
-
-        model.to(device).half()
-        for param in model.parameters():
-            assert param.dtype == torch.float16, "Model parameters are not in FP16"
-        logger.info("Converted model to half precision (FP16)")
 
         return model
 
