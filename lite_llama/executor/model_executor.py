@@ -16,6 +16,11 @@ from ..models.model_config import LlamaConfig, Qwen3VLConfig
 from ..kernels import update_kv_index
 from ..utils.device import get_device
 from ..utils.logger import get_logger
+from .tp_utils import (
+    TPConfig, init_tp, detect_tp_env, get_tp_config,
+    shard_attention_q, shard_attention_kv, shard_attention_o,
+    shard_ffn_gate_up, shard_ffn_down, shard_lm_head,
+)
 
 logger = get_logger(__name__)
 
@@ -51,6 +56,15 @@ class ModelExecutor:
             ModelExecutor: 初始化后的 ModelExecutor 实例。
         """
         device = get_device(device)
+
+        # --- Tensor Parallelism init ---
+        tp_config = detect_tp_env()
+        if tp_config is not None:
+            logger.info("TP initialized: world_size=%d rank=%d", tp_config.world_size, tp_config.rank)
+            device = f"{'npu' if tp_config.is_npu else 'cuda'}:{tp_config.rank}"
+        else:
+            tp_config = TPConfig()
+
         # Set as current device before any allocations
         if "npu" in device:
             torch.npu.set_device(device)
@@ -58,10 +72,13 @@ class ModelExecutor:
             torch.cuda.set_device(device)
 
         model_config = ModelExecutor._load_model_config(checkpoints_dir, max_seq_len)
-        model = ModelExecutor._load_model_weight(model_config, checkpoints_dir, device=device)
-    
+        model = ModelExecutor._load_model_weight(
+            model_config, checkpoints_dir, device=device, tp_config=tp_config,
+        )
+
         return ModelExecutor(
-            checkpoints_dir, model_config, model, max_gpu_num_blocks, compiled_model, device
+            checkpoints_dir, model_config, model, max_gpu_num_blocks,
+            compiled_model, device, tp_config,
         )
 
     @staticmethod
@@ -105,8 +122,11 @@ class ModelExecutor:
         model_config,
         checkpoints_dir,
         device=None,
+        tp_config=None,
     ):
         device = get_device(device)
+        tp = tp_config or TPConfig()
+
         # Set as current device before any allocations
         if "npu" in device:
             torch.npu.set_device(device)
@@ -115,29 +135,29 @@ class ModelExecutor:
 
         start_time = time.time()
 
-        # 初始化模型
+        # 初始化模型（TP 感知：sharded weight shapes）
         with init_empty_weights():
-            model = ModelExecutor._initialize_model(model_config, device=device)
+            model = ModelExecutor._initialize_model(model_config, device=device, tp_config=tp)
             state_dict = None
 
         checkpoints = sorted(Path(checkpoints_dir).glob("*.pth"))
-        assert len(checkpoints) > 0, (
-            f"no checkpoint files found in {checkpoints_dir}"
-        )
+        assert len(checkpoints) > 0, f"no checkpoint files found in {checkpoints_dir}"
         ckpt_path = str(checkpoints[0])
         logger.info(f'Loading checkpoint "{ckpt_path}"')
-        # 使用 torch.load 加载权重文件。torch.load 可以根据需要将权重加载到指定的设备上
         state_dict = torch.load(
             ckpt_path, mmap=True, weights_only=True, map_location=device
         )
 
-        model.load_state_dict(
-            state_dict, strict=True, assign=True
-        )  # 将加载的 state_dict 应用到模型实例中。
+        # --- TP weight sharding ---
+        if tp.enabled:
+            logger.info("Sharding weights for TP (rank=%d/%d)", tp.rank, tp.world_size)
+            num_layers = _get_num_layers_from_config(model_config)
+            state_dict = _shard_state_dict(state_dict, num_layers, tp, model_config)
+
+        model.load_state_dict(state_dict, strict=True, assign=True)
         model.eval()
         logger.info(f"Loaded state dict in {time.time() - start_time:.2f}s")
 
-        # 先移到目标设备，再转换半精度（避免中间分配落在错误的设备上）
         model.to(device).half()
         for param in model.parameters():
             assert param.dtype == torch.float16, "Model parameters are not in FP16"
@@ -146,20 +166,11 @@ class ModelExecutor:
         return model
 
     @staticmethod
-    def _initialize_model(model_config, device: str) -> nn.Module:
-        """
-        根据配置初始化模型并将其移动到指定设备。
-
-        参数:
-            model_config (LlamaConfig): 自定义模型的配置参数。
-            device (str): 设备类型（'cuda'或'cpu'）。
-
-        返回:
-            nn.Module: 初始化后的模型。
-        """
+    def _initialize_model(model_config, device: str, tp_config: TPConfig = None) -> nn.Module:
         model_type = model_config.model_type.lower()
         logger.info(
-            f"Initializing model of type '{model_type}' and moving it to device '{device}'..."
+            f"Initializing model of type '{model_type}' to device '{device}' "
+            f"(TP world_size={tp_config.world_size if tp_config else 1})"
         )
         if model_type == "llama":
             from ..models.llama import LlamaModel
@@ -169,17 +180,17 @@ class ModelExecutor:
             model = Qwen2Model(model_config)
         elif model_type == "qwen3":
             from ..models.qwen3 import Qwen3Model
-            model = Qwen3Model(model_config)
+            model = Qwen3Model(model_config, tp_config=tp_config)
         elif model_type == "llava":
             from ..models.llava import LlavaLlama
             model = LlavaLlama(model_config)
         elif model_type == "qwen3_vl":
             from ..models.qwen3vl import Qwen3VLModel
-            model = Qwen3VLModel(model_config)
+            model = Qwen3VLModel(model_config, tp_config=tp_config)
         else:
             raise ValueError(f"Unsupported model type: {model_type}")
 
-        logger.info(f"The model has been initialized and moved to the device. '{device}'")
+        logger.info(f"Model initialized on device '{device}'")
         return model
 
     def __init__(
@@ -190,7 +201,9 @@ class ModelExecutor:
         max_gpu_num_blocks=None,
         compiled_model=False,
         device=None,
+        tp_config: TPConfig = None,
     ):
+        self.tp = tp_config or TPConfig()
         self.device = get_device(device)
         self.checkpoints_dir = checkpoints_dir
         self.model_config = model_config
@@ -200,6 +213,9 @@ class ModelExecutor:
             self.llm_config = model_config.text_config
         else:
             self.llm_config = model_config
+
+        # KV heads are sharded under TP
+        self.local_kv_heads = self.llm_config.num_kv_heads // self.tp.world_size
 
         self.max_seq_len = self.llm_config.max_seq_len
         self.model_type = model_config.model_type
@@ -235,8 +251,8 @@ class ModelExecutor:
         avaliable_blocks = ComputeMaxAvailableBlocks(
             num_layers=self.llm_config.num_layers,
             hidden_size=self.llm_config.hidden_size,
-            num_heads=self.llm_config.num_heads,
-            num_kv_heads=self.llm_config.num_kv_heads,
+            num_heads=self.llm_config.num_heads // self.tp.world_size,
+            num_kv_heads=self.local_kv_heads,
             head_dim=self.llm_config.head_dim,
             gpu_memory_utilization=gpu_memory_utilization,
             block_size=block_size,
@@ -252,7 +268,7 @@ class ModelExecutor:
     ):
         kv_mem_manager = KVCacheMemoryManager(
             num_layers=self.llm_config.num_layers,
-            num_kv_heads=self.llm_config.num_kv_heads,
+            num_kv_heads=self.local_kv_heads,
             head_dim=self.llm_config.head_dim,
             gpu_num_blocks=gpu_num_blocks,
             block_size=block_size,
@@ -387,3 +403,65 @@ class ModelExecutor:
         else:
             logits = self.model.forward(input_ids, position_ids, self.atten_info)
         return logits
+
+
+# ---------------------------------------------------------------------------
+# TP weight sharding helpers (module-level)
+# ---------------------------------------------------------------------------
+def _get_num_layers_from_config(model_config) -> int:
+    if hasattr(model_config, "num_layers"):
+        return model_config.num_layers
+    if hasattr(model_config, "text_config"):
+        return model_config.text_config.num_layers
+    return 0
+
+
+def _shard_state_dict(
+    state_dict: dict, num_layers: int, tp: TPConfig, model_config,
+) -> dict:
+    """Shard loaded state_dict weights for tensor parallelism."""
+    is_vl = isinstance(model_config, Qwen3VLConfig)
+    prefix = "language_model." if is_vl else ""
+    kv_heads = (
+        model_config.text_config.num_kv_heads if is_vl
+        else model_config.num_kv_heads
+    )
+    head_dim = (
+        model_config.text_config.head_dim if is_vl
+        else model_config.head_dim
+    )
+    if head_dim is None:
+        hidden = kv_heads * 8  # fallback, won't be used if none
+
+    for i in range(num_layers):
+        p = f"{prefix}layers.{i}.self_attn"
+
+        # Attention: Q, KV (fused), O
+        if f"{p}.q_proj_weight" in state_dict:
+            state_dict[f"{p}.q_proj_weight"] = shard_attention_q(
+                state_dict[f"{p}.q_proj_weight"], tp
+            )
+        if f"{p}.kv_proj_weight" in state_dict:
+            state_dict[f"{p}.kv_proj_weight"] = shard_attention_kv(
+                state_dict[f"{p}.kv_proj_weight"], kv_heads, head_dim, tp,
+            )
+        if f"{p}.o_proj_weight" in state_dict:
+            state_dict[f"{p}.o_proj_weight"] = shard_attention_o(
+                state_dict[f"{p}.o_proj_weight"], tp
+            )
+
+        # FFN: gate, up, down
+        for proj in ("gate_proj.weight", "up_proj.weight"):
+            k = f"{p.replace('self_attn', 'mlp')}.{proj}"
+            if k in state_dict:
+                state_dict[k] = shard_ffn_gate_up(state_dict[k], tp)
+        k_down = f"{p.replace('self_attn', 'mlp')}.down_proj.weight"
+        if k_down in state_dict:
+            state_dict[k_down] = shard_ffn_down(state_dict[k_down], tp)
+
+    # lm_head: column-shard along vocab dim
+    lm_key = f"{prefix}lm_head_weight"
+    if lm_key in state_dict:
+        state_dict[lm_key] = shard_lm_head(state_dict[lm_key], tp)
+
+    return state_dict

@@ -16,6 +16,7 @@ from .model_config import Qwen3VLConfig
 from .qwen3vl_vision import Qwen3VLVisionModel
 from .qwen3 import Qwen3Model
 from .RotaryEmbedding import Qwen3VLTextRotaryEmbedding
+from ..executor.tp_utils import TPConfig
 
 
 @dataclass
@@ -28,7 +29,7 @@ class Qwen3VLModelOutput:
 class Qwen3VLModel(nn.Module):
     """Qwen3-VL multimodal model for inference."""
 
-    def __init__(self, config: Qwen3VLConfig):
+    def __init__(self, config: Qwen3VLConfig, tp_config: TPConfig = None):
         super().__init__()
         self.config = config
         self.vision_config = config.vision_config
@@ -37,8 +38,8 @@ class Qwen3VLModel(nn.Module):
         # Vision encoder
         self.visual = Qwen3VLVisionModel(config.vision_config)
 
-        # Language model (Qwen3-based)
-        self.language_model = Qwen3Model(config.text_config)
+        # Language model (Qwen3-based, TP-aware)
+        self.language_model = Qwen3Model(config.text_config, tp_config=tp_config)
         # Replace standard RoPE with M-RoPE for 3D position encoding
         self.language_model.rotary_emb = Qwen3VLTextRotaryEmbedding(config=config.text_config)
 
