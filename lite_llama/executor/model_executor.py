@@ -154,9 +154,9 @@ class ModelExecutor:
             num_layers = _get_num_layers_from_config(model_config)
             state_dict = _shard_state_dict(state_dict, num_layers, tp, model_config)
 
-        # Move model to device first, then load sharded weights in-place
-        model.to(device).half()
+        # Load sharded weights into model (from CPU → NPU via assign=True)
         model.load_state_dict(state_dict, strict=True, assign=True)
+        model.to(device).half()
         model.eval()
         logger.info(f"Loaded state dict in {time.time() - start_time:.2f}s")
 
