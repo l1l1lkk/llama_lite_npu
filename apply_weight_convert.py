@@ -422,8 +422,8 @@ def main() -> None:
     parser.add_argument("--model-type",
                         choices=_SPEC.keys(),
                         help="显式指定模型类型；默认根据目录名猜测")
-    parser.add_argument("--device", default="cuda",
-                        help="加载权重时使用的设备 (default: cuda)")
+    parser.add_argument("--device", default="cpu",
+                        help="加载权重时使用的设备 (default: cpu，权重转换不需要 GPU)")
     args = parser.parse_args()
 
     ckpt_dir: Path = args.checkpoints_dir.resolve()
