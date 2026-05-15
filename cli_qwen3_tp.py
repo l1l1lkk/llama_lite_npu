@@ -18,6 +18,7 @@ warnings.filterwarnings("ignore", category=UserWarning, module="torch._utils")
 
 from lite_llama.generate_stream import GenerateStreamText
 from lite_llama.executor.tp_utils import detect_tp_env
+from lite_llama.utils.prompt_templates import get_prompter
 
 
 def _broadcast_string(s: str, src: int = 0) -> str:
@@ -62,6 +63,9 @@ def main(
     torch.manual_seed(42)
     torch.npu.manual_seed(42)
     torch.npu.manual_seed_all(42) if hasattr(torch.npu, "manual_seed_all") else None
+
+    # Qwen3-instruct requires ChatML template
+    prompter = get_prompter("qwen3", checkpoints_dir, short_prompt=False)
     console = Console() if rank == 0 else None
 
     while True:
@@ -76,12 +80,16 @@ def main(
         if prompt.lower() == "exit":
             break
 
+        # Wrap with Qwen3 ChatML template
+        prompter.insert_prompt(prompt)
+        formatted_prompt = prompter.model_input
+
         if rank == 0:
             print("\nASSISTANT: ", end="", flush=True)
 
         try:
             stream = generator.text_completion_stream(
-                [prompt],
+                [formatted_prompt],
                 temperature=temperature, top_p=top_p, max_gen_len=max_gen_len,
             )
         except Exception as e:

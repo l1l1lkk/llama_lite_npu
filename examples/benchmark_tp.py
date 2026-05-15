@@ -32,6 +32,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from lite_llama.executor.tp_utils import detect_tp_env
 from lite_llama.generate_stream import GenerateStreamText
+from lite_llama.utils.prompt_templates import get_prompter
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -204,7 +205,10 @@ def main():
         prompts = [f"<image> Describe this image in detail. {prompt_text[:args.prompt_len]}"
                    for _ in range(args.batch_size)]
     else:
-        prompts = [prompt_text[:args.prompt_len] for _ in range(args.batch_size)]
+        # Wrap with Qwen3 ChatML template
+        prompter = get_prompter("qwen3", args.checkpoints_dir, short_prompt=False)
+        prompter.insert_prompt(prompt_text[:args.prompt_len])
+        prompts = [prompter.model_input for _ in range(args.batch_size)]
 
     torch.manual_seed(42)
 
