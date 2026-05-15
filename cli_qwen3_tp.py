@@ -24,11 +24,12 @@ def _broadcast_string(s: str, src: int = 0, max_len: int = 4096) -> str:
     if s is None:
         s = ""
     encoded = s.encode("utf-8")[:max_len]
-    data = torch.zeros(max_len, dtype=torch.int32, device="cpu")
+    dev = f"npu:{src}"
+    data = torch.zeros(max_len, dtype=torch.int32, device=dev)
     for i, b in enumerate(encoded):
         data[i] = b
     torch.distributed.broadcast(data, src=src)
-    decoded = bytes(data[data != 0].tolist()).decode("utf-8", errors="replace")
+    decoded = bytes(data[data != 0].cpu().tolist()).decode("utf-8", errors="replace")
     return decoded
 
 
