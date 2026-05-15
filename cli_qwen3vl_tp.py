@@ -22,18 +22,11 @@ from lite_llama.utils.image_process import vis_images
 from lite_llama.executor.tp_utils import detect_tp_env
 
 
-def _broadcast_string(s: str, src: int = 0, max_len: int = 4096) -> str:
-    if s is None:
-        s = ""
-    encoded = s.encode("utf-8")[:max_len]
-    # HCCL only supports NPU tensors — use rank-specific device
-    dev = f"npu:{src}"
-    data = torch.zeros(max_len, dtype=torch.int32, device=dev)
-    for i, b in enumerate(encoded):
-        data[i] = b
-    torch.distributed.broadcast(data, src=src)
-    decoded = bytes(data[data != 0].cpu().tolist()).decode("utf-8", errors="replace")
-    return decoded
+def _broadcast_string(s: str, src: int = 0) -> str:
+    """Broadcast a string from src to all ranks via object list."""
+    objects = [s]
+    torch.distributed.broadcast_object_list(objects, src=src)
+    return objects[0]
 
 
 def main(
