@@ -177,6 +177,11 @@ class GenerateStreamText:
             else:
                 next_token = torch.argmax(logits[:, -1], dim=-1)
 
+            # TP: broadcast sampled token from rank 0 to all ranks
+            # (sampling may diverge across ranks due to unsynchronized RNG)
+            if torch.distributed.is_initialized():
+                torch.distributed.broadcast(next_token, src=0)
+
             input_ids = next_token  # [batch_size, 1]
 
             # 仅在需要生成的情况下替换 token

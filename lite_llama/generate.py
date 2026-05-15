@@ -165,6 +165,8 @@ class GenerateText:
                 last_logits / temperature, dim=-1
             )  # [batch_size, vocab_size]
             next_token = sample_top_p(probs, top_p)  # [batch_size]
+            if torch.distributed.is_initialized():
+                torch.distributed.broadcast(next_token, src=0)
             input_ids = next_token  # [batch_size, 1]
 
             mask = ~input_text_mask[:, cur_pos]  # [batch_size]

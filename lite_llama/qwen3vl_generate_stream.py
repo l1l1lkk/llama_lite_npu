@@ -169,6 +169,10 @@ class Qwen3VLGeneratorStream:
             else:
                 next_token = torch.argmax(logits[:, -1], dim=-1)
 
+            # TP: ensure all ranks use the same sampled token
+            if torch.distributed.is_initialized():
+                torch.distributed.broadcast(next_token, src=0)
+
             input_ids = next_token
             mask = ~input_text_mask[:, cur_pos]
             tokens[:, cur_pos] = torch.where(
