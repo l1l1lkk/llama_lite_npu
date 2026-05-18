@@ -62,6 +62,7 @@ class GenerateStreamText:
         max_gpu_num_blocks=None,
         max_seq_len=1024,
         compiled_model=False,
+        page_size=None,
         device=None,
     ):
         self.device = get_device(device)
@@ -72,6 +73,7 @@ class GenerateStreamText:
             max_gpu_num_blocks=max_gpu_num_blocks,
             max_seq_len=max_seq_len,
             compiled_model=compiled_model,
+            page_size=page_size,
             device=device,
         )
         self.tokenizer = self.load_tokenizer(tokenizer_path)

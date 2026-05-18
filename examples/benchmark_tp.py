@@ -145,6 +145,10 @@ def main():
     parser.add_argument("--max_gen_len", type=int, default=256)
     parser.add_argument("--temperature", type=float, default=0.6)
     parser.add_argument("--top_p", type=float, default=0.9)
+    parser.add_argument("--page_size", type=int, default=16,
+                        help="PagedAttention page size; use 0 to disable.")
+    parser.add_argument("--compiled_model", action="store_true",
+                        help="Enable NPU Graph path for decode.")
     parser.add_argument("--warmup", type=int, default=2,
                         help="Number of warmup iterations")
     parser.add_argument("--iterations", type=int, default=5,
@@ -171,6 +175,11 @@ def main():
         print(f"  Prompt len:  ~{args.prompt_len} tokens")
         print(f"  Batch size:  {args.batch_size}")
         print(f"  Max gen len: {args.max_gen_len}")
+        print(f"  Temperature: {args.temperature}")
+        print(f"  Top-p:       {args.top_p}")
+        print(f"  Thinking:    {'on' if args.enable_thinking else 'off'}")
+        print(f"  Page size:   {args.page_size}")
+        print(f"  NPU Graph:   {'on' if args.compiled_model else 'off'}")
         print(f"  Warmup:      {args.warmup}  |  Iterations: {args.iterations}")
         print("=" * 70)
 
@@ -193,6 +202,8 @@ def main():
             checkpoints_dir=args.checkpoints_dir,
             tokenizer_path=args.checkpoints_dir,
             max_seq_len=args.prompt_len + args.max_gen_len + 1024,
+            compiled_model=args.compiled_model,
+            page_size=args.page_size,
             device=f"npu:{rank}",
         )
         dummy_image = None

@@ -42,6 +42,7 @@ class ModelExecutor:
         max_seq_len: int,
         max_gpu_num_blocks: None,
         compiled_model: bool = False,
+        page_size: int | None = None,
         device: str = None,
     ):
         """
@@ -73,6 +74,11 @@ class ModelExecutor:
             torch.cuda.set_device(device)
 
         model_config = ModelExecutor._load_model_config(checkpoints_dir, max_seq_len)
+        if page_size is not None:
+            if isinstance(model_config, Qwen3VLConfig):
+                model_config.text_config.page_size = page_size
+            else:
+                model_config.page_size = page_size
         model = ModelExecutor._load_model_weight(
             model_config, checkpoints_dir, device=device, tp_config=tp_config,
         )
