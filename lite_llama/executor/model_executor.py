@@ -239,10 +239,13 @@ class ModelExecutor:
         self.atten_info.kv_buffer = self.kv_mem_manager.gpu_kv_buffer
         self.atten_info.b_req_tokens_table = self.req_tokens_manager.b_req_tokens_table
 
-        # TODO apply_cuda_graph 新代码有 bug，已经删去，后续等待修复
-        self.compiled_model = False
+        # --- NPU Graph (decode kernel launch batching) ---
+        self.graph_runner = None
         if self.compiled_model:
-            self.apply_cuda_graph()  # 调用 cuda graph 优化
+            self.apply_npu_graph()
+
+        # --- PagedAttention (opt-in via page_size > 0) ---
+        self.use_paged_attn = getattr(self.llm_config, "page_size", 0) > 0
 
     def _get_max_avaliable_tokens(self,model, gpu_memory_utilization=0.9, block_size=1):
         avaliable_blocks = ComputeMaxAvailableBlocks(
@@ -275,22 +278,11 @@ class ModelExecutor:
 
         return kv_mem_manager
 
-    def apply_cuda_graph(
-        self,
-    ):
-        """应用 cuda graph 优化
-        参数:
-            - input_ids: 输入 tokens id 列表, shape: (batch_size, 1)
-            - prev_pos: 当前处于第几轮迭代循环, 生成第几个 token
-        """
-        self.model_runner = ModelRunner(
-            self.model,
-            self.llm_config,
-            self.max_gpu_num_tokens,
-            self.kv_mem_manager,
-            self.req_tokens_manager,
-        )
-        self.model_runner.capture_decode_graph()
+    def apply_npu_graph(self):
+        """Apply NPU graph for decode phase (kernel launch batching)."""
+        from .npu_graph import NpuGraphRunner
+        self.graph_runner = NpuGraphRunner(self.model)
+        logger.info("NPU Graph runner created (available=%s)", self.graph_runner.available)
 
     def init_req_to_tokens_table(
         self, b_req_tokens_table, b_req_idx, b_seq_len, alloc_mem_index
