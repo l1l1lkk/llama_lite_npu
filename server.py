@@ -415,11 +415,14 @@ async def _stream_chat(
             yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
 
         # Final chunk
-        yield f"data: {json.dumps({
-            'id': rid, 'object': 'chat.completion.chunk',
-            'created': int(time.time()), 'model': _model_name,
-            'choices': [{'index': 0, 'delta': {}, 'finish_reason': 'stop'}],
-        })}\n\n"
+        final_chunk = {
+            "id": rid,
+            "object": "chat.completion.chunk",
+            "created": int(time.time()),
+            "model": _model_name,
+            "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
+        }
+        yield f"data: {json.dumps(final_chunk, ensure_ascii=False)}\n\n"
         yield "data: [DONE]\n\n"
     except Exception as e:
         yield f"data: {json.dumps({'error': str(e)})}\n\n"
@@ -462,11 +465,14 @@ async def _stream_completion(
             text = batch[0].get("generation", "") if isinstance(batch[0], dict) else batch[0]
             delta = text[len(completion):]
             completion = text
-            yield f"data: {json.dumps({
-                'id': rid, 'object': 'text_completion.chunk',
-                'created': int(time.time()), 'model': _model_name,
-                'choices': [{'index': 0, 'text': delta, 'finish_reason': None}],
-            })}\n\n"
+            chunk = {
+                "id": rid,
+                "object": "text_completion.chunk",
+                "created": int(time.time()),
+                "model": _model_name,
+                "choices": [{"index": 0, "text": delta, "finish_reason": None}],
+            }
+            yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
         yield "data: [DONE]\n\n"
     except Exception as e:
         yield f"data: {json.dumps({'error': str(e)})}\n\n"
