@@ -149,6 +149,17 @@ def main():
                         help="Number of warmup iterations")
     parser.add_argument("--iterations", type=int, default=5,
                         help="Number of benchmark iterations")
+    parser.add_argument(
+        "--enable_thinking", dest="enable_thinking",
+        action="store_true",
+        help="Enable Qwen3 thinking mode (default).",
+    )
+    parser.add_argument(
+        "--disable_thinking", dest="enable_thinking",
+        action="store_false",
+        help="Disable Qwen3 thinking mode.",
+    )
+    parser.set_defaults(enable_thinking=True)
     args = parser.parse_args()
 
     # Print header (rank 0 only)
@@ -206,7 +217,10 @@ def main():
                    for _ in range(args.batch_size)]
     else:
         # Wrap with Qwen3 ChatML template
-        prompter = get_prompter("qwen3", args.checkpoints_dir, short_prompt=False)
+        prompter = get_prompter(
+            "qwen3", args.checkpoints_dir, short_prompt=False,
+            enable_thinking=args.enable_thinking,
+        )
         prompter.insert_prompt(prompt_text[:args.prompt_len])
         prompts = [prompter.model_input for _ in range(args.batch_size)]
 

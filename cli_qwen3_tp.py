@@ -35,6 +35,7 @@ def main(
     max_gen_len: Optional[int] = 1024,
     compiled_model: bool = False,
     checkpoints_dir: str = None,
+    enable_thinking: bool = True,
 ):
     tp = detect_tp_env()
     rank = tp.rank if tp else 0
@@ -65,7 +66,12 @@ def main(
     torch.npu.manual_seed_all(42) if hasattr(torch.npu, "manual_seed_all") else None
 
     # Qwen3-instruct requires ChatML template
-    prompter = get_prompter("qwen3", checkpoints_dir, short_prompt=False)
+    prompter = get_prompter(
+        "qwen3",
+        checkpoints_dir,
+        short_prompt=False,
+        enable_thinking=enable_thinking,
+    )
     console = Console() if rank == 0 else None
 
     while True:
@@ -118,10 +124,24 @@ if __name__ == "__main__":
     parser.add_argument("--max_seq_len", type=int, default=2048)
     parser.add_argument("--max_gen_len", type=int, default=1024)
     parser.add_argument("--max_gpu_num_blocks", type=int, default=None)
+    parser.add_argument(
+        "--enable_thinking",
+        dest="enable_thinking",
+        action="store_true",
+        help="Enable Qwen3 thinking mode (default).",
+    )
+    parser.add_argument(
+        "--disable_thinking",
+        dest="enable_thinking",
+        action="store_false",
+        help="Disable Qwen3 thinking mode and start generation from the final answer.",
+    )
+    parser.set_defaults(enable_thinking=True)
     args = parser.parse_args()
     main(
         temperature=args.temperature, top_p=args.top_p,
         max_seq_len=args.max_seq_len, max_gen_len=args.max_gen_len,
         max_gpu_num_blocks=args.max_gpu_num_blocks,
         checkpoints_dir=args.checkpoints_dir,
+        enable_thinking=args.enable_thinking,
     )

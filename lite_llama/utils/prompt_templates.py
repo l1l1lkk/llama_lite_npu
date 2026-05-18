@@ -353,7 +353,7 @@ class Qwen2Prompter(BasePrompter):
 
 
 class Qwen3Prompter(BasePrompter):
-    def __init__(self, enable_thinking: bool = False):
+    def __init__(self, enable_thinking: bool = True):
         """
         Qwen3 ChatML Prompt 模板。
 
@@ -409,10 +409,12 @@ class Qwen3Prompter(BasePrompter):
             )
 
     def insert_prompt(self, input_prompt):
+        prompt = self.template.format(prompt=input_prompt)
         if not self.enable_thinking:
-            input_prompt = "/no_think " + input_prompt
-
-        self.model_input = self.template.format(prompt=input_prompt)
+            # Match tokenizer.apply_chat_template(..., enable_thinking=False):
+            # prefill an empty reasoning block so generation starts from final answer.
+            prompt += "<think>\n\n</think>\n\n"
+        self.model_input = prompt
 
     def update_template(self, outputs, chunk_prefilling=0):
         if chunk_prefilling:
@@ -499,7 +501,13 @@ class MPTChatPrompter(BasePrompter):
         )
 
 
-def get_prompter(model_type, model_path="", short_prompt=False, empty_prompt=False):
+def get_prompter(
+    model_type,
+    model_path="",
+    short_prompt=False,
+    empty_prompt=False,
+    enable_thinking=True,
+):
     if empty_prompt:
         return EmptyPrompter()
 
@@ -536,7 +544,7 @@ def get_prompter(model_type, model_path="", short_prompt=False, empty_prompt=Fal
         return Qwen2Prompter()
 
     elif model_type == "qwen3":
-        return Qwen3Prompter(enable_thinking=False)
+        return Qwen3Prompter(enable_thinking=enable_thinking)
 
     else:
         raise ValueError(f"model type {model_type} is not supported")
