@@ -85,7 +85,13 @@ _is_tp = False
 _tp_lock = None  # threading.Lock for single-request-at-a-time in TP mode
 
 
-def load_generator(checkpoints_dir: str, device: str):
+def load_generator(
+    checkpoints_dir: str,
+    device: str,
+    *,
+    page_size: int = 16,
+    compiled_model: bool = True,
+):
     global _generator, _is_vl, _model_name
     import json
     from pathlib import Path
@@ -109,6 +115,8 @@ def load_generator(checkpoints_dir: str, device: str):
         _generator = GenerateStreamText(
             checkpoints_dir=checkpoints_dir,
             tokenizer_path=checkpoints_dir,
+            compiled_model=compiled_model,
+            page_size=page_size,
             device=device,
         )
 
@@ -231,6 +239,12 @@ def _build_prompt(messages: List[ChatMessage], has_images: bool) -> str:
     return ""
 
 
+def _count_tokens(text: str) -> int:
+    if _generator is None or not hasattr(_generator, "tokenizer"):
+        return 0
+    return len(_generator.tokenizer.encode(text, add_special_tokens=False))
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
@@ -262,20 +276,10 @@ async def chat_completions(req: ChatCompletionRequest, raw: Request):
     request_id = f"chatcmpl-{uuid.uuid4().hex[:12]}"
 
     if req.stream:
-        if _is_tp:
-            # TP streaming: run sync in thread to avoid blocking event loop
-            import concurrent.futures
-            import asyncio
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(
-                None, lambda: _sync_chat(prompt, images, req, request_id)
-            )
-            return result
-        else:
-            return StreamingResponse(
-                _stream_chat(prompt, images, req, request_id),
-                media_type="text/event-stream",
-            )
+        return StreamingResponse(
+            _stream_chat(prompt, images, req, request_id),
+            media_type="text/event-stream",
+        )
     else:
         return _sync_chat(prompt, images, req, request_id)
 
@@ -328,6 +332,8 @@ def _sync_chat(prompt: str, images: list, req: ChatCompletionRequest, rid: str):
             for batch in stream:
                 completion = batch[0].get("generation", "") if isinstance(batch[0], dict) else batch[0]
 
+        prompt_tokens = _count_tokens(prompt)
+        completion_tokens = _count_tokens(completion)
         return {
             "id": rid,
             "object": "chat.completion",
@@ -339,9 +345,9 @@ def _sync_chat(prompt: str, images: list, req: ChatCompletionRequest, rid: str):
                 "finish_reason": "stop",
             }],
             "usage": {
-                "prompt_tokens": 0,
-                "completion_tokens": len(completion),
-                "total_tokens": len(completion),
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": prompt_tokens + completion_tokens,
             },
         }
     except Exception as e:
@@ -439,13 +445,19 @@ def _sync_completion(prompt: str, req: CompletionRequest, rid: str):
         for batch in stream:
             completion = batch[0].get("generation", "") if isinstance(batch[0], dict) else batch[0]
 
+        prompt_tokens = _count_tokens(prompt)
+        completion_tokens = _count_tokens(completion)
         return {
             "id": rid,
             "object": "text_completion",
             "created": int(time.time()),
             "model": _model_name,
             "choices": [{"index": 0, "text": completion, "finish_reason": "stop"}],
-            "usage": {"prompt_tokens": 0, "completion_tokens": len(completion), "total_tokens": len(completion)},
+            "usage": {
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": prompt_tokens + completion_tokens,
+            },
         }
     except Exception as e:
         raise HTTPException(500, str(e))
@@ -489,6 +501,21 @@ def main():
     parser.add_argument("--device", type=str, default=None,
                         help="Device override (auto-detected if not set). "
                              "For TP, this is auto-set by torchrun.")
+    parser.add_argument("--page_size", type=int, default=16,
+                        help="PagedAttention page size; use 0 to disable.")
+    parser.add_argument(
+        "--compiled_model",
+        dest="compiled_model",
+        action="store_true",
+        help="Enable NPU Graph path (default).",
+    )
+    parser.add_argument(
+        "--no_compiled_model",
+        dest="compiled_model",
+        action="store_false",
+        help="Disable NPU Graph path.",
+    )
+    parser.set_defaults(compiled_model=True)
     args = parser.parse_args()
 
     # Detect TP
@@ -502,8 +529,15 @@ def main():
     if _rank == 0:
         print(f"Loading model from {args.checkpoints_dir}")
         print(f"Device: {device}, TP: world_size={tp.world_size if _is_tp else 1}")
+        print(f"PagedAttention page_size: {args.page_size}")
+        print(f"NPU Graph: {'on' if args.compiled_model else 'off'}")
 
-    load_generator(args.checkpoints_dir, device)
+    load_generator(
+        args.checkpoints_dir,
+        device,
+        page_size=args.page_size,
+        compiled_model=args.compiled_model,
+    )
 
     if _rank == 0:
         print(f"Server starting on http://{args.host}:{args.port}")
