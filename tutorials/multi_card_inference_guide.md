@@ -520,7 +520,42 @@ Reduce-Scatter: 结果分散存储 (只求和，各自拿一部分)
 ├── FP8 量化 (降低权重大小)
 └── 预期收益: 30-50% 吞吐提升
 ```
+```
+● 已推送。实现总结：
 
+  阶段 1：算子融合 + NPU Graph
+
+  优化: NPU Graph
+  文件: executor/npu_graph.py
+  状态: 新增。NpuGraphRunner 捕获 decode forward 为 graph，消除 ~128 次 kernel launch 开销。自动检测 NPU 是否支持，不支持则静默 fallback
+  ────────────────────────────────────────
+  优化: QKV 融合
+  文件: —
+  状态: K/V 权重早已融合（kv_proj_weight），Q 因 TP head 数不同无法合并
+  ────────────────────────────────────────
+  优化: FlashDecoding+KV read
+  文件: —
+  状态: KV cache 读取已在 FlashDecoding kernel 内部
+
+  阶段 2：PagedAttention + AllReduce
+
+  优化: PagedAttention
+  文件: executor/paged_attention.py
+  状态: 新增。PagedKVCacheManager 以 page_size=16 为粒度分配 KV cache。kernel 零改动——FlashDecoding 已用 b_req_tokens_table 间接索引
+  ────────────────────────────────────────
+  优化: All-Reduce 合批
+  文件: —
+  状态: 分析后不可行：O_proj 的 all_reduce 结果被 FFN RMSNorm 消费，无法延迟到 FFN down 之后
+
+  为什么 All-Reduce 合批做不了
+  Layer N:
+    O_proj → [all_reduce A] → residual add → RMSNorm → FFN → down → [all_reduce B]
+                                      ↑
+                            FFN 需要 A 的结果，不能等 B 一起做
+
+  这不是代码问题，是数学依赖。要减少通信次数只能靠 reduce_scatter
+  替代或通信-计算 overlap，两者都需要更底层改动。
+```
 ---
 
 ## A. 参考：各模型在 910B3 TP2 下的预估性能

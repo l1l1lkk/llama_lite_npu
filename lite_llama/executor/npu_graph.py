@@ -19,7 +19,7 @@ import torch
 from typing import Optional
 
 try:
-    _NPU_GRAPH_AVAILABLE = hasattr(torch.npu, "set_option")
+    _NPU_GRAPH_AVAILABLE = hasattr(torch.npu, "set_option") and hasattr(torch.npu, "graph")
 except Exception:
     _NPU_GRAPH_AVAILABLE = False
 
@@ -39,10 +39,15 @@ class NpuGraphRunner:
         self._graph_inputs: dict = {}
         self._graph_output = None
         self._batch_size = 0
+        self._captured_max_actual_seq_len = None
 
     @property
     def available(self) -> bool:
         return _NPU_GRAPH_AVAILABLE
+
+    @property
+    def captured(self) -> bool:
+        return self._captured
 
     def capture(
         self,
@@ -79,6 +84,7 @@ class NpuGraphRunner:
                 "cur_select_index": atten_info.cur_select_index,
                 "b_req_idx": getattr(atten_info, "b_req_idx", None),
             }
+            self._captured_max_actual_seq_len = atten_info.max_actual_seq_len
             self._captured = True
             return True
 
@@ -96,6 +102,8 @@ class NpuGraphRunner:
     ) -> Optional[torch.Tensor]:
         """Replay captured graph with new inputs."""
         if not self._captured or self._graph is None:
+            return None
+        if atten_info.max_actual_seq_len != self._captured_max_actual_seq_len:
             return None
 
         # Update mutable inputs in-place

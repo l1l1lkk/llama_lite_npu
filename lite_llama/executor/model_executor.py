@@ -9,6 +9,7 @@ from accelerate import init_empty_weights, load_checkpoint_and_dispatch
 
 from .mem_manager import ComputeMaxAvailableBlocks, KVCacheMemoryManager
 from .req_tokens_manager import ReqTokensManager
+from .paged_attention import PagedKVCacheManager, PagedReqTokensManager
 
 from .cuda_graph import ModelRunner
 from .executor_struct import AttentionInfo, CONFIG_CLASS_MAP
@@ -218,6 +219,9 @@ class ModelExecutor:
         self.model_type = model_config.model_type
         self.model = model
         self.model_runner = None
+        self.compiled_model = compiled_model
+        self.page_size = getattr(self.llm_config, "page_size", 0)
+        self.use_paged_attn = self.page_size > 0
 
         if max_gpu_num_blocks:
             self.kv_mem_manager = self._init_mem_manager(max_gpu_num_blocks, device=self.device)
@@ -232,9 +236,14 @@ class ModelExecutor:
 
         self.max_request_num = max_gpu_num_blocks // self.max_seq_len
 
-        self.req_tokens_manager = ReqTokensManager(
-            self.max_request_num, self.max_seq_len, device=self.device
-        )
+        if self.use_paged_attn:
+            self.req_tokens_manager = PagedReqTokensManager(
+                self.max_request_num, self.max_seq_len, self.kv_mem_manager, device=self.device
+            )
+        else:
+            self.req_tokens_manager = ReqTokensManager(
+                self.max_request_num, self.max_seq_len, device=self.device
+            )
         self.atten_info = AttentionInfo()  # 创建 AttentionInfo 实例
         self.atten_info.kv_buffer = self.kv_mem_manager.gpu_kv_buffer
         self.atten_info.b_req_tokens_table = self.req_tokens_manager.b_req_tokens_table
@@ -243,9 +252,6 @@ class ModelExecutor:
         self.graph_runner = None
         if self.compiled_model:
             self.apply_npu_graph()
-
-        # --- PagedAttention (opt-in via page_size > 0) ---
-        self.use_paged_attn = getattr(self.llm_config, "page_size", 0) > 0
 
     def _get_max_avaliable_tokens(self,model, gpu_memory_utilization=0.9, block_size=1):
         avaliable_blocks = ComputeMaxAvailableBlocks(
@@ -266,15 +272,26 @@ class ModelExecutor:
     def _init_mem_manager(
         self, gpu_num_blocks, block_size=1, dtype=torch.float16, device=None
     ):
-        kv_mem_manager = KVCacheMemoryManager(
-            num_layers=self.llm_config.num_layers,
-            num_kv_heads=self.local_kv_heads,
-            head_dim=self.llm_config.head_dim,
-            gpu_num_blocks=gpu_num_blocks,
-            block_size=block_size,
-            dtype=dtype,
-            device=device,
-        )
+        if self.use_paged_attn:
+            kv_mem_manager = PagedKVCacheManager(
+                num_layers=self.llm_config.num_layers,
+                num_kv_heads=self.local_kv_heads,
+                head_dim=self.llm_config.head_dim,
+                num_pages=max(1, gpu_num_blocks // self.page_size),
+                page_size=self.page_size,
+                dtype=dtype,
+                device=device,
+            )
+        else:
+            kv_mem_manager = KVCacheMemoryManager(
+                num_layers=self.llm_config.num_layers,
+                num_kv_heads=self.local_kv_heads,
+                head_dim=self.llm_config.head_dim,
+                gpu_num_blocks=gpu_num_blocks,
+                block_size=block_size,
+                dtype=dtype,
+                device=device,
+            )
 
         return kv_mem_manager
 
@@ -340,21 +357,41 @@ class ModelExecutor:
             print(f"num_patch_indexs: {num_patch_indexs}")
 
         context_num_tokens = max_prompt_len * batch_size
-        # 一次性分配 bsz * seq_len + (number_patchs * number_patchs - 1) * img_batch_size 个索引
-        self.atten_info.cur_select_index, _ = self.kv_mem_manager.alloc_kvcache_index(
-            context_num_tokens
-        )
+        if self.use_paged_attn:
+            for req_idx in b_req_idx.tolist():
+                ok = self.req_tokens_manager.alloc_req(req_idx, max_prompt_len)
+                if not ok:
+                    raise RuntimeError("Paged KV allocation failed during prefill")
+            self.atten_info.cur_select_index = torch.cat(
+                [
+                    self.req_tokens_manager.get_token_indices(req_idx, max_prompt_len)
+                    for req_idx in b_req_idx.tolist()
+                ]
+            ).to(torch.int32)
+        else:
+            self.atten_info.cur_select_index, _ = self.kv_mem_manager.alloc_kvcache_index(
+                context_num_tokens
+            )
         # 初始化每个批次项的实际提示词长度
         self.atten_info.b_seq_len = actual_prompt_lens  # 张量, 形状 [batch_size, 1]
         # 初始化批次请求的当前最大序列上下文长度(对应 kv cache 长度)
         self.atten_info.max_actual_seq_len = max_prompt_len  # int 类型
 
-        self.atten_info.b_start_loc = self.init_req_to_tokens_table(
-            self.atten_info.b_req_tokens_table,
-            self.atten_info.b_req_idx,
-            self.atten_info.b_seq_len,
-            self.atten_info.cur_select_index,
-        )
+        if self.use_paged_attn:
+            self.atten_info.b_start_loc = torch.arange(
+                0,
+                batch_size * max_prompt_len,
+                max_prompt_len,
+                dtype=torch.int32,
+                device=self.device,
+            )
+        else:
+            self.atten_info.b_start_loc = self.init_req_to_tokens_table(
+                self.atten_info.b_req_tokens_table,
+                self.atten_info.b_req_idx,
+                self.atten_info.b_seq_len,
+                self.atten_info.cur_select_index,
+            )
 
         if debug_mode:
             print(
@@ -368,16 +405,24 @@ class ModelExecutor:
         return self.atten_info.cur_select_index, num_patch_indexs
 
     def decode_alloc_kv_cache(self, batch_size):
-        # TODO: torch.empty 创建的临时张量, 保存分配的非连续 kv_cache 索引空间
-        self.atten_info.cur_select_index, _ = self.kv_mem_manager.alloc_kvcache_index(
-            batch_size
-        )
-        update_kv_index(
-            self.atten_info.b_req_tokens_table,
-            self.atten_info.b_req_idx,
-            self.atten_info.b_seq_len,
-            self.atten_info.cur_select_index,
-        )
+        if self.use_paged_attn:
+            new_indices = []
+            for req_idx in self.atten_info.b_req_idx.tolist():
+                ok = self.req_tokens_manager.extend_req(req_idx, 1)
+                if not ok:
+                    raise RuntimeError("Paged KV allocation failed during decode")
+                new_indices.append(self.req_tokens_manager.get_token_indices(req_idx)[-1])
+            self.atten_info.cur_select_index = torch.stack(new_indices).to(torch.int32)
+        else:
+            self.atten_info.cur_select_index, _ = self.kv_mem_manager.alloc_kvcache_index(
+                batch_size
+            )
+            update_kv_index(
+                self.atten_info.b_req_tokens_table,
+                self.atten_info.b_req_idx,
+                self.atten_info.b_seq_len,
+                self.atten_info.cur_select_index,
+            )
 
         self.atten_info.b_seq_len += 1
         self.atten_info.max_actual_seq_len += 1
@@ -389,6 +434,10 @@ class ModelExecutor:
             logits = self.model.forward(
                 input_ids, position_ids, self.atten_info, image_tensor=image_tensor, **kwargs
             )
+        elif self.graph_runner is not None and input_ids.shape[1] == 1:
+            if not self.graph_runner.captured:
+                self.graph_runner.capture(input_ids, position_ids, self.atten_info)
+            logits = self.graph_runner(input_ids, position_ids, self.atten_info)
         else:
             logits = self.model.forward(input_ids, position_ids, self.atten_info)
         return logits

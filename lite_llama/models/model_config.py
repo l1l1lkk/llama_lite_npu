@@ -197,6 +197,7 @@ class Qwen3Config(BaseConfig):
     model_type: str = "qwen3"
     max_seq_len: int = 2048
     max_batch_size: int = 64
+    page_size: int = 0
 
     _ALIASES = {
         "num_attention_heads": "num_heads",

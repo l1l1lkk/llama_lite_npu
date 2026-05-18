@@ -61,10 +61,11 @@ class PagedKVCacheManager:
 
         # Total tokens that can be stored
         self.max_tokens = num_pages * page_size
+        self.max_num_tokens = self.max_tokens
 
         # Pre-allocate one big KV buffer: (num_pages * page_size, 2*kv_heads, head_dim)
         tokens_per_layer = num_pages * page_size
-        self.kv_buffer = [
+        self.gpu_kv_buffer = [
             torch.empty(
                 (tokens_per_layer, 2 * num_kv_heads, head_dim),
                 dtype=dtype, device=device,
@@ -165,15 +166,15 @@ class PagedReqTokensManager:
         self.req_active = torch.zeros(max_requests, dtype=torch.bool, device="cpu")
         self.free_req_indices = list(range(max_requests))
 
-    def alloc_req(self, num_tokens: int) -> Optional[int]:
-        """Allocate a request with KV cache for `num_tokens`."""
-        if not self.free_req_indices:
-            return None
+    def alloc_req(self, req_idx: int, num_tokens: int) -> bool:
+        """Allocate KV cache for an explicit request id."""
+        if req_idx not in self.free_req_indices:
+            return False
         pages = self.page_mgr.alloc(num_tokens)
         if pages is None:
-            return None
+            return False
 
-        req_idx = self.free_req_indices.pop(0)
+        self.free_req_indices.remove(req_idx)
         self.req_page_table[req_idx] = pages
         self.req_token_count[req_idx] = num_tokens
         self.req_active[req_idx] = True
@@ -181,7 +182,7 @@ class PagedReqTokensManager:
         self.page_mgr.build_token_table(
             pages, num_tokens, self.b_req_tokens_table, req_idx,
         )
-        return req_idx
+        return True
 
     def extend_req(self, req_idx: int, num_new_tokens: int) -> bool:
         """Extend a request by `num_new_tokens` (decode step)."""
@@ -206,6 +207,14 @@ class PagedReqTokensManager:
             self.b_req_tokens_table, req_idx,
         )
         return True
+
+    def get_token_indices(
+        self, req_idx: int, num_tokens: Optional[int] = None
+    ) -> torch.Tensor:
+        """Return physical KV token positions for a request."""
+        if num_tokens is None:
+            num_tokens = self.req_token_count[req_idx]
+        return self.b_req_tokens_table[req_idx, :num_tokens]
 
     def free_req(self, req_idx: int):
         """Free a request and its pages."""

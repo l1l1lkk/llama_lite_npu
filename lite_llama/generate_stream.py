@@ -225,8 +225,12 @@ class GenerateStreamText:
                 break
 
         # 减少 kv cache 内存管理器的引用计数
-        all_select_indexs = torch.concat(all_select_index_list)
-        self.model_executor.kv_mem_manager.release_ref(all_select_indexs)
+        if self.model_executor.use_paged_attn:
+            for req_idx in b_req_idx.tolist():
+                self.model_executor.req_tokens_manager.free_req(req_idx)
+        else:
+            all_select_indexs = torch.concat(all_select_index_list)
+            self.model_executor.kv_mem_manager.release_ref(all_select_indexs)
 
     def text_completion_stream(
         self,
