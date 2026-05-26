@@ -54,6 +54,49 @@ def get_gpu_memory_info(device: str) -> dict:
     }
 
 
+def build_npu_profiler(args):
+    """Create an Ascend PyTorch profiler when requested."""
+    if not args.profile:
+        return None
+
+    if not hasattr(torch_npu, "profiler"):
+        raise RuntimeError(
+            "Ascend profiler is unavailable: torch_npu.profiler was not found. "
+            "Please verify the torch_npu/CANN installation."
+        )
+
+    required_attrs = [
+        "profile",
+        "schedule",
+        "tensorboard_trace_handler",
+        "ProfilerActivity",
+    ]
+    missing = [name for name in required_attrs if not hasattr(torch_npu.profiler, name)]
+    if missing:
+        raise RuntimeError(
+            "Ascend profiler is unavailable: missing torch_npu.profiler "
+            f"attribute(s): {', '.join(missing)}"
+        )
+
+    os.makedirs(args.profile_dir, exist_ok=True)
+    return torch_npu.profiler.profile(
+        activities=[
+            torch_npu.profiler.ProfilerActivity.CPU,
+            torch_npu.profiler.ProfilerActivity.NPU,
+        ],
+        schedule=torch_npu.profiler.schedule(
+            wait=args.profile_wait,
+            warmup=args.profile_warmup,
+            active=args.profile_active,
+            repeat=args.profile_repeat,
+        ),
+        on_trace_ready=torch_npu.profiler.tensorboard_trace_handler(args.profile_dir),
+        record_shapes=args.profile_record_shapes,
+        profile_memory=args.profile_memory,
+        with_stack=args.profile_with_stack,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Dummy image for VL benchmark
 # ---------------------------------------------------------------------------
@@ -153,6 +196,26 @@ def main():
                         help="Number of warmup iterations")
     parser.add_argument("--iterations", type=int, default=5,
                         help="Number of benchmark iterations")
+    parser.add_argument("--profile", action="store_true",
+                        help="Enable Ascend PyTorch profiler collection.")
+    parser.add_argument("--profile_dir", type=str, default="./profiler_output",
+                        help="Profiler output directory for MindStudio Insight.")
+    parser.add_argument("--profile_wait", type=int, default=0,
+                        help="Profiler schedule wait steps.")
+    parser.add_argument("--profile_warmup", type=int, default=1,
+                        help="Profiler schedule warmup steps.")
+    parser.add_argument("--profile_active", type=int, default=1,
+                        help="Profiler schedule active steps.")
+    parser.add_argument("--profile_repeat", type=int, default=1,
+                        help="Profiler schedule repeat count.")
+    parser.add_argument("--profile_record_shapes", action="store_true",
+                        help="Record operator input shapes in profiler data.")
+    parser.add_argument("--profile_memory", dest="profile_memory", action="store_true",
+                        help="Record operator memory usage in profiler data.")
+    parser.add_argument("--no_profile_memory", dest="profile_memory", action="store_false",
+                        help="Disable profiler memory collection.")
+    parser.add_argument("--profile_with_stack", action="store_true",
+                        help="Record Python stack traces in profiler data.")
     parser.add_argument(
         "--enable_thinking", dest="enable_thinking",
         action="store_true",
@@ -164,6 +227,7 @@ def main():
         help="Disable Qwen3 thinking mode.",
     )
     parser.set_defaults(enable_thinking=True)
+    parser.set_defaults(profile_memory=True)
     args = parser.parse_args()
 
     # Print header (rank 0 only)
@@ -180,6 +244,13 @@ def main():
         print(f"  Thinking:    {'on' if args.enable_thinking else 'off'}")
         print(f"  Page size:   {args.page_size}")
         print(f"  NPU Graph:   {'on' if args.compiled_model else 'off'}")
+        print(f"  Profiler:    {'on' if args.profile else 'off'}")
+        if args.profile:
+            print(f"    Output:    {args.profile_dir}")
+            print(f"    Schedule:  wait={args.profile_wait}, warmup={args.profile_warmup}, "
+                  f"active={args.profile_active}, repeat={args.profile_repeat}")
+            print(f"    Options:   record_shapes={args.profile_record_shapes}, "
+                  f"profile_memory={args.profile_memory}, with_stack={args.profile_with_stack}")
         print(f"  Warmup:      {args.warmup}  |  Iterations: {args.iterations}")
         print("=" * 70)
 
@@ -253,7 +324,9 @@ def main():
         print(f"\n  Running {args.iterations} benchmark iterations...\n")
 
     results = []
-    for i in range(args.iterations):
+    profiler = build_npu_profiler(args)
+
+    def run_one_iteration(i: int):
         torch.npu.synchronize()
         r = run_benchmark(
             generator, prompts, args.max_gen_len,
@@ -265,6 +338,16 @@ def main():
                   f"{r['total_time_s']:.3f}s, "
                   f"{r['throughput_tok_s']:.1f} tok/s, "
                   f"{r['per_token_ms']:.2f} ms/tok")
+
+    if profiler is None:
+        for i in range(args.iterations):
+            run_one_iteration(i)
+    else:
+        with profiler as prof:
+            for i in range(args.iterations):
+                run_one_iteration(i)
+                torch.npu.synchronize()
+                prof.step()
 
     # --- Summary (rank 0) ---
     if rank != 0:
