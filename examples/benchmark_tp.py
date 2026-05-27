@@ -20,9 +20,11 @@ Usage (VL model):
 """
 
 import argparse
+import inspect
 import time
 import sys
 import os
+import warnings
 from typing import Optional
 
 import torch
@@ -78,23 +80,96 @@ def build_npu_profiler(args):
             f"attribute(s): {', '.join(missing)}"
         )
 
+    experimental_config = build_npu_experimental_config(args)
     os.makedirs(args.profile_dir, exist_ok=True)
-    return torch_npu.profiler.profile(
-        activities=[
+    profile_kwargs = {
+        "activities": [
             torch_npu.profiler.ProfilerActivity.CPU,
             torch_npu.profiler.ProfilerActivity.NPU,
         ],
-        schedule=torch_npu.profiler.schedule(
+        "schedule": torch_npu.profiler.schedule(
             wait=args.profile_wait,
             warmup=args.profile_warmup,
             active=args.profile_active,
             repeat=args.profile_repeat,
         ),
-        on_trace_ready=torch_npu.profiler.tensorboard_trace_handler(args.profile_dir),
-        record_shapes=args.profile_record_shapes,
-        profile_memory=args.profile_memory,
-        with_stack=args.profile_with_stack,
+        "on_trace_ready": torch_npu.profiler.tensorboard_trace_handler(args.profile_dir),
+        "record_shapes": args.profile_record_shapes,
+        "profile_memory": args.profile_memory,
+        "with_stack": args.profile_with_stack,
+    }
+    if experimental_config is not None and supports_kwarg(torch_npu.profiler.profile, "experimental_config"):
+        profile_kwargs["experimental_config"] = experimental_config
+    elif experimental_config is not None:
+        warnings.warn(
+            "torch_npu.profiler.profile does not support experimental_config in this environment; "
+            "HCCL communication matrix may not be collected.",
+            RuntimeWarning,
+        )
+
+    return torch_npu.profiler.profile(**profile_kwargs)
+
+
+def supports_kwarg(fn, name: str) -> bool:
+    """Return whether a callable accepts a keyword argument."""
+    try:
+        signature = inspect.signature(fn)
+    except (TypeError, ValueError):
+        return True
+    return (
+        name in signature.parameters
+        or any(p.kind == inspect.Parameter.VAR_KEYWORD for p in signature.parameters.values())
     )
+
+
+def get_profiler_enum(enum_name: str, member_name: str):
+    enum_cls = getattr(torch_npu.profiler, enum_name, None)
+    if enum_cls is None or not hasattr(enum_cls, member_name):
+        raise RuntimeError(
+            f"torch_npu.profiler.{enum_name}.{member_name} is unavailable. "
+            "Please verify the torch_npu profiler version."
+        )
+    return getattr(enum_cls, member_name)
+
+
+def build_npu_experimental_config(args):
+    """Build Ascend profiler experimental config for CANN/HCCL analysis."""
+    if not hasattr(torch_npu.profiler, "_ExperimentalConfig"):
+        warnings.warn(
+            "torch_npu.profiler._ExperimentalConfig is unavailable; "
+            "HCCL communication matrix may not be collected.",
+            RuntimeWarning,
+        )
+        return None
+
+    profiler_level = get_profiler_enum("ProfilerLevel", args.profile_level)
+    aic_metrics = get_profiler_enum("AiCMetrics", args.profile_aic_metrics)
+
+    requested_kwargs = {
+        "profiler_level": profiler_level,
+        "aic_metrics": aic_metrics,
+        "l2_cache": args.profile_l2_cache,
+        "record_op_args": args.profile_record_op_args,
+        "op_attr": args.profile_op_attr,
+        "data_simplification": args.profile_data_simplification,
+    }
+
+    config_cls = torch_npu.profiler._ExperimentalConfig
+    try:
+        signature = inspect.signature(config_cls)
+        accepts_var_kwargs = any(
+            p.kind == inspect.Parameter.VAR_KEYWORD
+            for p in signature.parameters.values()
+        )
+        if not accepts_var_kwargs:
+            requested_kwargs = {
+                k: v for k, v in requested_kwargs.items()
+                if k in signature.parameters
+            }
+    except (TypeError, ValueError):
+        pass
+
+    return config_cls(**requested_kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -216,6 +291,33 @@ def main():
                         help="Disable profiler memory collection.")
     parser.add_argument("--profile_with_stack", action="store_true",
                         help="Record Python stack traces in profiler data.")
+    parser.add_argument("--profile_level", type=str, default="Level1",
+                        choices=["Level0", "Level1", "Level2"],
+                        help="Ascend profiler level. Level1 is recommended for HCCL communication analysis.")
+    parser.add_argument("--profile_aic_metrics", type=str, default="PipeUtilization",
+                        choices=[
+                            "PipeUtilization",
+                            "ArithmeticUtilization",
+                            "Memory",
+                            "MemoryL0",
+                            "MemoryUB",
+                            "ResourceConflictRatio",
+                            "L2Cache",
+                            "MemoryAccess",
+                        ],
+                        help="Ascend AI Core metrics collected by profiler.")
+    parser.add_argument("--profile_l2_cache", action="store_true",
+                        help="Collect L2 cache profiler data when supported.")
+    parser.add_argument("--profile_record_op_args", action="store_true",
+                        help="Record operator arguments when supported.")
+    parser.add_argument("--profile_op_attr", action="store_true",
+                        help="Record operator attributes when supported.")
+    parser.add_argument("--profile_data_simplification", dest="profile_data_simplification",
+                        action="store_true",
+                        help="Enable profiler data simplification.")
+    parser.add_argument("--no_profile_data_simplification", dest="profile_data_simplification",
+                        action="store_false",
+                        help="Disable profiler data simplification to preserve communication analysis files.")
     parser.add_argument(
         "--enable_thinking", dest="enable_thinking",
         action="store_true",
@@ -228,6 +330,7 @@ def main():
     )
     parser.set_defaults(enable_thinking=True)
     parser.set_defaults(profile_memory=True)
+    parser.set_defaults(profile_data_simplification=False)
     args = parser.parse_args()
 
     # Print header (rank 0 only)
@@ -251,6 +354,12 @@ def main():
                   f"active={args.profile_active}, repeat={args.profile_repeat}")
             print(f"    Options:   record_shapes={args.profile_record_shapes}, "
                   f"profile_memory={args.profile_memory}, with_stack={args.profile_with_stack}")
+            print(f"    Ascend:    level={args.profile_level}, "
+                  f"aic_metrics={args.profile_aic_metrics}, "
+                  f"l2_cache={args.profile_l2_cache}, "
+                  f"record_op_args={args.profile_record_op_args}, "
+                  f"op_attr={args.profile_op_attr}, "
+                  f"data_simplification={args.profile_data_simplification}")
         print(f"  Warmup:      {args.warmup}  |  Iterations: {args.iterations}")
         print("=" * 70)
 
