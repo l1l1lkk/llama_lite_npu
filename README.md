@@ -413,6 +413,7 @@ apply_weight_convert.py        # Hugging Face 权重转换
 - [LightLLM](https://github.com/ModelTC/lightllm)
 - [vLLM](https://github.com/vllm-project/vllm)
 - [SGLang](https://github.com/sgl-project/sglang)
+- [LiteLlama](https://github.com/harleyszhang/lite_llama)
 
 ## Citation
 
@@ -421,8 +422,8 @@ apply_weight_convert.py        # Hugging Face 权重转换
 ```bibtex
 @misc{lite-llama-npu-2026,
   title        = {Lite Llama NPU},
-  author       = {Lite Llama NPU Contributors},
+  author       = {Litellama AI team},
   year         = {2026},
-  howpublished = {\url{https://gitlab.com/l1l1lkk/llama_lite_npu}}
+  howpublished = {\url{https://github.com/harleyszhang/lite_llama}},
 }
 ```
