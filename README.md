@@ -422,8 +422,11 @@ apply_weight_convert.py        # Hugging Face 权重转换
 ```bibtex
 @misc{lite-llama-npu-2026,
   title        = {Lite Llama NPU},
-  author       = {Litellama AI team},
+  author       = {{Litellama AI team} and {Lite Llama NPU Contributors}},
   year         = {2026},
-  howpublished = {\url{https://github.com/harleyszhang/lite_llama}},
+  howpublished = {
+    \url{https://github.com/harleyszhang/lite_llama} and
+    \url{https://gitlab.com/l1l1lkk/llama_lite_npu}
+  },
 }
 ```
