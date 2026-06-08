@@ -143,6 +143,39 @@ Qwen3-32B、TP=2 时，每个 Decode Token 的主要 Linear 路径为：
 
 Profiler 会显著增加运行开销，因此开启 `--profile` 后的延迟不作为正式性能成绩。
 
+### 与 vLLM-Ascend 8.2.0rc2 的性能对比
+
+以下数据均来自 **2 × Atlas 910B3、Qwen3-32B、BF16、并发 1** 的 EvalScope 测试。vLLM-Ascend 一侧的版本标识按对比测试环境记录为 `8.2.0rc2`。
+
+| 指标 | Lite Llama NPU | vLLM-Ascend 8.2.0rc2 | 当前差距 |
+|---|---:|---:|---:|
+| Output Throughput | 5.63 tok/s | 7.64 tok/s | vLLM-Ascend 高约 35.7% |
+| Decode Throughput | 5.68 tok/s | 约 7.63 tok/s | vLLM-Ascend 高约 34% |
+| TPOT / 每输出 Token 时间 | 176.0 ms | 131.1 ms | Lite Llama NPU 高约 34.2% |
+| TTFT | 615.9 ms | 392.7 ms | 测试输入长度不同，仅供参考 |
+| 请求成功率 | 100% | 100% | 相同 |
+
+测试口径存在以下差异：
+
+| 项目 | Lite Llama NPU | vLLM-Ascend |
+|---|---:|---:|
+| 平均输入长度 | 128 tokens | 约 29 tokens |
+| 平均输出长度 | 约 256 tokens | 约 1300 tokens |
+| 输出上下文范围 | 约 384 tokens | 最高约 1700 tokens |
+
+因此，TTFT 和单请求总延迟不能直接横向比较；TPOT 与 Output Throughput 更能反映当前 Decode 引擎差距。即使 vLLM-Ascend 测试覆盖了更长的 Decode 上下文，其输出吞吐仍高于本项目，说明当前框架在 Decode 路径上仍有约 **25%～35%** 的优化空间。
+
+结合 MindStudio Insight 分析，当前差距主要集中在：
+
+- Decode 阶段大量 small-M `MatMulV2`，每 Token 共 385 次 MatMul；
+- Q+KV、Gate+Up 尚未融合；
+- 每 Token 执行 128 次同步 HCCL AllReduce，计算与通信尚未重叠；
+- NPU Graph 尚未形成稳定的固定 Shape replay；
+- LM Head 会 AllGather 完整词表 Logits；
+- 服务端尚未实现 Continuous Batching。
+
+> 该对比用于记录当前工程状态。后续将使用完全一致的 Prompt、Output、采样参数和 EvalScope 版本重新测试，形成严格可复现的对照数据。
+
 ### Profiler 观察
 
 MindStudio Insight 对当前 TP2 Decode 的分析显示：
