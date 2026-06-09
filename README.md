@@ -9,6 +9,7 @@
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.7-orange)
 ![Ascend](https://img.shields.io/badge/Ascend-910B3-red)
+![Version](https://img.shields.io/badge/version-0.0.1rc1-blue)
 ![Status](https://img.shields.io/badge/status-active_development-yellow)
 
 </div>
@@ -25,6 +26,14 @@ Lite Llama NPU 的目标不是封装 Transformers，而是实现一条可以观�
 - Ascend PyTorch Profiler 与 MindStudio Insight 可视化分析。
 
 当前项目适合推理框架学习、算子分析和性能优化实验，仍处于持续开发阶段，不建议直接作为生产服务使用。
+
+## 最新版本
+
+当前版本：**0.0.1rc1**（2026-06-09）
+
+- [v0.0.1rc1完整版本报告](docs/releases/v0.0.1rc1.md)
+- [完整CHANGELOG](CHANGELOG.md)
+- [版本管理与发布规范](docs/versioning.md)
 
 ## 主要能力
 
@@ -62,7 +71,8 @@ Lite Llama NPU 的目标不是封装 Transformers，而是实现一条可以观�
   - Skip + RMSNorm 融合；
   - RoPE、RMSNorm、Softmax、KV 更新等 Triton Ascend 内核。
 - **图模式**
-  - Decode NPU Graph capture/replay 实验路径；
+  - Decode NPU Graph按128-token长度Bucket进行capture/replay；
+  - 同一Bucket复用固定Shape Graph并更新动态KV元数据；
   - Shape 不满足 replay 条件时安全回退 Eager。
 - **性能观测**
   - Ascend PyTorch Profiler；
@@ -100,9 +110,9 @@ Qwen3-32B、TP=2 时，每个 Decode Token 的主要 Linear 路径为：
 
 当前 K/V 已融合为一次投影；Q+KV、Gate+Up 融合仍是后续重点。
 
-## 当前性能
+## 最新版本性能
 
-### 测试环境
+以下仅记录当前版本`0.0.1rc1`的最新性能。历史性能、相对上一版本的变化和验证过程见[版本报告](docs/releases/v0.0.1rc1.md)。
 
 | 项目 | 配置 |
 |---|---|
@@ -110,91 +120,39 @@ Qwen3-32B、TP=2 时，每个 Decode Token 的主要 Linear 路径为：
 | 模型 | Qwen3-32B |
 | 并行 | TP=2 |
 | 当前计算路径 | FP16 |
-| Prompt | 约 128 tokens |
-| 最大生成长度 | 256 tokens |
+| 并发 | 1 |
+| 请求数 | 15 |
+| 原始输入长度 | 随机20～45 tokens |
+| 最大生成长度 | 2048 tokens |
 | PagedAttention | page size 16 |
-| NPU Graph | 实验性开启 |
-
-### 离线 TP Benchmark
-
-测试参数：`batch_size=4`、`warmup=2`、`iterations=5`。
-
-| 指标 | 当前结果 |
-|---|---:|
-| 平均生成耗时 | 约 47.5～48.5 s |
-| 单序列 Decode 吞吐 | 约 5.3～5.4 tok/s |
-| 每 Token 延迟 | 约 185～189 ms |
-| Batch 聚合吞吐 | 约 21～22 tok/s |
-| 模型与 KV Cache 显存 | 约 54.2 GB/卡 |
-
-> `5.3 tok/s` 是一次 Decode Step 的速度；batch=4 时聚合吞吐约为 `21.3 tok/s`。两种指标不能混用。
-
-### EvalScope / OpenAI API
-
-最新测试参数：2 × Atlas 910B3、TP=2、并发 1、15 个请求、随机输入长度 20～45 tokens、`max_tokens=2048`、真实 SSE Streaming。服务端按实际送入模型的完整 Qwen3 ChatML Prompt 统计 Token，因此最终输入长度为 53～72 tokens。
+| NPU Graph | 128-token Bucket Capture/Replay |
 
 | 指标 | 当前结果 |
 |---|---:|
 | 请求成功率 | 100%（15/15） |
-| 平均输入长度 | 60.73 tokens |
-| 平均输出长度 | 564.73 tokens |
-| 平均延迟 | 99.15 s |
-| TTFT | 228.3 ms |
-| TPOT | 175.2 ms |
-| ITL | 174.7 ms |
-| Output Throughput | 5.696 tok/s |
-| Total Throughput | 6.309 tok/s |
-
-Profiler 会显著增加运行开销，因此开启 `--profile` 后的延迟不作为正式性能成绩。
+| 平均输入长度 | 59.53 tokens（含ChatML） |
+| 平均输出长度 | 494.47 tokens |
+| 平均延迟 | 20.5502 s |
+| TTFT | 261.2 ms |
+| TPOT | 40.6 ms |
+| ITL | 40.9 ms |
+| Output Throughput | 24.0606 tok/s |
+| Total Throughput | 26.9575 tok/s |
+| Request Throughput | 0.0487 req/s |
 
 ### 与 vLLM-Ascend 0.8.4rc2 的性能对比
 
-以下数据均来自 **2 × Atlas 910B3、Qwen3-32B、TP=2、并发 1** 的 EvalScope 测试。Lite Llama NPU 使用本项目最新实测结果；vLLM-Ascend 使用第三方公开的 `0.8.4rc2` 测试结果。
+双方均为2 × Atlas 910B3、Qwen3-32B、TP=2、并发1。Lite Llama NPU使用本项目最新实测结果；vLLM-Ascend使用第三方公开的`0.8.4rc2`结果。
 
-| 指标 | Lite Llama NPU | vLLM-Ascend 0.8.4rc2 | 当前差距 |
+| 指标 | Lite Llama NPU 0.0.1rc1 | vLLM-Ascend 0.8.4rc2 | 对比 |
 |---|---:|---:|---:|
-| Output Throughput | 5.696 tok/s | 7.6409 tok/s | 本项目低约 25.5%，vLLM-Ascend 约为 1.34× |
-| Total Throughput | 6.3085 tok/s | 7.8122 tok/s | 本项目低约 19.3% |
-| TPOT / 每输出 Token 时间 | 175.2 ms | 131.1 ms | 本项目高约 33.6% |
-| TTFT | 228.3 ms | 392.7 ms | 输入长度与服务实现不同，仅供参考 |
-| 平均延迟 | 99.15 s | 170.12 s | 输出长度不同，不直接比较 |
+| Output Throughput | 24.0606 tok/s | 7.6409 tok/s | 本项目约3.15× |
+| Total Throughput | 26.9575 tok/s | 7.8122 tok/s | 本项目约3.45× |
+| TPOT | 40.6 ms | 131.1 ms | 本项目低约69.0% |
+| TTFT | 261.2 ms | 392.7 ms | 本项目低约33.5% |
 | 请求成功率 | 100% | 100% | 相同 |
 
-测试口径存在以下差异：
-
-| 项目 | Lite Llama NPU | vLLM-Ascend |
-|---|---:|---:|
-| 计算精度 | FP16 | BF16 |
-| 请求数 | 15 | 15 |
-| 平均输入长度 | 60.73 tokens（含 ChatML） | 29.13 tokens |
-| 输入长度范围 | 53～72 tokens（含 ChatML） | 约 20～45 tokens |
-| 平均输出长度 | 564.73 tokens | 约 1300 tokens |
-| 最大观测输出长度 | 1374 tokens | 1704 tokens |
-
-因此，TTFT、请求吞吐和单请求总延迟不能直接横向比较；TPOT 与 Output Throughput 更能反映当前 Decode 引擎差距。即使 vLLM-Ascend 测试覆盖了更长的 Decode 上下文，其输出吞吐仍高于本项目。按当前结果，本项目的 Output Throughput 低约 **25.5%**，TPOT 高约 **33.6%**，Decode 路径仍有明确优化空间。
-
-结合 MindStudio Insight 分析，当前差距主要集中在：
-
-- Decode 阶段大量 small-M `MatMulV2`，每 Token 共 385 次 MatMul；
-- Q+KV、Gate+Up 尚未融合；
-- 每 Token 执行 128 次同步 HCCL AllReduce，计算与通信尚未重叠；
-- NPU Graph 尚未形成稳定的固定 Shape replay；
-- LM Head 会 AllGather 完整词表 Logits；
-- 服务端尚未实现 Continuous Batching。
-
-> 该对比用于记录当前工程状态，不是严格同口径 Benchmark。后续需要使用相同精度、Prompt、Output、采样参数和 EvalScope 版本重新测试，形成可复现的直接对照。
-
-### Profiler 观察
-
-MindStudio Insight 对当前 TP2 Decode 的分析显示：
-
-- `MatMulV2` 约占已统计算子耗时的 **59.6%**；
-- 生成 256 tokens 共触发 **98,560 次 MatMulV2**，与模型结构计算一致；
-- 64 层模型每 Token 执行 128 次 AllReduce；
-- 256 Token 采集中记录到 **32,768 次 HCCL AllReduce**；
-- 当前主要优化方向是 small-M MatMul、TP 通信等待、Graph replay、LM Head 和采样小算子。
-
-这些数据用于定位瓶颈，不代表所有运行环境都会得到完全相同的比例。
+> 该对比不是严格同口径Benchmark：本项目使用FP16，对方使用BF16；输入模板、平均输入/输出长度和EvalScope版本也可能不同。数据用于当前工程基座观察，详细口径见[版本报告](docs/releases/v0.0.1rc1.md)。
 
 ## 环境安装
 
