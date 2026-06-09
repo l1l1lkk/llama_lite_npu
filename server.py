@@ -44,6 +44,10 @@ class ChatMessage(BaseModel):
     content: Union[str, List[dict]]
 
 
+class StreamOptions(BaseModel):
+    include_usage: bool = False
+
+
 class ChatCompletionRequest(BaseModel):
     model: str = "default"
     messages: List[ChatMessage]
@@ -51,6 +55,7 @@ class ChatCompletionRequest(BaseModel):
     top_p: float = Field(default=0.9, ge=0.0, le=1.0)
     max_tokens: int = Field(default=512, ge=1, le=32768)
     stream: bool = False
+    stream_options: Optional[StreamOptions] = None
     enable_thinking: bool = True
 
 
@@ -429,6 +434,24 @@ async def _stream_chat(
             "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
         }
         yield f"data: {json.dumps(final_chunk, ensure_ascii=False)}\n\n"
+
+        if req.stream_options and req.stream_options.include_usage:
+            prompt_tokens = _count_tokens(prompt)
+            completion_tokens = _count_tokens(completion)
+            usage_chunk = {
+                "id": rid,
+                "object": "chat.completion.chunk",
+                "created": int(time.time()),
+                "model": _model_name,
+                "choices": [],
+                "usage": {
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                    "total_tokens": prompt_tokens + completion_tokens,
+                },
+            }
+            yield f"data: {json.dumps(usage_chunk, ensure_ascii=False)}\n\n"
+
         yield "data: [DONE]\n\n"
     except Exception as e:
         yield f"data: {json.dumps({'error': str(e)})}\n\n"
