@@ -441,8 +441,6 @@ class ModelExecutor:
                 input_ids, position_ids, self.atten_info, image_tensor=image_tensor, **kwargs
             )
         elif self.graph_runner is not None and input_ids.shape[1] == 1:
-            if not self.graph_runner.captured:
-                self.graph_runner.capture(input_ids, position_ids, self.atten_info)
             logits = self.graph_runner(input_ids, position_ids, self.atten_info)
         else:
             logits = self.model.forward(input_ids, position_ids, self.atten_info)

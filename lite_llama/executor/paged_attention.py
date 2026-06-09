@@ -186,6 +186,9 @@ class PagedReqTokensManager:
 
     def extend_req(self, req_idx: int, num_new_tokens: int) -> bool:
         """Extend a request by `num_new_tokens` (decode step)."""
+        if num_new_tokens <= 0:
+            return True
+
         cur_tokens = self.req_token_count[req_idx]
         new_total = cur_tokens + num_new_tokens
         if new_total > self.max_seq_len:
@@ -201,11 +204,21 @@ class PagedReqTokensManager:
             existing = self.req_page_table[req_idx]
             self.req_page_table[req_idx] = torch.cat([existing, additional])
 
-        self.req_token_count[req_idx] = new_total
-        self.page_mgr.build_token_table(
-            self.req_page_table[req_idx], new_total,
-            self.b_req_tokens_table, req_idx,
+        # Append only the new logical-to-physical mappings. Rebuilding the
+        # complete table on every token makes decode host work grow with the
+        # context length and repeatedly synchronizes page ids back to Python.
+        logical_positions = torch.arange(cur_tokens, new_total, dtype=torch.long)
+        page_slots = torch.div(
+            logical_positions, self.page_mgr.page_size, rounding_mode="floor"
         )
+        offsets = logical_positions.remainder(self.page_mgr.page_size)
+        page_ids = self.req_page_table[req_idx][page_slots]
+        physical_positions = page_ids * self.page_mgr.page_size + offsets
+        self.b_req_tokens_table[req_idx, cur_tokens:new_total] = physical_positions.to(
+            device=self.b_req_tokens_table.device,
+            dtype=self.b_req_tokens_table.dtype,
+        )
+        self.req_token_count[req_idx] = new_total
         return True
 
     def get_token_indices(
