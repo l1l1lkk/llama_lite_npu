@@ -131,39 +131,47 @@ Qwen3-32B、TP=2 时，每个 Decode Token 的主要 Linear 路径为：
 
 ### EvalScope / OpenAI API
 
-测试参数：并发 1、输入 128 tokens、输出 256 tokens、真实 SSE Streaming。
+最新测试参数：2 × Atlas 910B3、TP=2、并发 1、15 个请求、随机输入长度 20～45 tokens、`max_tokens=2048`、真实 SSE Streaming。服务端按实际送入模型的完整 Qwen3 ChatML Prompt 统计 Token，因此最终输入长度为 53～72 tokens。
 
 | 指标 | 当前结果 |
 |---|---:|
-| TTFT | 约 615.9 ms |
-| TPOT | 约 176.0 ms |
-| ITL | 约 175.2 ms |
-| Decode 吞吐 | 约 5.68 tok/s |
-| Output Throughput | 约 5.63 tok/s |
+| 请求成功率 | 100%（15/15） |
+| 平均输入长度 | 60.73 tokens |
+| 平均输出长度 | 564.73 tokens |
+| 平均延迟 | 99.15 s |
+| TTFT | 228.3 ms |
+| TPOT | 175.2 ms |
+| ITL | 174.7 ms |
+| Output Throughput | 5.696 tok/s |
+| Total Throughput | 6.309 tok/s |
 
 Profiler 会显著增加运行开销，因此开启 `--profile` 后的延迟不作为正式性能成绩。
 
-### 与 vLLM-Ascend 8.2.0rc2 的性能对比
+### 与 vLLM-Ascend 0.8.4rc2 的性能对比
 
-以下数据均来自 **2 × Atlas 910B3、Qwen3-32B、BF16、并发 1** 的 EvalScope 测试。vLLM-Ascend 一侧的版本标识按对比测试环境记录为 `8.2.0rc2`。
+以下数据均来自 **2 × Atlas 910B3、Qwen3-32B、TP=2、并发 1** 的 EvalScope 测试。Lite Llama NPU 使用本项目最新实测结果；vLLM-Ascend 使用第三方公开的 `0.8.4rc2` 测试结果。
 
-| 指标 | Lite Llama NPU | vLLM-Ascend 8.2.0rc2 | 当前差距 |
+| 指标 | Lite Llama NPU | vLLM-Ascend 0.8.4rc2 | 当前差距 |
 |---|---:|---:|---:|
-| Output Throughput | 5.63 tok/s | 7.64 tok/s | vLLM-Ascend 高约 35.7% |
-| Decode Throughput | 5.68 tok/s | 约 7.63 tok/s | vLLM-Ascend 高约 34% |
-| TPOT / 每输出 Token 时间 | 176.0 ms | 131.1 ms | Lite Llama NPU 高约 34.2% |
-| TTFT | 615.9 ms | 392.7 ms | 测试输入长度不同，仅供参考 |
+| Output Throughput | 5.696 tok/s | 7.6409 tok/s | 本项目低约 25.5%，vLLM-Ascend 约为 1.34× |
+| Total Throughput | 6.3085 tok/s | 7.8122 tok/s | 本项目低约 19.3% |
+| TPOT / 每输出 Token 时间 | 175.2 ms | 131.1 ms | 本项目高约 33.6% |
+| TTFT | 228.3 ms | 392.7 ms | 输入长度与服务实现不同，仅供参考 |
+| 平均延迟 | 99.15 s | 170.12 s | 输出长度不同，不直接比较 |
 | 请求成功率 | 100% | 100% | 相同 |
 
 测试口径存在以下差异：
 
 | 项目 | Lite Llama NPU | vLLM-Ascend |
 |---|---:|---:|
-| 平均输入长度 | 128 tokens | 约 29 tokens |
-| 平均输出长度 | 约 256 tokens | 约 1300 tokens |
-| 输出上下文范围 | 约 384 tokens | 最高约 1700 tokens |
+| 计算精度 | FP16 | BF16 |
+| 请求数 | 15 | 15 |
+| 平均输入长度 | 60.73 tokens（含 ChatML） | 29.13 tokens |
+| 输入长度范围 | 53～72 tokens（含 ChatML） | 约 20～45 tokens |
+| 平均输出长度 | 564.73 tokens | 约 1300 tokens |
+| 最大观测输出长度 | 1374 tokens | 1704 tokens |
 
-因此，TTFT 和单请求总延迟不能直接横向比较；TPOT 与 Output Throughput 更能反映当前 Decode 引擎差距。即使 vLLM-Ascend 测试覆盖了更长的 Decode 上下文，其输出吞吐仍高于本项目，说明当前框架在 Decode 路径上仍有约 **25%～35%** 的优化空间。
+因此，TTFT、请求吞吐和单请求总延迟不能直接横向比较；TPOT 与 Output Throughput 更能反映当前 Decode 引擎差距。即使 vLLM-Ascend 测试覆盖了更长的 Decode 上下文，其输出吞吐仍高于本项目。按当前结果，本项目的 Output Throughput 低约 **25.5%**，TPOT 高约 **33.6%**，Decode 路径仍有明确优化空间。
 
 结合 MindStudio Insight 分析，当前差距主要集中在：
 
@@ -174,7 +182,7 @@ Profiler 会显著增加运行开销，因此开启 `--profile` 后的延迟不�
 - LM Head 会 AllGather 完整词表 Logits；
 - 服务端尚未实现 Continuous Batching。
 
-> 该对比用于记录当前工程状态。后续将使用完全一致的 Prompt、Output、采样参数和 EvalScope 版本重新测试，形成严格可复现的对照数据。
+> 该对比用于记录当前工程状态，不是严格同口径 Benchmark。后续需要使用相同精度、Prompt、Output、采样参数和 EvalScope 版本重新测试，形成可复现的直接对照。
 
 ### Profiler 观察
 
