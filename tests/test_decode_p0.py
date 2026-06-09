@@ -119,7 +119,9 @@ class NpuGraphBucketTest(unittest.TestCase):
                 graph.capture_end()
 
         fake_npu = SimpleNamespace(
-            set_option=lambda options: None,
+            set_option=lambda options: (_ for _ in ()).throw(
+                AssertionError("NPUGraph must not depend on ACL_TASK_SINK")
+            ),
             synchronize=lambda: None,
             NPUGraph=lambda: fake_graph,
             graph=graph_context,

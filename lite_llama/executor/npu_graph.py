@@ -17,8 +17,7 @@ import torch
 
 try:
     _NPU_GRAPH_AVAILABLE = (
-        hasattr(torch.npu, "set_option")
-        and hasattr(torch.npu, "NPUGraph")
+        hasattr(torch.npu, "NPUGraph")
         and hasattr(torch.npu, "graph")
     )
 except Exception:
@@ -94,8 +93,6 @@ class NpuGraphRunner:
             return False
 
         try:
-            torch.npu.set_option({"ACL_TASK_SINK": "1"})
-
             # Graph capture requires stable storage. AttentionInfo is mutated by
             # KV allocation after every decode step, so retain independent
             # dynamic tensors while sharing the large KV and request tables.
