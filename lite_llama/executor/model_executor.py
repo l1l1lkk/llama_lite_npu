@@ -13,7 +13,7 @@ from .paged_attention import PagedKVCacheManager, PagedReqTokensManager
 
 from .cuda_graph import ModelRunner
 from .executor_struct import AttentionInfo, CONFIG_CLASS_MAP
-from ..models.model_config import LlamaConfig, Qwen3VLConfig
+from ..models.model_config import LlamaConfig, Qwen3MoeConfig, Qwen3VLConfig
 from ..kernels import update_kv_index
 from ..utils.device import get_device
 from ..utils.logger import get_logger
@@ -21,6 +21,7 @@ from .tp_utils import (
     TPConfig, init_tp, detect_tp_env, get_tp_config,
     shard_attention_q, shard_attention_kv, shard_attention_o,
     shard_ffn_gate_up, shard_ffn_down, shard_lm_head,
+    shard_moe_gate_up, shard_moe_down,
 )
 
 logger = get_logger(__name__)
@@ -185,6 +186,9 @@ class ModelExecutor:
         elif model_type == "qwen3":
             from ..models.qwen3 import Qwen3Model
             model = Qwen3Model(model_config, tp_config=tp_config)
+        elif model_type == "qwen3_moe":
+            from ..models.qwen3_moe import Qwen3MoeModel
+            model = Qwen3MoeModel(model_config, tp_config=tp_config)
         elif model_type == "llava":
             from ..models.llava import LlavaLlama
             model = LlavaLlama(model_config)
@@ -257,7 +261,16 @@ class ModelExecutor:
         # --- NPU Graph (decode kernel launch batching) ---
         self.graph_runner = None
         if self.compiled_model:
-            self.apply_npu_graph()
+            from .npu_graph import supports_decode_graph
+
+            if supports_decode_graph(self.model_type):
+                self.apply_npu_graph()
+            else:
+                logger.warning(
+                    "NPU Graph is disabled for qwen3_moe because dynamic "
+                    "expert dispatch does not have a static decode topology; "
+                    "using eager decode."
+                )
 
     def _get_max_avaliable_tokens(self,model, gpu_memory_utilization=0.9, block_size=1):
         avaliable_blocks = ComputeMaxAvailableBlocks(
@@ -500,6 +513,21 @@ def _shard_state_dict(
         k_down = f"{p.replace('self_attn', 'mlp')}.down_proj.weight"
         if k_down in state_dict:
             state_dict[k_down] = shard_ffn_down(state_dict[k_down], tp)
+
+        # MoE experts: router is replicated, expert MLP uses tensor parallel.
+        moe_prefix = p.replace("self_attn", "mlp")
+        gate_up_key = f"{moe_prefix}.experts.gate_up_weight"
+        down_key = f"{moe_prefix}.experts.down_weight"
+        if gate_up_key in state_dict:
+            state_dict[gate_up_key] = shard_moe_gate_up(
+                state_dict[gate_up_key],
+                model_config.moe_intermediate_size,
+                tp,
+            )
+        if down_key in state_dict:
+            state_dict[down_key] = shard_moe_down(
+                state_dict[down_key], tp
+            )
 
     # lm_head: column-shard along vocab dim
     lm_key = f"{prefix}lm_head_weight"

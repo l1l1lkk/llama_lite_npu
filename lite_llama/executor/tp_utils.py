@@ -158,6 +158,38 @@ def shard_ffn_down(
     return weight[:, _shard_slice(weight.shape[1], tp.world_size, tp.rank)].clone()
 
 
+def shard_moe_gate_up(
+    weight: torch.Tensor, intermediate_size: int, tp: TPConfig
+) -> torch.Tensor:
+    """Shard stacked MoE gate/up weights without mixing their row ranges.
+
+    ``weight`` uses ``[expert, gate_then_up, hidden]`` layout.
+    """
+    if not tp.enabled:
+        return weight
+    if weight.ndim != 3 or weight.shape[1] != 2 * intermediate_size:
+        raise ValueError(
+            "MoE gate/up weight must have shape "
+            f"[experts, {2 * intermediate_size}, hidden], got {tuple(weight.shape)}"
+        )
+    gate_slice = _shard_slice(intermediate_size, tp.world_size, tp.rank)
+    up_slice = _shard_slice(intermediate_size, tp.world_size, tp.rank)
+    gate = weight[:, gate_slice, :]
+    up = weight[:, intermediate_size + up_slice.start : intermediate_size + up_slice.stop, :]
+    return torch.cat((gate, up), dim=1).clone()
+
+
+def shard_moe_down(weight: torch.Tensor, tp: TPConfig) -> torch.Tensor:
+    """Shard stacked MoE down weights on their intermediate/input axis."""
+    if not tp.enabled:
+        return weight
+    if weight.ndim != 3:
+        raise ValueError(
+            f"MoE down weight must be three-dimensional, got {tuple(weight.shape)}"
+        )
+    return weight[:, :, _shard_slice(weight.shape[2], tp.world_size, tp.rank)].clone()
+
+
 def shard_lm_head(
     weight: torch.Tensor, tp: TPConfig
 ) -> torch.Tensor:

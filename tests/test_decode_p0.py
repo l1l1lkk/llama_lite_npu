@@ -72,6 +72,10 @@ class PagedKvIncrementalUpdateTest(unittest.TestCase):
 
 
 class NpuGraphBucketTest(unittest.TestCase):
+    def test_qwen3_moe_is_explicitly_excluded_from_decode_graph(self):
+        self.assertTrue(npu_graph.supports_decode_graph("qwen3"))
+        self.assertFalse(npu_graph.supports_decode_graph("qwen3_moe"))
+
     def test_sequence_lengths_share_partition_bucket(self):
         self.assertEqual(npu_graph.NpuGraphRunner.sequence_bucket(1), 128)
         self.assertEqual(npu_graph.NpuGraphRunner.sequence_bucket(127), 128)

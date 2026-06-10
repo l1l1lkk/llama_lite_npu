@@ -27,6 +27,11 @@ except Exception:
 logger = logging.getLogger(__name__)
 
 
+def supports_decode_graph(model_type: str) -> bool:
+    """Return whether the model has a static decode execution topology."""
+    return model_type.lower() != "qwen3_moe"
+
+
 @dataclass
 class _CapturedGraph:
     graph: object
