@@ -1,4 +1,5 @@
 import importlib.util
+import ast
 import sys
 import unittest
 from pathlib import Path
@@ -158,6 +159,23 @@ class Qwen3MoeExecutionTest(unittest.TestCase):
             )
         expected = torch.stack(expected_rows).view_as(inputs)
         torch.testing.assert_close(output, expected)
+
+
+class Qwen3MoeSwiGLUStrideTest(unittest.TestCase):
+    def test_kernel_accepts_independent_input_and_output_row_strides(self):
+        source = (ROOT / "lite_llama/kernels/swiglu.py").read_text()
+        module = ast.parse(source)
+        kernel = next(
+            node
+            for node in module.body
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and node.name == "_swiglu_forward_kernel"
+        )
+        argument_names = [arg.arg for arg in kernel.args.args]
+
+        self.assertIn("a_row_stride", argument_names)
+        self.assertIn("b_row_stride", argument_names)
+        self.assertIn("c_row_stride", argument_names)
 
 
 class Qwen3MoeWeightConversionTest(unittest.TestCase):

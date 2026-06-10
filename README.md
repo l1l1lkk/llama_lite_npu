@@ -9,7 +9,7 @@
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.7-orange)
 ![Ascend](https://img.shields.io/badge/Ascend-910B3-red)
-![Version](https://img.shields.io/badge/version-0.0.2rc1-blue)
+![Version](https://img.shields.io/badge/version-0.0.2rc2-blue)
 ![Status](https://img.shields.io/badge/status-active_development-yellow)
 
 </div>
@@ -29,9 +29,9 @@ Lite Llama NPU 的目标不是封装 Transformers，而是实现一条可以观�
 
 ## 最新版本
 
-当前版本：**0.0.2rc1**（2026-06-10）
+当前版本：**0.0.2rc2**（2026-06-10）
 
-- [v0.0.2rc1完整版本报告](docs/releases/v0.0.2rc1.md)
+- [v0.0.2rc2完整版本报告](docs/releases/v0.0.2rc2.md)
 - [完整CHANGELOG](CHANGELOG.md)
 - [版本管理与发布规范](docs/versioning.md)
 

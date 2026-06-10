@@ -51,14 +51,21 @@ def silu(x):
 
 @triton.jit
 def _swiglu_forward_kernel(
-    a_ptr, b_ptr, c_ptr, row_stride, n_cols: tl.constexpr, BLOCK_SIZE: tl.constexpr
+    a_ptr,
+    b_ptr,
+    c_ptr,
+    a_row_stride,
+    b_row_stride,
+    c_row_stride,
+    n_cols: tl.constexpr,
+    BLOCK_SIZE: tl.constexpr,
 ):
     program_id = tl.program_id(0).to(tl.int64)
 
     # locate start index
-    a_ptr += program_id * row_stride
-    b_ptr += program_id * row_stride
-    c_ptr += program_id * row_stride
+    a_ptr += program_id * a_row_stride
+    b_ptr += program_id * b_row_stride
+    c_ptr += program_id * c_row_stride
 
     col_offsets = tl.arange(0, BLOCK_SIZE)
     mask = col_offsets < n_cols
@@ -85,7 +92,9 @@ def swiglu_forward(a, b):
         a,
         b,
         c,
-        c.stride(-2),  # c.stride(-2) = n_cols
+        a.stride(-2),
+        b.stride(-2),
+        c.stride(-2),
         n_cols=n_cols,
         BLOCK_SIZE=BLOCK_SIZE,
     )

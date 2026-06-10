@@ -2,6 +2,26 @@
 
 所有触发版本升级的变更按发布时间倒序记录。详细规则见[版本管理与发布规范](docs/versioning.md)。
 
+## [0.0.2rc2] - 2026-06-10
+
+修复Qwen3-30B-A3B MoE在Prefill阶段因SwiGLU错误读取非连续Gate/Up视图而产生无关回答的问题。
+
+### Bug修复
+
+- SwiGLU Triton内核分别接收Gate、Up和输出张量的行跨度；
+- 修复融合Gate/Up经过`chunk()`后输入stride大于输出stride时的错误寻址；
+- Dense MLP连续张量路径保持兼容。
+
+### 验证状态
+
+- Qwen3 MoE单元测试由9项增加到10项并全部通过；
+- Python静态编译和`git diff --check`通过；
+- Atlas 910B3端到端回答正确性等待目标服务器验证。
+
+### 文档
+
+- [v0.0.2rc2完整版本报告](docs/releases/v0.0.2rc2.md)
+
 ## [0.0.2rc1] - 2026-06-10
 
 新增Qwen3-30B-A3B MoE模型的正确性优先适配。
@@ -52,3 +72,4 @@
 
 [0.0.1rc1]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.1rc1
 [0.0.2rc1]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.2rc1
+[0.0.2rc2]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.2rc2
