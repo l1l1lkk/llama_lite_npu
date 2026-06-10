@@ -9,14 +9,14 @@
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.7-orange)
 ![Ascend](https://img.shields.io/badge/Ascend-910B3-red)
-![Version](https://img.shields.io/badge/version-0.0.1rc1-blue)
+![Version](https://img.shields.io/badge/version-0.0.2rc1-blue)
 ![Status](https://img.shields.io/badge/status-active_development-yellow)
 
 </div>
 
 ## 项目简介
 
-Lite Llama NPU 的目标不是封装 Transformers，而是实现一条可以观察、修改和验证的昇腾大模型推理链路。目前项目重点围绕 **Qwen3-32B 在 Atlas 910B3 上的多卡推理**展开，覆盖：
+Lite Llama NPU 的目标不是封装 Transformers，而是实现一条可以观察、修改和验证的昇腾大模型推理链路。目前项目重点围绕 **Qwen3 Dense与MoE模型在Atlas 910B3上的多卡推理**展开，覆盖：
 
 - 模型权重转换与 TP 分片；
 - Prefill、Decode、KV Cache 和流式生成；
@@ -29,9 +29,9 @@ Lite Llama NPU 的目标不是封装 Transformers，而是实现一条可以观�
 
 ## 最新版本
 
-当前版本：**0.0.1rc1**（2026-06-09）
+当前版本：**0.0.2rc1**（2026-06-10）
 
-- [v0.0.1rc1完整版本报告](docs/releases/v0.0.1rc1.md)
+- [v0.0.2rc1完整版本报告](docs/releases/v0.0.2rc1.md)
 - [完整CHANGELOG](CHANGELOG.md)
 - [版本管理与发布规范](docs/versioning.md)
 
@@ -40,6 +40,7 @@ Lite Llama NPU 的目标不是封装 Transformers，而是实现一条可以观�
 ### 模型与推理
 
 - 支持 Qwen3 文本模型，重点验证 Qwen3-32B；
+- 支持 Qwen3-30B-A3B MoE模型的FP16双卡正确性路径；
 - 支持 Qwen3-VL 多模态推理路径；
 - 保留 Llama、Qwen2、LLaVA 等模型实现；
 - 支持流式输出、Top-p、Temperature 和贪心采样；
@@ -54,6 +55,7 @@ Lite Llama NPU 的目标不是封装 Transformers，而是实现一条可以观�
 
 - **Tensor Parallelism**
   - Q、KV、O、Gate、Up、Down 和 LM Head 权重分片；
+  - MoE Router复制与专家内部Tensor Parallel；
   - HCCL AllReduce、AllGather；
   - 支持 `torchrun` 单机多卡推理。
 - **Attention**
@@ -74,6 +76,7 @@ Lite Llama NPU 的目标不是封装 Transformers，而是实现一条可以观�
   - Decode NPU Graph按128-token长度Bucket进行capture/replay；
   - 同一Bucket复用固定Shape Graph并更新动态KV元数据；
   - Shape 不满足 replay 条件时安全回退 Eager。
+  - Qwen3 MoE首版因动态专家路由显式使用Eager Decode。
 - **性能观测**
   - Ascend PyTorch Profiler；
   - CPU、CANN、NPU 算子、HBM 和 HCCL 通信数据；
@@ -112,7 +115,7 @@ Qwen3-32B、TP=2 时，每个 Decode Token 的主要 Linear 路径为：
 
 ## 最新版本性能
 
-以下仅记录当前版本`0.0.1rc1`的最新性能。历史性能、相对上一版本的变化和验证过程见[版本报告](docs/releases/v0.0.1rc1.md)。
+以下记录当前已完成目标硬件验证的最新性能，即Qwen3-32B基线。Qwen3-30B-A3B尚未产生910B3实测数据，验证状态见[v0.0.2rc1版本报告](docs/releases/v0.0.2rc1.md)。
 
 | 项目 | 配置 |
 |---|---|
@@ -144,7 +147,7 @@ Qwen3-32B、TP=2 时，每个 Decode Token 的主要 Linear 路径为：
 
 双方均为2 × Atlas 910B3、Qwen3-32B、TP=2、并发1。Lite Llama NPU使用本项目最新实测结果；vLLM-Ascend使用第三方公开的`0.8.4rc2`结果。
 
-| 指标 | Lite Llama NPU 0.0.1rc1 | vLLM-Ascend 0.8.4rc2 | 对比 |
+| 指标 | Lite Llama NPU Qwen3-32B基线 | vLLM-Ascend 0.8.4rc2 | 对比 |
 |---|---:|---:|---:|
 | Output Throughput | 24.0606 tok/s | 7.6409 tok/s | 本项目约3.15× |
 | Total Throughput | 26.9575 tok/s | 7.8122 tok/s | 本项目约3.45× |
@@ -206,6 +209,15 @@ PY
 python apply_weight_convert.py /path/to/Qwen3-32B
 ```
 
+Qwen3-30B-A3B：
+
+```bash
+python apply_weight_convert.py \
+  /path/to/Qwen3-30B-A3B \
+  --model-type qwen3_moe \
+  --device cpu
+```
+
 转换结果默认写入：
 
 ```text
@@ -226,6 +238,21 @@ ASCEND_RT_VISIBLE_DEVICES=4,5 python -m torch.distributed.run \
   cli_qwen3_tp.py \
   --checkpoints_dir /data/models/Qwen3-32B/
 ```
+
+### Qwen3-30B-A3B 双卡交互推理
+
+```bash
+ASCEND_RT_VISIBLE_DEVICES=4,5 python -m torch.distributed.run \
+  --nproc_per_node=2 \
+  cli_qwen3_moe_tp.py \
+  --checkpoints_dir /data/models/Qwen3-30B-A3B/ \
+  --page_size 16 \
+  --max_seq_len 4096 \
+  --max_gen_len 1024 \
+  --enable_thinking
+```
+
+> 当前MoE版本使用动态专家执行并自动回退Eager Decode。Grouped MatMul与MoE NPU Graph属于后续性能版本。
 
 Thinking 模式：
 

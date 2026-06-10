@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import torch.nn as nn
-
 from .model_config import Qwen3MoeConfig
 from .moe import Qwen3SparseMoeBlock
 from .qwen3 import FusedMLP, Qwen3DecoderLayer, Qwen3Model
@@ -45,10 +43,10 @@ class Qwen3MoeModel(Qwen3Model):
         config.validate_tensor_parallel(
             getattr(tp_config, "world_size", 1)
         )
-        super().__init__(config, tp_config=tp_config)
-        self.layers = nn.ModuleList(
-            [
-                Qwen3MoeDecoderLayer(config, i, tp_config)
-                for i in range(config.num_layers)
-            ]
+        super().__init__(
+            config,
+            tp_config=tp_config,
+            decoder_layer_factory=lambda layer_index: Qwen3MoeDecoderLayer(
+                config, layer_index, tp_config
+            ),
         )
