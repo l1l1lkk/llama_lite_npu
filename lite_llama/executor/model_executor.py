@@ -101,7 +101,9 @@ class ModelExecutor:
         if cfg_cls is None:
             raise ValueError(f"Unsupported model_type {params['model_type']!r}")
         
-        return cfg_cls.from_dict(params)
+        model_config = cfg_cls.from_dict(params)
+        model_config.max_seq_len = max_seq_len
+        return model_config
     
     @staticmethod
     def _accelerate_load_weight(

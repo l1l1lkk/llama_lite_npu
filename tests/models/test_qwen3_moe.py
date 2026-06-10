@@ -160,5 +160,80 @@ class Qwen3MoeExecutionTest(unittest.TestCase):
         torch.testing.assert_close(output, expected)
 
 
+class Qwen3MoeWeightConversionTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.weights = _load_module(
+            "qwen3_moe_weight_utils",
+            "lite_llama/utils/qwen3_moe_weights.py",
+        )
+
+    def test_experts_are_stacked_in_numeric_order_and_gate_up_are_fused(self):
+        state = {
+            "model.layers.0.mlp.gate.weight": torch.full((2, 3), 9.0),
+        }
+        for expert_id in range(2):
+            prefix = f"model.layers.0.mlp.experts.{expert_id}"
+            state[f"{prefix}.gate_proj.weight"] = torch.full(
+                (2, 3), 10.0 + expert_id
+            )
+            state[f"{prefix}.up_proj.weight"] = torch.full(
+                (2, 3), 20.0 + expert_id
+            )
+            state[f"{prefix}.down_proj.weight"] = torch.full(
+                (3, 2), 30.0 + expert_id
+            )
+
+        converted = self.weights.stack_qwen3_moe_weights(
+            state, num_layers=1, num_experts=2
+        )
+
+        self.assertTrue(
+            torch.equal(
+                converted["layers.0.mlp.gate.weight"],
+                state["model.layers.0.mlp.gate.weight"],
+            )
+        )
+        gate_up = converted["layers.0.mlp.experts.gate_up_weight"]
+        down = converted["layers.0.mlp.experts.down_weight"]
+        self.assertEqual(gate_up.shape, (2, 4, 3))
+        self.assertEqual(down.shape, (2, 3, 2))
+        self.assertTrue(torch.all(gate_up[0, :2] == 10.0))
+        self.assertTrue(torch.all(gate_up[0, 2:] == 20.0))
+        self.assertTrue(torch.all(gate_up[1, :2] == 11.0))
+        self.assertTrue(torch.all(gate_up[1, 2:] == 21.0))
+
+    def test_missing_expert_weight_raises_clear_error(self):
+        state = {
+            "model.layers.0.mlp.gate.weight": torch.zeros(2, 3),
+            "model.layers.0.mlp.experts.0.gate_proj.weight": torch.zeros(2, 3),
+            "model.layers.0.mlp.experts.0.up_proj.weight": torch.zeros(2, 3),
+        }
+
+        with self.assertRaisesRegex(
+            KeyError, "layer 0 expert 0.*down_proj"
+        ):
+            self.weights.stack_qwen3_moe_weights(
+                state, num_layers=1, num_experts=1
+            )
+
+    def test_conversion_can_release_source_expert_tensors(self):
+        state = {
+            "model.layers.0.mlp.gate.weight": torch.zeros(1, 1),
+            "model.layers.0.mlp.experts.0.gate_proj.weight": torch.zeros(1, 1),
+            "model.layers.0.mlp.experts.0.up_proj.weight": torch.zeros(1, 1),
+            "model.layers.0.mlp.experts.0.down_proj.weight": torch.zeros(1, 1),
+        }
+
+        self.weights.stack_qwen3_moe_weights(
+            state, num_layers=1, num_experts=1, consume=True
+        )
+
+        self.assertNotIn(
+            "model.layers.0.mlp.experts.0.gate_proj.weight", state
+        )
+        self.assertNotIn("model.layers.0.mlp.gate.weight", state)
+
+
 if __name__ == "__main__":
     unittest.main()
