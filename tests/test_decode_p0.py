@@ -71,6 +71,47 @@ class PagedKvIncrementalUpdateTest(unittest.TestCase):
         self.assertEqual(len(self.req_mgr.req_page_table[0]), 2)
         self.assertEqual(self.req_mgr.b_req_tokens_table[0, 4].item(), 4)
 
+    def test_reserve_req_assigns_and_reuses_request_id(self):
+        first = self.req_mgr.reserve_req(3)
+        self.assertEqual(first, 0)
+        self.assertIsNone(self.req_mgr.reserve_req(1))
+
+        self.req_mgr.free_req(first)
+        reused = self.req_mgr.reserve_req(2)
+        self.assertEqual(reused, 0)
+        self.assertEqual(self.req_mgr.req_token_count[reused], 2)
+
+    def test_batch_metadata_uses_each_request_length_and_last_token(self):
+        page_mgr = paged_attention.PagedKVCacheManager(
+            num_layers=1,
+            num_kv_heads=1,
+            head_dim=2,
+            num_pages=8,
+            page_size=4,
+            dtype=torch.float16,
+            device="cpu",
+        )
+        req_mgr = paged_attention.PagedReqTokensManager(
+            max_requests=2,
+            max_seq_len=16,
+            page_manager=page_mgr,
+            device="cpu",
+        )
+        self.assertTrue(req_mgr.alloc_req(0, 3))
+        self.assertTrue(req_mgr.alloc_req(1, 5))
+
+        req_ids, seq_lens, last_indices = req_mgr.batch_metadata([1, 0])
+
+        self.assertEqual(req_ids.tolist(), [1, 0])
+        self.assertEqual(seq_lens.tolist(), [5, 3])
+        self.assertEqual(
+            last_indices.tolist(),
+            [
+                req_mgr.b_req_tokens_table[1, 4].item(),
+                req_mgr.b_req_tokens_table[0, 2].item(),
+            ],
+        )
+
 
 class NpuGraphBucketTest(unittest.TestCase):
     def test_qwen3_moe_can_attempt_decode_graph_capture(self):

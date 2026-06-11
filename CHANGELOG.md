@@ -2,6 +2,32 @@
 
 所有触发版本升级的变更按发布时间倒序记录。详细规则见[版本管理与发布规范](docs/versioning.md)。
 
+## [0.0.5rc1] - 2026-06-11
+
+增加文本服务Continuous Batching、MoE Decode小Batch专家内核和单机Expert Parallel。
+
+### 核心能力
+
+- OpenAI兼容文本Server由单请求串行执行升级为共享Continuous Batching调度器；
+- 每个请求独立管理Paged KV request ID、序列长度、输出队列和结束释放；
+- TP进程使用Prefill、Decode、Release步骤级命令保持动态Batch一致；
+- 新增Triton Routed-GEMV专家后端，小Decode批次跳过通用专家排序与Gather/Scatter；
+- `auto`后端按`tokens * top_k`在Routed-GEMV和Ascend GMM间选择；
+- 新增`--moe_parallel_mode ep`，每卡持有部分完整专家并通过HCCL AllReduce合并局部输出；
+- CLI、Server和Benchmark均可选择MoE TP或EP执行模式。
+
+### 验证状态
+
+- 47项Continuous Batching、Paged KV、NPU Graph和Qwen3 MoE CPU测试通过；
+- 5项Atlas NPU测试入口在无NPU本地环境中按预期跳过；
+- Python静态编译通过；
+- 本地无Atlas NPU，Triton Ascend内核、EP双卡完整模型、服务并发与Graph Replay需要在910B3验证；
+- 本版本不填写预测性能，实测结果后续写入性能历史记录。
+
+### 文档
+
+- [v0.0.5rc1完整版本报告](docs/releases/v0.0.5rc1.md)
+
 ## [0.0.4rc1] - 2026-06-11
 
 完成Qwen3 MoE Decode热路径Host同步清理，并开放带安全回退的NPU Graph Capture/Replay。

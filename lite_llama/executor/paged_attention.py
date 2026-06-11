@@ -184,6 +184,48 @@ class PagedReqTokensManager:
         )
         return True
 
+    def reserve_req(self, num_tokens: int) -> Optional[int]:
+        """Allocate the lowest free request id and its initial KV pages."""
+        if not self.free_req_indices:
+            return None
+        req_idx = self.free_req_indices[0]
+        if not self.alloc_req(req_idx, num_tokens):
+            return None
+        return req_idx
+
+    def batch_metadata(
+        self, req_indices: List[int]
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Build device metadata for a dynamic decode batch.
+
+        The method only reads host-managed request dictionaries. It does not
+        copy an NPU tensor back to Host, so it is safe to use between decode
+        steps when the active request set changes.
+        """
+        if not req_indices:
+            raise ValueError("req_indices must not be empty")
+        for req_idx in req_indices:
+            if req_idx not in self.req_token_count:
+                raise KeyError(f"request {req_idx} is not allocated")
+
+        req_ids = torch.tensor(
+            req_indices, dtype=torch.int32, device=self.device
+        )
+        seq_lens = torch.tensor(
+            [self.req_token_count[req_idx] for req_idx in req_indices],
+            dtype=torch.long,
+            device=self.device,
+        )
+        last_indices = torch.stack(
+            [
+                self.b_req_tokens_table[
+                    req_idx, self.req_token_count[req_idx] - 1
+                ]
+                for req_idx in req_indices
+            ]
+        ).to(dtype=torch.int32, device=self.device)
+        return req_ids, seq_lens, last_indices
+
     def extend_req(self, req_idx: int, num_new_tokens: int) -> bool:
         """Extend a request by `num_new_tokens` (decode step)."""
         if num_new_tokens <= 0:
@@ -236,5 +278,6 @@ class PagedReqTokensManager:
             del self.req_page_table[req_idx]
             del self.req_token_count[req_idx]
         self.req_active[req_idx] = False
-        self.free_req_indices.append(req_idx)
-        self.free_req_indices.sort()
+        if req_idx not in self.free_req_indices:
+            self.free_req_indices.append(req_idx)
+            self.free_req_indices.sort()

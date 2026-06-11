@@ -110,10 +110,41 @@ class Qwen3MoeTensorParallelTest(unittest.TestCase):
         self.assertTrue(torch.equal(runtime_gate_up, expected_gate_up))
         self.assertTrue(torch.equal(runtime_down, expected_down))
 
+    def test_expert_parallel_slices_complete_experts(self):
+        gate_up = torch.arange(4 * 8 * 3).reshape(4, 8, 3)
+        down = torch.arange(4 * 3 * 4).reshape(4, 3, 4)
+        tp = tp_utils.TPConfig(
+            world_size=2,
+            rank=1,
+            moe_parallel_mode="ep",
+        )
+
+        runtime_gate_up = tp_utils.prepare_moe_gate_up_for_ep(gate_up, tp)
+        runtime_down = tp_utils.prepare_moe_down_for_ep(down, tp)
+
+        self.assertEqual(runtime_gate_up.shape, (2, 3, 8))
+        self.assertEqual(runtime_down.shape, (2, 4, 3))
+        self.assertTrue(
+            torch.equal(
+                runtime_gate_up,
+                gate_up[2:4].transpose(1, 2).contiguous(),
+            )
+        )
+        self.assertTrue(
+            torch.equal(
+                runtime_down,
+                down[2:4].transpose(1, 2).contiguous(),
+            )
+        )
+
 
 class Qwen3MoeExecutionTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        cls.routed = _load_module(
+            "qwen3_moe_routed_gemv",
+            "lite_llama/kernels/moe_routed_gemv.py",
+        )
         cls.moe = _load_module("qwen3_moe_layers", "lite_llama/models/moe.py")
         cls.routing = _load_module(
             "qwen3_moe_routing", "lite_llama/kernels/moe_routing.py"
@@ -230,6 +261,31 @@ class Qwen3MoeExecutionTest(unittest.TestCase):
                 ) * routing_weights[token_id, slot]
         torch.testing.assert_close(actual, expected)
 
+    def test_local_routing_keeps_only_owned_experts(self):
+        hidden_states = torch.tensor(
+            [[1.0, 10.0], [2.0, 20.0], [3.0, 30.0]]
+        )
+        selected_experts = torch.tensor([[0, 3], [1, 2], [3, 0]])
+        routing_weights = torch.tensor(
+            [[0.7, 0.3], [0.4, 0.6], [0.8, 0.2]]
+        )
+
+        plan = self.routing.prepare_moe_routing_local_reference(
+            hidden_states,
+            selected_experts,
+            routing_weights,
+            expert_start=2,
+            local_num_experts=2,
+        )
+
+        self.assertEqual(plan.expert_counts.tolist(), [1, 2])
+        self.assertEqual(plan.group_list.tolist(), [1, 3])
+        self.assertEqual(plan.sorted_token_ids.tolist(), [1, 0, 2])
+        torch.testing.assert_close(
+            plan.routed_states,
+            hidden_states[plan.sorted_token_ids],
+        )
+
     def test_grouped_path_matches_eager_reference(self):
         experts = self.moe.Qwen3MoeExperts(
             hidden_size=3,
@@ -270,6 +326,117 @@ class Qwen3MoeExecutionTest(unittest.TestCase):
         self.assertEqual(first_weight.shape, (3, 3, 4))
         self.assertEqual(second_weight.shape, (3, 2, 3))
         torch.testing.assert_close(grouped, eager, rtol=1e-5, atol=1e-5)
+
+    def test_routed_gemv_path_matches_eager_reference(self):
+        experts = self.moe.Qwen3MoeExperts(
+            hidden_size=3,
+            num_experts=3,
+            intermediate_size=2,
+            dtype=torch.float32,
+        )
+        torch.manual_seed(17)
+        experts.gate_up_weight.data.normal_()
+        experts.down_weight.data.normal_()
+        hidden_states = torch.randn(4, 3)
+        selected_experts = torch.tensor(
+            [[0, 2], [1, 0], [2, 1], [2, 0]]
+        )
+        routing_weights = torch.tensor(
+            [[0.8, 0.2], [0.6, 0.4], [0.7, 0.3], [0.5, 0.5]]
+        )
+
+        routed = experts._forward_routed_local(
+            hidden_states, selected_experts, routing_weights
+        )
+        eager = experts._forward_eager_local(
+            hidden_states, selected_experts, routing_weights
+        )
+
+        torch.testing.assert_close(routed, eager, rtol=1e-5, atol=1e-5)
+
+    def test_auto_backend_selects_routed_gemv_for_small_decode_batch(self):
+        experts = self.moe.Qwen3MoeExperts(
+            hidden_size=3,
+            num_experts=3,
+            intermediate_size=2,
+            dtype=torch.float32,
+        )
+        experts.routed_gemv_max_assignments = 32
+
+        self.assertTrue(
+            experts._should_use_routed_gemv(
+                num_tokens=4, top_k=2, device_type="npu"
+            )
+        )
+        self.assertFalse(
+            experts._should_use_routed_gemv(
+                num_tokens=17, top_k=2, device_type="npu"
+            )
+        )
+        self.assertFalse(
+            experts._should_use_routed_gemv(
+                num_tokens=4, top_k=2, device_type="cpu"
+            )
+        )
+
+    def test_expert_parallel_partial_outputs_sum_to_dense_reference(self):
+        torch.manual_seed(31)
+        hidden_states = torch.randn(3, 4)
+        selected_experts = torch.tensor([[0, 3], [1, 2], [3, 0]])
+        routing_weights = torch.tensor(
+            [[0.7, 0.3], [0.4, 0.6], [0.8, 0.2]]
+        )
+        global_gate_up = torch.randn(4, 4, 6)
+        global_down = torch.randn(4, 3, 4)
+
+        dense = self.routed.routed_expert_matmul_reference(
+            hidden_states,
+            selected_experts,
+            routing_weights,
+            global_gate_up,
+            global_down,
+        )
+        rank0 = self.routed.routed_expert_matmul_reference(
+            hidden_states,
+            selected_experts,
+            routing_weights,
+            global_gate_up[:2],
+            global_down[:2],
+            expert_start=0,
+            local_num_experts=2,
+        )
+        rank1 = self.routed.routed_expert_matmul_reference(
+            hidden_states,
+            selected_experts,
+            routing_weights,
+            global_gate_up[2:],
+            global_down[2:],
+            expert_start=2,
+            local_num_experts=2,
+        )
+
+        torch.testing.assert_close(rank0 + rank1, dense)
+
+    def test_expert_parallel_runtime_owns_only_local_experts(self):
+        tp = tp_utils.TPConfig(
+            world_size=2,
+            rank=1,
+            moe_parallel_mode="ep",
+        )
+        experts = self.moe.Qwen3MoeExperts(
+            hidden_size=4,
+            num_experts=4,
+            intermediate_size=3,
+            tp_config=tp,
+            dtype=torch.float32,
+        )
+
+        self.assertEqual(experts.expert_start, 2)
+        self.assertEqual(experts.expert_end, 4)
+        self.assertEqual(experts.local_num_experts, 2)
+        self.assertEqual(experts.local_intermediate_size, 3)
+        self.assertEqual(experts.gate_up_weight.shape, (2, 4, 6))
+        self.assertEqual(experts.down_weight.shape, (2, 3, 4))
 
     def test_torch_npu_gmm_uses_tensor_split_and_cumulative_groups(self):
         calls = []
@@ -352,6 +519,17 @@ class Qwen3MoeExecutionTest(unittest.TestCase):
                     num_experts=2,
                     intermediate_size=2,
                 )
+
+    def test_backend_environment_accepts_routed_gemv(self):
+        with mock.patch.dict(
+            os.environ, {"LITE_LLAMA_MOE_BACKEND": "routed_gemv"}
+        ):
+            experts = self.moe.Qwen3MoeExperts(
+                hidden_size=2,
+                num_experts=2,
+                intermediate_size=2,
+            )
+        self.assertEqual(experts.backend, "routed_gemv")
 
     def test_npu_routing_source_has_no_host_visible_tolist(self):
         source = (

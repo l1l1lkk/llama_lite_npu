@@ -107,6 +107,98 @@ class Qwen3MoeGMMNPUTest(unittest.TestCase):
         finally:
             os.environ.pop("LITE_LLAMA_MOE_VALIDATE", None)
 
+    def test_routed_gemv_matches_eager_local_output(self):
+        from lite_llama.models.moe import Qwen3MoeExperts
+
+        os.environ["LITE_LLAMA_MOE_BACKEND"] = "routed_gemv"
+        try:
+            torch.manual_seed(29)
+            experts = Qwen3MoeExperts(
+                hidden_size=64,
+                num_experts=8,
+                intermediate_size=32,
+                layer_index=9,
+                dtype=torch.float16,
+            ).npu()
+            experts.gate_up_weight.data.normal_(mean=0.0, std=0.02)
+            experts.down_weight.data.normal_(mean=0.0, std=0.02)
+            hidden_states = torch.randn(
+                4, 64, device="npu", dtype=torch.float16
+            )
+            selected_experts = torch.randint(
+                0, 8, (4, 2), device="npu", dtype=torch.int64
+            )
+            routing_weights = torch.rand(
+                4, 2, device="npu", dtype=torch.float16
+            )
+            routing_weights = routing_weights / routing_weights.sum(
+                dim=-1, keepdim=True
+            )
+
+            with torch.no_grad():
+                eager = experts._forward_eager_local(
+                    hidden_states, selected_experts, routing_weights
+                )
+                routed = experts._forward_routed_local(
+                    hidden_states, selected_experts, routing_weights
+                )
+            torch.npu.synchronize()
+
+            torch.testing.assert_close(
+                routed, eager, rtol=1e-2, atol=1e-2
+            )
+        finally:
+            os.environ["LITE_LLAMA_MOE_BACKEND"] = "gmm"
+
+    def test_routed_gemv_expert_parallel_computes_local_contribution(self):
+        from lite_llama.executor.tp_utils import TPConfig
+        from lite_llama.models.moe import Qwen3MoeExperts
+
+        torch.manual_seed(37)
+        global_gate_up = torch.randn(
+            8, 64, 64, device="npu", dtype=torch.float16
+        ) * 0.02
+        global_down = torch.randn(
+            8, 32, 64, device="npu", dtype=torch.float16
+        ) * 0.02
+        hidden_states = torch.randn(
+            4, 64, device="npu", dtype=torch.float16
+        )
+        selected_experts = torch.tensor(
+            [[0, 7], [2, 5], [6, 1], [4, 3]],
+            device="npu",
+            dtype=torch.int64,
+        )
+        routing_weights = torch.full(
+            (4, 2), 0.5, device="npu", dtype=torch.float16
+        )
+        rank1 = Qwen3MoeExperts(
+            hidden_size=64,
+            num_experts=8,
+            intermediate_size=32,
+            tp_config=TPConfig(
+                world_size=2,
+                rank=1,
+                moe_parallel_mode="ep",
+            ),
+            dtype=torch.float16,
+        ).npu()
+        rank1.gate_up_weight.data.copy_(global_gate_up[4:])
+        rank1.down_weight.data.copy_(global_down[4:])
+
+        with torch.no_grad():
+            eager = rank1._forward_eager_local(
+                hidden_states, selected_experts, routing_weights
+            )
+            routed = rank1._forward_routed_local(
+                hidden_states, selected_experts, routing_weights
+            )
+        torch.npu.synchronize()
+
+        torch.testing.assert_close(
+            routed, eager, rtol=1e-2, atol=1e-2
+        )
+
     @unittest.skipUnless(
         HAS_NPU_GRAPH, "requires torch_npu GMM and NPUGraph on an NPU"
     )

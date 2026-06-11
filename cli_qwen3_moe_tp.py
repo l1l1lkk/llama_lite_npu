@@ -41,6 +41,7 @@ def main(
     max_gen_len: int = 1024,
     page_size: int = 16,
     compiled_model: bool = True,
+    moe_parallel_mode: str = "tp",
     enable_thinking: bool = True,
 ) -> None:
     tp = detect_tp_env()
@@ -63,6 +64,7 @@ def main(
             max_seq_len=max_seq_len,
             compiled_model=compiled_model,
             page_size=page_size,
+            moe_parallel_mode=moe_parallel_mode,
             device=device,
         )
     except Exception as exc:
@@ -90,6 +92,7 @@ def main(
         print(f"TP size:     {tp.world_size if tp else 1}")
         print(f"Max seq len: {max_seq_len}")
         print(f"Page size:   {page_size}")
+        print(f"MoE parallel:{moe_parallel_mode.upper()}")
         print(
             "NPU Graph:   on (capture failure falls back to eager)"
             if compiled_model
@@ -152,6 +155,15 @@ if __name__ == "__main__":
         type=int,
         default=16,
         help="PagedAttention page size; use 0 to disable.",
+    )
+    parser.add_argument(
+        "--moe_parallel_mode",
+        choices=("tp", "ep"),
+        default="tp",
+        help=(
+            "MoE expert execution mode: tp shards every expert's "
+            "intermediate dimension; ep stores complete experts per rank."
+        ),
     )
     parser.add_argument(
         "--compiled_model",

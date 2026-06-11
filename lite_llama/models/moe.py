@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sys
 import warnings
 from typing import Optional
 
@@ -69,25 +70,53 @@ class Qwen3MoeExperts(nn.Module):
     ) -> None:
         super().__init__()
         world_size = getattr(tp_config, "world_size", 1)
-        if intermediate_size % world_size != 0:
+        self.parallel_mode = getattr(
+            tp_config, "moe_parallel_mode", "tp"
+        )
+        if self.parallel_mode not in {"tp", "ep"}:
+            raise ValueError(
+                "moe_parallel_mode must be 'tp' or 'ep', got "
+                f"{self.parallel_mode!r}"
+            )
+        if self.parallel_mode == "tp" and intermediate_size % world_size != 0:
             raise ValueError(
                 f"moe_intermediate_size={intermediate_size} must be divisible "
                 f"by tensor parallel world_size={world_size}"
             )
+        if self.parallel_mode == "ep" and num_experts % world_size != 0:
+            raise ValueError(
+                f"num_experts={num_experts} must be divisible by "
+                f"expert parallel world_size={world_size}"
+            )
         self.hidden_size = hidden_size
         self.num_experts = num_experts
         self.intermediate_size = intermediate_size
-        self.local_intermediate_size = intermediate_size // world_size
+        if self.parallel_mode == "ep":
+            self.local_num_experts = num_experts // world_size
+            self.expert_start = (
+                getattr(tp_config, "rank", 0) * self.local_num_experts
+            )
+            self.expert_end = self.expert_start + self.local_num_experts
+            self.local_intermediate_size = intermediate_size
+        else:
+            self.local_num_experts = num_experts
+            self.expert_start = 0
+            self.expert_end = num_experts
+            self.local_intermediate_size = intermediate_size // world_size
         self.tp_config = tp_config
         self.layer_index = layer_index
         self.backend = os.environ.get(
             "LITE_LLAMA_MOE_BACKEND", "auto"
         ).lower()
-        if self.backend not in {"auto", "eager", "gmm"}:
+        if self.backend not in {"auto", "eager", "gmm", "routed_gemv"}:
             raise ValueError(
-                "LITE_LLAMA_MOE_BACKEND must be one of auto/eager/gmm, "
+                "LITE_LLAMA_MOE_BACKEND must be one of "
+                "auto/eager/gmm/routed_gemv, "
                 f"got {self.backend!r}"
             )
+        self.routed_gemv_max_assignments = int(
+            os.environ.get("LITE_LLAMA_MOE_GEMV_MAX_ASSIGNMENTS", "64")
+        )
         self.validate_gmm = os.environ.get(
             "LITE_LLAMA_MOE_VALIDATE", "0"
         ).lower() in {"1", "true", "yes", "on"}
@@ -102,7 +131,7 @@ class Qwen3MoeExperts(nn.Module):
         # remain [expert, output, input] and are transposed by the loader.
         self.gate_up_weight = nn.Parameter(
             torch.empty(
-                num_experts,
+                self.local_num_experts,
                 hidden_size,
                 2 * self.local_intermediate_size,
                 dtype=dtype,
@@ -110,7 +139,7 @@ class Qwen3MoeExperts(nn.Module):
         )
         self.down_weight = nn.Parameter(
             torch.empty(
-                num_experts,
+                self.local_num_experts,
                 self.local_intermediate_size,
                 hidden_size,
                 dtype=dtype,
@@ -139,9 +168,12 @@ class Qwen3MoeExperts(nn.Module):
         # intentionally prioritizes correctness; grouped matmul replaces this
         # host-visible dispatch in the next performance release.
         active_experts = torch.unique(selected_experts).tolist()
-        for expert_id in active_experts:
+        for global_expert_id in active_experts:
+            if not self.expert_start <= global_expert_id < self.expert_end:
+                continue
+            expert_id = global_expert_id - self.expert_start
             token_indices, topk_slots = torch.where(
-                selected_experts == expert_id
+                selected_experts == global_expert_id
             )
             current_states = hidden_states[token_indices]
             gate_up = F.linear(
@@ -205,19 +237,32 @@ class Qwen3MoeExperts(nn.Module):
             from ..kernels.moe_routing import (
                 finalize_moe_routing,
                 prepare_moe_routing,
+                prepare_moe_routing_local,
             )
         else:  # Direct file loading used by dependency-light CPU tests.
             from qwen3_moe_routing import (
                 finalize_moe_routing,
                 prepare_moe_routing,
+                prepare_moe_routing_local,
             )
 
-        plan = prepare_moe_routing(
-            hidden_states,
-            selected_experts,
-            routing_weights,
-            self.num_experts,
-        )
+        if self.parallel_mode == "ep":
+            plan = prepare_moe_routing_local(
+                hidden_states,
+                selected_experts,
+                routing_weights,
+                self.expert_start,
+                self.local_num_experts,
+            )
+            if plan.routed_states.shape[0] == 0:
+                return torch.zeros_like(hidden_states)
+        else:
+            plan = prepare_moe_routing(
+                hidden_states,
+                selected_experts,
+                routing_weights,
+                self.num_experts,
+            )
         gate_up = self._run_grouped_matmul(
             plan.routed_states,
             self.gate_up_weight,
@@ -235,6 +280,41 @@ class Qwen3MoeExperts(nn.Module):
             plan.sorted_token_ids,
             plan.sorted_weights,
             hidden_states.shape[0],
+        )
+
+    def _forward_routed_local(
+        self,
+        hidden_states: torch.Tensor,
+        selected_experts: torch.Tensor,
+        routing_weights: torch.Tensor,
+    ) -> torch.Tensor:
+        if __package__:
+            from ..kernels.moe_routed_gemv import routed_expert_matmul
+        else:
+            routed_expert_matmul = sys.modules[
+                "qwen3_moe_routed_gemv"
+            ].routed_expert_matmul
+        return routed_expert_matmul(
+            hidden_states,
+            selected_experts,
+            routing_weights,
+            self.gate_up_weight,
+            self.down_weight,
+            expert_start=self.expert_start,
+            local_num_experts=self.local_num_experts,
+            filter_local_experts=self.parallel_mode == "ep",
+        )
+
+    def _should_use_routed_gemv(
+        self,
+        *,
+        num_tokens: int,
+        top_k: int,
+        device_type: str,
+    ) -> bool:
+        return (
+            device_type == "npu"
+            and num_tokens * top_k <= self.routed_gemv_max_assignments
         )
 
     def _validate_local_outputs(
@@ -290,8 +370,32 @@ class Qwen3MoeExperts(nn.Module):
         selected_experts: torch.Tensor,
         routing_weights: torch.Tensor,
     ) -> torch.Tensor:
-        use_grouped = self._use_grouped_backend(hidden_states)
-        if use_grouped:
+        use_routed = self.backend == "routed_gemv" or (
+            self.backend == "auto"
+            and self._should_use_routed_gemv(
+                num_tokens=hidden_states.shape[0],
+                top_k=selected_experts.shape[1],
+                device_type=hidden_states.device.type,
+            )
+        )
+        use_grouped = (
+            not use_routed and self._use_grouped_backend(hidden_states)
+        )
+        if use_routed:
+            final_hidden_states = self._forward_routed_local(
+                hidden_states, selected_experts, routing_weights
+            )
+            if self.validate_gmm:
+                reference = self._forward_eager_local(
+                    hidden_states, selected_experts, routing_weights
+                )
+                self._validate_local_outputs(
+                    reference,
+                    final_hidden_states,
+                    rtol=self.alignment_rtol,
+                    atol=self.alignment_atol,
+                )
+        elif use_grouped:
             final_hidden_states = self._forward_grouped_local(
                 hidden_states, selected_experts, routing_weights
             )

@@ -53,6 +53,44 @@ def prepare_moe_routing_reference(
     )
 
 
+def prepare_moe_routing_local_reference(
+    hidden_states: torch.Tensor,
+    selected_experts: torch.Tensor,
+    routing_weights: torch.Tensor,
+    expert_start: int,
+    local_num_experts: int,
+) -> MoeRoutingPlan:
+    """Build an expert-major plan containing only locally-owned experts."""
+    num_tokens, top_k = selected_experts.shape
+    flat_experts = selected_experts.reshape(-1)
+    flat_weights = routing_weights.reshape(-1)
+    token_ids = torch.arange(
+        num_tokens, device=hidden_states.device, dtype=torch.long
+    ).repeat_interleave(top_k)
+    local_mask = (
+        (flat_experts >= expert_start)
+        & (flat_experts < expert_start + local_num_experts)
+    )
+    local_experts = flat_experts[local_mask] - expert_start
+    local_token_ids = token_ids[local_mask]
+    local_weights = flat_weights[local_mask]
+    order = torch.argsort(local_experts, stable=True)
+    sorted_experts = local_experts[order]
+    sorted_token_ids = local_token_ids[order]
+    sorted_weights = local_weights[order]
+    expert_counts = torch.bincount(
+        sorted_experts, minlength=local_num_experts
+    ).to(torch.int32)
+    group_list = torch.cumsum(expert_counts, dim=0, dtype=torch.int64)
+    return MoeRoutingPlan(
+        routed_states=hidden_states[sorted_token_ids],
+        sorted_token_ids=sorted_token_ids,
+        sorted_weights=sorted_weights,
+        expert_counts=expert_counts,
+        group_list=group_list,
+    )
+
+
 def finalize_moe_routing_reference(
     expert_output: torch.Tensor,
     sorted_token_ids: torch.Tensor,
@@ -224,6 +262,91 @@ def prepare_moe_routing_npu(
     )
 
 
+def prepare_moe_routing_local_npu(
+    hidden_states: torch.Tensor,
+    selected_experts: torch.Tensor,
+    routing_weights: torch.Tensor,
+    expert_start: int,
+    local_num_experts: int,
+) -> MoeRoutingPlan:
+    """Filter and group locally-owned assignments on the NPU."""
+    if triton is None:
+        raise RuntimeError(
+            "Triton is required for the NPU MoE routing backend"
+        )
+    hidden_states = hidden_states.contiguous()
+    expert_ids = selected_experts.contiguous().view(-1).to(torch.int32)
+    flat_weights = routing_weights.contiguous().view(-1)
+    local_mask = (
+        (expert_ids >= expert_start)
+        & (expert_ids < expert_start + local_num_experts)
+    )
+    local_assignment_ids = torch.nonzero(
+        local_mask, as_tuple=False
+    ).reshape(-1)
+    local_expert_ids = (
+        expert_ids.index_select(0, local_assignment_ids) - expert_start
+    )
+    order = torch.argsort(local_expert_ids)
+    sorted_assignment_ids = local_assignment_ids.index_select(
+        0, order
+    ).to(torch.int32)
+    sorted_experts = local_expert_ids.index_select(0, order)
+    num_assignments = sorted_assignment_ids.numel()
+    hidden_size = hidden_states.shape[-1]
+    top_k = selected_experts.shape[-1]
+
+    expert_counts = torch.zeros(
+        local_num_experts,
+        device=hidden_states.device,
+        dtype=torch.int32,
+    )
+    count_block = 256
+    if num_assignments:
+        _moe_count_kernel[
+            (triton.cdiv(num_assignments, count_block),)
+        ](
+            sorted_experts,
+            expert_counts,
+            num_assignments=num_assignments,
+            BLOCK_SIZE=count_block,
+        )
+    group_list = torch.cumsum(expert_counts, dim=0, dtype=torch.int64)
+    routed_states = torch.empty(
+        (num_assignments, hidden_size),
+        device=hidden_states.device,
+        dtype=hidden_states.dtype,
+    )
+    sorted_token_ids = torch.empty(
+        num_assignments, device=hidden_states.device, dtype=torch.int64
+    )
+    sorted_weights = torch.empty(
+        num_assignments,
+        device=hidden_states.device,
+        dtype=routing_weights.dtype,
+    )
+    if num_assignments:
+        block_h = triton.next_power_of_2(hidden_size)
+        _moe_count_and_gather_kernel[(num_assignments,)](
+            hidden_states,
+            sorted_assignment_ids,
+            flat_weights,
+            routed_states,
+            sorted_token_ids,
+            sorted_weights,
+            hidden_size=hidden_size,
+            top_k=top_k,
+            BLOCK_H=block_h,
+        )
+    return MoeRoutingPlan(
+        routed_states=routed_states,
+        sorted_token_ids=sorted_token_ids,
+        sorted_weights=sorted_weights,
+        expert_counts=expert_counts,
+        group_list=group_list,
+    )
+
+
 def finalize_moe_routing_npu(
     expert_output: torch.Tensor,
     sorted_token_ids: torch.Tensor,
@@ -271,6 +394,30 @@ def prepare_moe_routing(
         selected_experts,
         routing_weights,
         num_experts,
+    )
+
+
+def prepare_moe_routing_local(
+    hidden_states: torch.Tensor,
+    selected_experts: torch.Tensor,
+    routing_weights: torch.Tensor,
+    expert_start: int,
+    local_num_experts: int,
+) -> MoeRoutingPlan:
+    if hidden_states.device.type == "npu":
+        return prepare_moe_routing_local_npu(
+            hidden_states,
+            selected_experts,
+            routing_weights,
+            expert_start,
+            local_num_experts,
+        )
+    return prepare_moe_routing_local_reference(
+        hidden_states,
+        selected_experts,
+        routing_weights,
+        expert_start,
+        local_num_experts,
     )
 
 

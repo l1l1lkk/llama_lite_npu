@@ -63,6 +63,7 @@ class GenerateStreamText:
         max_seq_len=1024,
         compiled_model=False,
         page_size=None,
+        moe_parallel_mode="tp",
         device=None,
     ):
         self.device = get_device(device)
@@ -74,6 +75,7 @@ class GenerateStreamText:
             max_seq_len=max_seq_len,
             compiled_model=compiled_model,
             page_size=page_size,
+            moe_parallel_mode=moe_parallel_mode,
             device=device,
         )
         self.tokenizer = self.load_tokenizer(tokenizer_path)

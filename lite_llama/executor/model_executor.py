@@ -22,6 +22,7 @@ from .tp_utils import (
     shard_attention_q, shard_attention_kv, shard_attention_o,
     shard_ffn_gate_up, shard_ffn_down, shard_lm_head,
     prepare_moe_gate_up_for_gmm, prepare_moe_down_for_gmm,
+    prepare_moe_gate_up_for_ep, prepare_moe_down_for_ep,
 )
 
 logger = get_logger(__name__)
@@ -44,6 +45,7 @@ class ModelExecutor:
         max_gpu_num_blocks: None,
         compiled_model: bool = False,
         page_size: int | None = None,
+        moe_parallel_mode: str = "tp",
         device: str = None,
     ):
         """
@@ -67,6 +69,12 @@ class ModelExecutor:
             device = f"{'npu' if tp_config.is_npu else 'cuda'}:{tp_config.rank}"
         else:
             tp_config = TPConfig()
+        if moe_parallel_mode not in {"tp", "ep"}:
+            raise ValueError(
+                "moe_parallel_mode must be 'tp' or 'ep', got "
+                f"{moe_parallel_mode!r}"
+            )
+        tp_config.moe_parallel_mode = moe_parallel_mode
 
         # Set as current device before any allocations
         if "npu" in device:
@@ -437,6 +445,109 @@ class ModelExecutor:
 
         return self.atten_info.cur_select_index, num_patch_indexs
 
+    def reserve_paged_requests(
+        self, prompt_lengths: list[int]
+    ) -> tuple[int, ...]:
+        """Reserve independent request ids for continuous batching."""
+        if not self.use_paged_attn:
+            raise RuntimeError(
+                "continuous batching requires PagedAttention"
+            )
+        request_ids: list[int] = []
+        try:
+            for prompt_length in prompt_lengths:
+                req_idx = self.req_tokens_manager.reserve_req(prompt_length)
+                if req_idx is None:
+                    raise RuntimeError(
+                        "Paged KV request or page capacity is exhausted"
+                    )
+                request_ids.append(req_idx)
+        except BaseException:
+            for req_idx in request_ids:
+                self.req_tokens_manager.free_req(req_idx)
+            raise
+        return tuple(request_ids)
+
+    def activate_paged_prefill_batch(
+        self, request_ids: tuple[int, ...], prompt_length: int
+    ) -> None:
+        """Select an equal-length request group for one prefill forward."""
+        if not request_ids:
+            raise ValueError("request_ids must not be empty")
+        for req_idx in request_ids:
+            actual_length = self.req_tokens_manager.req_token_count[req_idx]
+            if actual_length != prompt_length:
+                raise ValueError(
+                    "continuous prefill groups must have equal prompt "
+                    f"lengths: expected={prompt_length}, "
+                    f"request={req_idx}, actual={actual_length}"
+                )
+
+        self._paged_request_ids = request_ids
+        self.atten_info.b_req_idx = torch.tensor(
+            request_ids, dtype=torch.int32, device=self.device
+        )
+        self.atten_info.b_seq_len = torch.full(
+            (len(request_ids),),
+            prompt_length,
+            dtype=torch.long,
+            device=self.device,
+        )
+        self.atten_info.cur_select_index = torch.cat(
+            [
+                self.req_tokens_manager.get_token_indices(
+                    req_idx, prompt_length
+                )
+                for req_idx in request_ids
+            ]
+        ).to(torch.int32)
+        self.atten_info.b_start_loc = torch.arange(
+            0,
+            len(request_ids) * prompt_length,
+            prompt_length,
+            dtype=torch.int32,
+            device=self.device,
+        )
+        self.atten_info.max_actual_seq_len = prompt_length
+
+    def activate_paged_decode_batch(
+        self, request_ids: tuple[int, ...]
+    ) -> None:
+        """Rebuild AttentionInfo for the current dynamic decode batch."""
+        req_ids, seq_lens, last_indices = (
+            self.req_tokens_manager.batch_metadata(list(request_ids))
+        )
+        self._paged_request_ids = request_ids
+        self.atten_info.b_req_idx = req_ids
+        self.atten_info.b_seq_len = seq_lens
+        self.atten_info.cur_select_index = last_indices
+        self.atten_info.b_start_loc = torch.zeros(
+            len(request_ids), dtype=torch.int32, device=self.device
+        )
+        self.atten_info.max_actual_seq_len = max(
+            self.req_tokens_manager.req_token_count[req_idx]
+            for req_idx in request_ids
+        )
+
+    def extend_paged_requests(
+        self, request_ids: tuple[int, ...]
+    ) -> None:
+        """Allocate the KV position consumed by the next decode input."""
+        for req_idx in request_ids:
+            if not self.req_tokens_manager.extend_req(req_idx, 1):
+                raise RuntimeError(
+                    f"Paged KV allocation failed for request {req_idx}"
+                )
+        self.activate_paged_decode_batch(request_ids)
+
+    def release_paged_request_ids(
+        self, request_ids: tuple[int, ...]
+    ) -> None:
+        for req_idx in request_ids:
+            self.req_tokens_manager.free_req(req_idx)
+        if request_ids == self._paged_request_ids:
+            self._paged_request_ids = ()
+
     def decode_alloc_kv_cache(self, batch_size):
         if self.use_paged_attn:
             if len(self._paged_request_ids) != batch_size:
@@ -470,9 +581,7 @@ class ModelExecutor:
 
     def release_paged_requests(self) -> None:
         """Release host-managed page mappings without reading an NPU tensor."""
-        for req_idx in self._paged_request_ids:
-            self.req_tokens_manager.free_req(req_idx)
-        self._paged_request_ids = ()
+        self.release_paged_request_ids(self._paged_request_ids)
 
     def forward(self, input_ids, position_ids, image_tensor=None, **kwargs):
         if self.model_type in ("llava", "qwen3_vl"):
@@ -540,20 +649,31 @@ def _shard_state_dict(
         if k_down in state_dict:
             state_dict[k_down] = shard_ffn_down(state_dict[k_down], tp)
 
-        # MoE experts: router is replicated, expert MLP uses tensor parallel.
+        # MoE experts: router is replicated. Expert weights either shard their
+        # intermediate dimension (TP) or shard complete experts (EP).
         moe_prefix = p.replace("self_attn", "mlp")
         gate_up_key = f"{moe_prefix}.experts.gate_up_weight"
         down_key = f"{moe_prefix}.experts.down_weight"
         if gate_up_key in state_dict:
-            state_dict[gate_up_key] = prepare_moe_gate_up_for_gmm(
-                state_dict[gate_up_key],
-                model_config.moe_intermediate_size,
-                tp,
-            )
+            if tp.moe_parallel_mode == "ep":
+                state_dict[gate_up_key] = prepare_moe_gate_up_for_ep(
+                    state_dict[gate_up_key], tp
+                )
+            else:
+                state_dict[gate_up_key] = prepare_moe_gate_up_for_gmm(
+                    state_dict[gate_up_key],
+                    model_config.moe_intermediate_size,
+                    tp,
+                )
         if down_key in state_dict:
-            state_dict[down_key] = prepare_moe_down_for_gmm(
-                state_dict[down_key], tp
-            )
+            if tp.moe_parallel_mode == "ep":
+                state_dict[down_key] = prepare_moe_down_for_ep(
+                    state_dict[down_key], tp
+                )
+            else:
+                state_dict[down_key] = prepare_moe_down_for_gmm(
+                    state_dict[down_key], tp
+                )
 
     # lm_head: column-shard along vocab dim
     lm_key = f"{prefix}lm_head_weight"
