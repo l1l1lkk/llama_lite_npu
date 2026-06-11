@@ -90,9 +90,8 @@ if triton is not None:
     @triton.jit
     def _moe_count_and_gather_kernel(
         hidden_ptr,
-        expert_ids_ptr,
+        sorted_assignment_ids_ptr,
         routing_weights_ptr,
-        write_offsets_ptr,
         routed_states_ptr,
         sorted_token_ids_ptr,
         sorted_weights_ptr,
@@ -100,10 +99,9 @@ if triton is not None:
         top_k: tl.constexpr,
         BLOCK_H: tl.constexpr,
     ):
-        assignment_id = tl.program_id(0)
-        expert_id = tl.load(expert_ids_ptr + assignment_id)
+        target = tl.program_id(0)
+        assignment_id = tl.load(sorted_assignment_ids_ptr + target)
         token_id = assignment_id // top_k
-        target = tl.atomic_add(write_offsets_ptr + expert_id, 1)
 
         tl.store(sorted_token_ids_ptr + target, token_id)
         weight = tl.load(routing_weights_ptr + assignment_id)
@@ -171,7 +169,7 @@ def prepare_moe_routing_npu(
             "Triton is required for the NPU MoE routing backend"
         )
     hidden_states = hidden_states.contiguous()
-    expert_ids = selected_experts.contiguous().view(-1)
+    expert_ids = selected_experts.contiguous().view(-1).to(torch.int32)
     flat_weights = routing_weights.contiguous().view(-1)
     num_assignments = expert_ids.numel()
     hidden_size = hidden_states.shape[-1]
@@ -188,15 +186,10 @@ def prepare_moe_routing_npu(
         BLOCK_SIZE=count_block,
     )
     group_list = torch.cumsum(expert_counts, dim=0, dtype=torch.int64)
-    starts = torch.cat(
-        (
-            torch.zeros(
-                1, device=hidden_states.device, dtype=torch.int32
-            ),
-            torch.cumsum(expert_counts[:-1], dim=0, dtype=torch.int32),
-        )
-    )
-    write_offsets = starts.clone()
+    # Ascend Triton 3.2 cannot consume the old value returned by
+    # tl.atomic_add. Keep sorting on the NPU with torch.argsort, then let
+    # Triton fuse the ordered gather and metadata writes.
+    sorted_assignment_ids = torch.argsort(expert_ids).to(torch.int32)
     routed_states = torch.empty(
         (num_assignments, hidden_size),
         device=hidden_states.device,
@@ -213,16 +206,14 @@ def prepare_moe_routing_npu(
     block_h = triton.next_power_of_2(hidden_size)
     _moe_count_and_gather_kernel[(num_assignments,)](
         hidden_states,
-        expert_ids,
+        sorted_assignment_ids,
         flat_weights,
-        write_offsets,
         routed_states,
         sorted_token_ids,
         sorted_weights,
         hidden_size=hidden_size,
         top_k=top_k,
         BLOCK_H=block_h,
-        num_warps=8,
     )
     return MoeRoutingPlan(
         routed_states=routed_states,
@@ -258,7 +249,6 @@ def finalize_moe_routing_npu(
         accumulation,
         hidden_size=hidden_size,
         BLOCK_H=block_h,
-        num_warps=8,
     )
     return accumulation.to(expert_output.dtype)
 

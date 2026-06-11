@@ -13,7 +13,8 @@ CPU参考、显式调试后端和 GMM 不可用时的安全回退。
 
 1. Router 继续执行 FP32 softmax 和 TopK，不改变专家选择语义。
 2. 将 `[tokens, top_k]` 路由展开为 `tokens * top_k` 条任务。
-3. Triton 统计每个专家任务数，并按专家分区 Gather hidden states。
+3. Triton统计每个专家任务数，NPU `torch.argsort`生成专家顺序，
+   Triton按排序索引Gather hidden states。
 4. 使用累计 `group_list` 调用 Gate/Up Grouped MatMul。
 5. 继续复用现有 Triton SwiGLU。
 6. 调用 Down Grouped MatMul。

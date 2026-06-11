@@ -377,6 +377,33 @@ class Qwen3MoeExecutionTest(unittest.TestCase):
         self.assertIn("_moe_count_and_gather_kernel", kernel_names)
         self.assertIn("_moe_weighted_scatter_kernel", kernel_names)
 
+    def test_ascend_gather_does_not_consume_atomic_add_return_value(self):
+        source = (
+            ROOT / "lite_llama/kernels/moe_routing.py"
+        ).read_text(encoding="utf-8")
+        module = ast.parse(source)
+        gather_kernel = next(
+            node
+            for node in ast.walk(module)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and node.name == "_moe_count_and_gather_kernel"
+        )
+
+        atomic_assignments = [
+            node
+            for node in ast.walk(gather_kernel)
+            if isinstance(node, ast.Assign)
+            and isinstance(node.value, ast.Call)
+            and isinstance(node.value.func, ast.Attribute)
+            and node.value.func.attr == "atomic_add"
+        ]
+        self.assertEqual(
+            atomic_assignments,
+            [],
+            "Ascend Triton cannot consume the old value returned by "
+            "tl.atomic_add during TTIR-to-Linalg conversion",
+        )
+
 
 class Qwen3MoeSwiGLUStrideTest(unittest.TestCase):
     def test_kernel_accepts_independent_input_and_output_row_strides(self):

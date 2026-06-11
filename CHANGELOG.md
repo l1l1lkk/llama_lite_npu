@@ -2,6 +2,27 @@
 
 所有触发版本升级的变更按发布时间倒序记录。详细规则见[版本管理与发布规范](docs/versioning.md)。
 
+## [0.0.3rc2] - 2026-06-11
+
+修复Qwen3 MoE Triton路由Gather在Ascend Triton 3.2编译阶段失败的问题。
+
+### Bug修复
+
+- 不再读取`tl.atomic_add`返回的旧值作为专家分组写入位置；
+- 改为在NPU上使用`torch.argsort`生成专家顺序，再由Triton融合Gather与路由元数据写入；
+- 保持路由过程无CPU同步、无`.tolist()`和无逐专家Python循环；
+- 移除Ascend Triton不建议手动传入的`num_warps`参数。
+
+### 验证状态
+
+- 新增Ascend Triton原子返回值兼容性回归测试；
+- 19项Qwen3 MoE CPU单元与契约测试通过；
+- Atlas 910B3需重新执行NPU GMM测试和双卡端到端启动。
+
+### 文档
+
+- [v0.0.3rc2完整版本报告](docs/releases/v0.0.3rc2.md)
+
 ## [0.0.3rc1] - 2026-06-11
 
 将Qwen3-30B-A3B MoE专家执行从动态Python循环升级为Ascend Grouped MatMul与Triton设备侧路由。
@@ -97,3 +118,4 @@
 [0.0.2rc1]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.2rc1
 [0.0.2rc2]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.2rc2
 [0.0.3rc1]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.3rc1
+[0.0.3rc2]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.3rc2
