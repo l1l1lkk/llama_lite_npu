@@ -29,11 +29,12 @@ Lite Llama NPU 的目标不是封装 Transformers，而是实现一条可以观�
 
 ## 最新版本
 
-当前版本：**0.0.3rc2**（2026-06-11）
+当前版本：**0.0.4rc1**（2026-06-11）
 
-- [v0.0.3rc2完整版本报告](docs/releases/v0.0.3rc2.md)
+- [v0.0.4rc1完整版本报告](docs/releases/v0.0.4rc1.md)
 - [完整CHANGELOG](CHANGELOG.md)
 - [版本管理与发布规范](docs/versioning.md)
+- [推理性能历史记录](docs/inference_performance_history.md)
 
 ## 主要能力
 
@@ -78,7 +79,8 @@ Lite Llama NPU 的目标不是封装 Transformers，而是实现一条可以观�
   - Decode NPU Graph按128-token长度Bucket进行capture/replay；
   - 同一Bucket复用固定Shape Graph并更新动态KV元数据；
   - Shape 不满足 replay 条件时安全回退 Eager。
-  - Qwen3 MoE已移除专家Python循环，但NPU Graph仍等待GMM动态分组兼容性验证。
+  - Qwen3 MoE允许Capture动态专家路由，失败Bucket只尝试一次并稳定回退Eager；
+  - Benchmark输出Graph Capture、Replay和Fallback计数。
 - **性能观测**
   - Ascend PyTorch Profiler；
   - CPU、CANN、NPU 算子、HBM 和 HCCL 通信数据；
@@ -117,7 +119,7 @@ Qwen3-32B、TP=2 时，每个 Decode Token 的主要 Linear 路径为：
 
 ## 最新版本性能
 
-以下记录当前已完成目标硬件验证的最新性能，即Qwen3-32B基线。Qwen3-30B-A3B GMM路径尚未产生910B3实测数据，验证方式见[v0.0.3rc1版本报告](docs/releases/v0.0.3rc1.md)。
+以下保留当前可与vLLM-Ascend对照的Qwen3-32B EvalScope基线。Qwen3-30B-A3B已完成首轮910B3实测，结果和不同版本的历史数据见[推理性能历史记录](docs/inference_performance_history.md)。
 
 | 项目 | 配置 |
 |---|---|
@@ -253,6 +255,7 @@ ASCEND_RT_VISIBLE_DEVICES=4,5 python -m torch.distributed.run \
   --page_size 16 \
   --max_seq_len 4096 \
   --max_gen_len 1024 \
+  --compiled_model \
   --enable_thinking
 ```
 
@@ -263,7 +266,7 @@ export LITE_LLAMA_MOE_BACKEND=gmm
 export LITE_LLAMA_MOE_VALIDATE=1
 ```
 
-验证模式会在每个MoE层同时运行GMM和eager参考计算，速度明显变慢；验证通过后应执行`unset LITE_LLAMA_MOE_VALIDATE`。当前MoE NPU Graph仍保持关闭。
+验证模式会在每个MoE层同时运行GMM和eager参考计算，速度明显变慢；验证通过后应执行`unset LITE_LLAMA_MOE_VALIDATE`。MoE NPU Graph默认开启；如果当前CANN/torch_npu组合不支持动态GMM Graph，日志会记录一次Capture失败并对该Bucket持续使用Eager。
 
 Thinking 模式：
 
@@ -390,8 +393,8 @@ Profiler 数据通常包含：
 - TP 通信为同步 AllReduce/AllGather，尚未实现计算通信重叠；
 - Q+KV、Gate+Up 尚未融合；
 - LM Head 当前会 AllGather 完整词表 logits；
-- Qwen3 MoE GMM已接入，但尚未完成Atlas 910B3性能基线；
-- Qwen3 MoE Decode NPU Graph仍未启用；
+- Qwen3 MoE GMM首轮Atlas 910B3基线为5.0 tok/s，详细口径见性能历史记录；
+- Qwen3 MoE Decode NPU Graph兼容性取决于CANN、torch_npu、GMM、Triton和HCCL版本；不兼容时按Bucket回退Eager；
 - 暂未支持 W8A8、INT8、INT4、AWQ 和 SmoothQuant。
 
 ## 优化路线
@@ -411,11 +414,13 @@ Profiler 数据通常包含：
 - [x] Qwen3 MoE Ascend Grouped MatMul；
 - [x] Qwen3 MoE Triton路由Gather/Scatter；
 - [x] Qwen3 MoE逐层eager/GMM数值对齐；
+- [x] Qwen3 MoE Decode Host同步清理；
+- [x] Qwen3 MoE NPU Graph能力探测与安全回退；
 - [ ] Packed Prefill，彻底移除 Padding MatMul；
 - [ ] Q+KV 融合；
 - [ ] Gate+Up 融合；
 - [ ] Vocab Parallel Sampling，避免完整 Logits AllGather；
-- [ ] NPU Graph 固定 Shape/分桶与命中率统计；
+- [x] NPU Graph 固定 Shape/分桶与命中率统计；
 - [ ] Continuous Batching；
 - [ ] 通信与计算重叠；
 - [ ] W8A8/INT8/INT4 量化；

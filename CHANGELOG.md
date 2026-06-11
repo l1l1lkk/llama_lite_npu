@@ -2,6 +2,29 @@
 
 所有触发版本升级的变更按发布时间倒序记录。详细规则见[版本管理与发布规范](docs/versioning.md)。
 
+## [0.0.4rc1] - 2026-06-11
+
+完成Qwen3 MoE Decode热路径Host同步清理，并开放带安全回退的NPU Graph Capture/Replay。
+
+### 核心能力
+
+- PagedAttention在Prefill阶段缓存CPU请求ID，Decode不再每个Token读取NPU请求Tensor；
+- 流式生成复用Token解码时已有的D2H结果判断EOS，删除额外的`eos_reached.all()`同步；
+- Qwen3 MoE允许按`(batch_size, 128-token bucket)`尝试NPU Graph Capture；
+- Graph Capture失败的Key只尝试一次，后续稳定回退Eager；
+- Benchmark输出Graph attempts、captured、replays和fallbacks计数；
+- 新增动态专家路由与GMM `group_list` Graph Replay的Atlas NPU测试。
+
+### 验证状态
+
+- Windows CPU契约与回归测试通过；
+- Atlas 910B3需运行新增NPU测试确认当前CANN/torch_npu组合支持GMM、Triton路由和HCCL Graph Replay；
+- 未填写预测性能，实测后写入性能历史记录。
+
+### 文档
+
+- [v0.0.4rc1完整版本报告](docs/releases/v0.0.4rc1.md)
+
 ## [0.0.3rc2] - 2026-06-11
 
 修复Qwen3 MoE Triton路由Gather在Ascend Triton 3.2编译阶段失败的问题。

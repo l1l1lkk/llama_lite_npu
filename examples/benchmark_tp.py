@@ -484,6 +484,17 @@ def main():
     print(f"  Avg throughput:      {avg_throughput:.1f} tokens/s")
     print(f"  Avg per-token:       {avg_latency:.2f} ms")
     print(f"  Batch throughput:    {avg_throughput * args.batch_size:.1f} tokens/s")
+    graph_runner = getattr(
+        getattr(generator, "model_executor", None), "graph_runner", None
+    )
+    if graph_runner is not None:
+        print(
+            "  NPU Graph stats:     "
+            f"attempts={graph_runner.capture_attempt_count}, "
+            f"captured={graph_runner.capture_count}, "
+            f"replays={graph_runner.replay_count}, "
+            f"fallbacks={graph_runner.fallback_count}"
+        )
     print("=" * 70)
 
     # Show sample output

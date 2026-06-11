@@ -139,7 +139,7 @@ class GenerateStreamText:
         # 预分配tokens张量
         tokens = torch.full((bsz, total_len), pad_id, dtype=torch.long, device=device)
         input_text_mask = tokens != pad_id
-        eos_reached = torch.tensor([False] * bsz, device=device)
+        host_eos_reached = [False] * bsz
         prev_pos = 0
         last_yielded_pos = [
             len(prompt_tokens[i]) if not echo else 0 for i in range(bsz)
@@ -194,16 +194,7 @@ class GenerateStreamText:
                 mask, next_token.reshape(-1), tokens[:, cur_pos]
             )
 
-            eos_reached = eos_reached | (
-                mask & (next_token == self.tokenizer.eos_token_id)
-            )
             prev_pos = cur_pos
-
-            # eos_reached 是一个布尔张量，记录每个序列是否到达了终止状态, 形状为 [batch_size, 1]。
-            # NOTE: ～input_text_mask[:, cur_pos] 标记当前生成位置是否是模型生成的部分（非输入部分）。True 表示当前列是待生成的部分。False 表示当前列是输入部分。
-            # NOTE: next_token == self.tokenizer.eos_token_id 表示检测当前生成的 next_token 是否等于 eos_token_id，即模型生成了终止标记。
-            # NOTE: & 表示按位与操作，确保当前位置是非输入部分且生成了终止标记。
-            # NOTE: 使用 |= 按位或更新，表示如果某个序列已经到达 eos_token_id，则保持 True 状态，不会被后续重置为 False。
 
             # 为整个批次收集输出
             batch_outputs = []
@@ -212,6 +203,11 @@ class GenerateStreamText:
                 end = cur_pos + 1
                 if start < end:
                     token = tokens[i, start:end].tolist()
+                    if token:
+                        host_eos_reached[i] = (
+                            host_eos_reached[i]
+                            or token[-1] == self.tokenizer.eos_token_id
+                        )
                     text = self.tokenizer.decode(
                         token, skip_special_tokens=True
                     )  # 解码时跳过特殊标记。
@@ -223,13 +219,15 @@ class GenerateStreamText:
             # 将整个批次的输出一次性 yield
             yield batch_outputs
 
-            if eos_reached.all():
+            # Token decoding already copied this step's ids to Host. Reuse
+            # that data for EOS detection instead of launching a second
+            # NPU-to-Host synchronization through eos_reached.all().
+            if all(host_eos_reached):
                 break
 
         # 减少 kv cache 内存管理器的引用计数
         if self.model_executor.use_paged_attn:
-            for req_idx in b_req_idx.tolist():
-                self.model_executor.req_tokens_manager.free_req(req_idx)
+            self.model_executor.release_paged_requests()
         else:
             all_select_indexs = torch.concat(all_select_index_list)
             self.model_executor.kv_mem_manager.release_ref(all_select_indexs)

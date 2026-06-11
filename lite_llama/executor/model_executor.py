@@ -260,6 +260,10 @@ class ModelExecutor:
         self.atten_info = AttentionInfo()  # 创建 AttentionInfo 实例
         self.atten_info.kv_buffer = self.kv_mem_manager.gpu_kv_buffer
         self.atten_info.b_req_tokens_table = self.req_tokens_manager.b_req_tokens_table
+        # Paged KV allocation is host-managed. Cache request ids once during
+        # prefill so decode does not synchronize an NPU tensor via .tolist()
+        # for every generated token.
+        self._paged_request_ids: tuple[int, ...] = ()
 
         # --- NPU Graph (decode kernel launch batching) ---
         self.graph_runner = None
@@ -270,9 +274,9 @@ class ModelExecutor:
                 self.apply_npu_graph()
             else:
                 logger.warning(
-                    "NPU Graph is disabled for qwen3_moe because dynamic "
-                    "expert dispatch does not have a static decode topology; "
-                    "using eager decode."
+                    "NPU Graph is unavailable for model_type=%s; "
+                    "using eager decode.",
+                    self.model_type,
                 )
 
     def _get_max_avaliable_tokens(self,model, gpu_memory_utilization=0.9, block_size=1):
@@ -320,7 +324,9 @@ class ModelExecutor:
     def apply_npu_graph(self):
         """Apply NPU graph for decode phase (kernel launch batching)."""
         from .npu_graph import NpuGraphRunner
-        self.graph_runner = NpuGraphRunner(self.model)
+        self.graph_runner = NpuGraphRunner(
+            self.model, model_type=self.model_type
+        )
         logger.info("NPU Graph runner created (available=%s)", self.graph_runner.available)
 
     def init_req_to_tokens_table(
@@ -380,17 +386,22 @@ class ModelExecutor:
 
         context_num_tokens = max_prompt_len * batch_size
         if self.use_paged_attn:
-            for req_idx in b_req_idx.tolist():
+            self._paged_request_ids = tuple(
+                int(req_idx)
+                for req_idx in b_req_idx.detach().cpu().tolist()
+            )
+            for req_idx in self._paged_request_ids:
                 ok = self.req_tokens_manager.alloc_req(req_idx, max_prompt_len)
                 if not ok:
                     raise RuntimeError("Paged KV allocation failed during prefill")
             self.atten_info.cur_select_index = torch.cat(
                 [
                     self.req_tokens_manager.get_token_indices(req_idx, max_prompt_len)
-                    for req_idx in b_req_idx.tolist()
+                    for req_idx in self._paged_request_ids
                 ]
             ).to(torch.int32)
         else:
+            self._paged_request_ids = ()
             self.atten_info.cur_select_index, _ = self.kv_mem_manager.alloc_kvcache_index(
                 context_num_tokens
             )
@@ -428,8 +439,14 @@ class ModelExecutor:
 
     def decode_alloc_kv_cache(self, batch_size):
         if self.use_paged_attn:
+            if len(self._paged_request_ids) != batch_size:
+                raise RuntimeError(
+                    "Paged request id cache is not initialized for the "
+                    f"decode batch: cached={len(self._paged_request_ids)}, "
+                    f"batch_size={batch_size}"
+                )
             new_indices = []
-            for req_idx in self.atten_info.b_req_idx.tolist():
+            for req_idx in self._paged_request_ids:
                 ok = self.req_tokens_manager.extend_req(req_idx, 1)
                 if not ok:
                     raise RuntimeError("Paged KV allocation failed during decode")
@@ -450,6 +467,12 @@ class ModelExecutor:
         self.atten_info.max_actual_seq_len += 1
 
         return self.atten_info.cur_select_index  # shape [batch_size,]
+
+    def release_paged_requests(self) -> None:
+        """Release host-managed page mappings without reading an NPU tensor."""
+        for req_idx in self._paged_request_ids:
+            self.req_tokens_manager.free_req(req_idx)
+        self._paged_request_ids = ()
 
     def forward(self, input_ids, position_ids, image_tensor=None, **kwargs):
         if self.model_type in ("llava", "qwen3_vl"):

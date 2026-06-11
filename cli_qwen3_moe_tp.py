@@ -91,7 +91,7 @@ def main(
         print(f"Max seq len: {max_seq_len}")
         print(f"Page size:   {page_size}")
         print(
-            "NPU Graph:   requested (MoE uses eager decode)"
+            "NPU Graph:   on (capture failure falls back to eager)"
             if compiled_model
             else "NPU Graph:   off"
         )
@@ -157,7 +157,7 @@ if __name__ == "__main__":
         "--compiled_model",
         dest="compiled_model",
         action="store_true",
-        help="Request NPU Graph (MoE falls back to eager decode).",
+        help="Enable MoE Decode NPU Graph with per-bucket eager fallback.",
     )
     parser.add_argument(
         "--no_compiled_model",
