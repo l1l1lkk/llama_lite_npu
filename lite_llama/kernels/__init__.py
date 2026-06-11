@@ -7,6 +7,7 @@ from .flashdecoding import flash_decoding
 
 from .skip_rmsnorm import skip_rmsnorm
 from .swiglu import swiglu_forward
+from .moe_routing import finalize_moe_routing, prepare_moe_routing
 from .rope_emb import rope_emb_forward
 from .softmax_split import softmax_split
 from .update_kv_buffer import update_kv_buffer

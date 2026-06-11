@@ -190,6 +190,25 @@ def shard_moe_down(weight: torch.Tensor, tp: TPConfig) -> torch.Tensor:
     return weight[:, :, _shard_slice(weight.shape[2], tp.world_size, tp.rank)].clone()
 
 
+def prepare_moe_gate_up_for_gmm(
+    weight: torch.Tensor,
+    intermediate_size: int,
+    tp: TPConfig,
+) -> torch.Tensor:
+    """Shard checkpoint gate/up weights and convert to ``[E, K, N]``."""
+    sharded = shard_moe_gate_up(weight, intermediate_size, tp)
+    return sharded.transpose(1, 2).contiguous()
+
+
+def prepare_moe_down_for_gmm(
+    weight: torch.Tensor,
+    tp: TPConfig,
+) -> torch.Tensor:
+    """Shard checkpoint down weights and convert to ``[E, K, N]``."""
+    sharded = shard_moe_down(weight, tp)
+    return sharded.transpose(1, 2).contiguous()
+
+
 def shard_lm_head(
     weight: torch.Tensor, tp: TPConfig
 ) -> torch.Tensor:

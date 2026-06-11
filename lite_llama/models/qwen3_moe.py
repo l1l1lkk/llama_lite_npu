@@ -29,6 +29,7 @@ class Qwen3MoeDecoderLayer(Qwen3DecoderLayer):
                 intermediate_size=config.moe_intermediate_size,
                 norm_topk_prob=config.norm_topk_prob,
                 tp_config=tp_config,
+                layer_index=layer_index,
             )
         else:
             self.mlp = FusedMLP(config, tp_config)

@@ -1,7 +1,10 @@
 import importlib.util
 import ast
+import os
 import sys
+import types
 import unittest
+from unittest import mock
 from pathlib import Path
 
 import torch
@@ -84,11 +87,37 @@ class Qwen3MoeTensorParallelTest(unittest.TestCase):
         self.assertEqual(rank1.shape, (2, 3, 4))
         self.assertTrue(torch.equal(rank1, weight[:, :, 4:8]))
 
+    def test_runtime_moe_weights_are_transposed_to_gmm_native_layout(self):
+        gate_up = torch.arange(2 * 16 * 3).reshape(2, 16, 3)
+        down = torch.arange(2 * 3 * 8).reshape(2, 3, 8)
+        tp = tp_utils.TPConfig(2, 1)
+
+        runtime_gate_up = tp_utils.prepare_moe_gate_up_for_gmm(
+            gate_up, intermediate_size=8, tp=tp
+        )
+        runtime_down = tp_utils.prepare_moe_down_for_gmm(down, tp=tp)
+
+        expected_gate_up = tp_utils.shard_moe_gate_up(
+            gate_up, intermediate_size=8, tp=tp
+        ).transpose(1, 2).contiguous()
+        expected_down = tp_utils.shard_moe_down(
+            down, tp
+        ).transpose(1, 2).contiguous()
+        self.assertEqual(runtime_gate_up.shape, (2, 3, 8))
+        self.assertEqual(runtime_down.shape, (2, 4, 3))
+        self.assertTrue(runtime_gate_up.is_contiguous())
+        self.assertTrue(runtime_down.is_contiguous())
+        self.assertTrue(torch.equal(runtime_gate_up, expected_gate_up))
+        self.assertTrue(torch.equal(runtime_down, expected_down))
+
 
 class Qwen3MoeExecutionTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.moe = _load_module("qwen3_moe_layers", "lite_llama/models/moe.py")
+        cls.routing = _load_module(
+            "qwen3_moe_routing", "lite_llama/kernels/moe_routing.py"
+        )
 
     def test_router_returns_normalized_topk_probabilities(self):
         router = self.moe.Qwen3MoeTopKRouter(
@@ -131,7 +160,7 @@ class Qwen3MoeExecutionTest(unittest.TestCase):
                     [[1.0, 0.0], [0.0, 1.0], [1.0, 1.0], [1.0, -1.0]],
                     [[0.5, 0.0], [0.0, 0.5], [1.0, 0.0], [0.0, 1.0]],
                 ]
-            )
+            ).transpose(1, 2)
         )
         block.experts.down_weight.data.copy_(
             torch.tensor(
@@ -148,17 +177,205 @@ class Qwen3MoeExecutionTest(unittest.TestCase):
         expected_rows = []
         for token, expert_id in zip(inputs.view(-1, 2), (0, 1)):
             gate_up = torch.nn.functional.linear(
-                token, block.experts.gate_up_weight[expert_id]
+                token,
+                block.experts.gate_up_weight[expert_id].transpose(0, 1),
             )
             gate, up = gate_up.chunk(2, dim=-1)
             hidden = torch.nn.functional.silu(gate) * up
             expected_rows.append(
                 torch.nn.functional.linear(
-                    hidden, block.experts.down_weight[expert_id]
+                    hidden,
+                    block.experts.down_weight[expert_id].transpose(0, 1),
                 )
             )
         expected = torch.stack(expected_rows).view_as(inputs)
         torch.testing.assert_close(output, expected)
+
+    def test_reference_routing_groups_gathers_and_scatters(self):
+        hidden_states = torch.tensor(
+            [[1.0, 10.0], [2.0, 20.0], [3.0, 30.0]]
+        )
+        selected_experts = torch.tensor([[2, 0], [1, 2], [0, 2]])
+        routing_weights = torch.tensor(
+            [[0.7, 0.3], [0.4, 0.6], [0.2, 0.8]]
+        )
+
+        plan = self.routing.prepare_moe_routing_reference(
+            hidden_states,
+            selected_experts,
+            routing_weights,
+            num_experts=3,
+        )
+
+        self.assertEqual(plan.expert_counts.tolist(), [2, 1, 3])
+        self.assertEqual(plan.group_list.tolist(), [2, 3, 6])
+        self.assertEqual(plan.sorted_token_ids.tolist(), [0, 2, 1, 0, 1, 2])
+        torch.testing.assert_close(
+            plan.routed_states,
+            hidden_states[plan.sorted_token_ids],
+        )
+
+        expert_output = plan.routed_states + 1.0
+        actual = self.routing.finalize_moe_routing_reference(
+            expert_output,
+            plan.sorted_token_ids,
+            plan.sorted_weights,
+            num_tokens=hidden_states.shape[0],
+        )
+        expected = torch.zeros_like(hidden_states)
+        for token_id in range(hidden_states.shape[0]):
+            for slot in range(selected_experts.shape[1]):
+                expected[token_id] += (
+                    hidden_states[token_id] + 1.0
+                ) * routing_weights[token_id, slot]
+        torch.testing.assert_close(actual, expected)
+
+    def test_grouped_path_matches_eager_reference(self):
+        experts = self.moe.Qwen3MoeExperts(
+            hidden_size=3,
+            num_experts=3,
+            intermediate_size=2,
+            dtype=torch.float32,
+        )
+        torch.manual_seed(7)
+        experts.gate_up_weight.data.normal_()
+        experts.down_weight.data.normal_()
+        hidden_states = torch.randn(4, 3)
+        selected_experts = torch.tensor([[0, 2], [1, 0], [2, 1], [2, 0]])
+        routing_weights = torch.tensor(
+            [[0.8, 0.2], [0.6, 0.4], [0.7, 0.3], [0.5, 0.5]]
+        )
+
+        def fake_grouped_matmul(x, weight, group_list):
+            outputs = []
+            start = 0
+            for expert_id, end in enumerate(group_list.tolist()):
+                outputs.append(x[start:end] @ weight[expert_id])
+                start = end
+            return torch.cat(outputs, dim=0)
+
+        with mock.patch.object(
+            experts, "_run_grouped_matmul", side_effect=fake_grouped_matmul
+        ) as grouped_matmul:
+            grouped = experts._forward_grouped_local(
+                hidden_states, selected_experts, routing_weights
+            )
+        eager = experts._forward_eager_local(
+            hidden_states, selected_experts, routing_weights
+        )
+
+        self.assertEqual(grouped_matmul.call_count, 2)
+        first_weight = grouped_matmul.call_args_list[0].args[1]
+        second_weight = grouped_matmul.call_args_list[1].args[1]
+        self.assertEqual(first_weight.shape, (3, 3, 4))
+        self.assertEqual(second_weight.shape, (3, 2, 3))
+        torch.testing.assert_close(grouped, eager, rtol=1e-5, atol=1e-5)
+
+    def test_torch_npu_gmm_uses_tensor_split_and_cumulative_groups(self):
+        calls = []
+
+        def fake_npu_grouped_matmul(**kwargs):
+            calls.append(kwargs)
+            return [kwargs["x"][0]]
+
+        fake_torch_npu = types.SimpleNamespace(
+            npu_grouped_matmul=fake_npu_grouped_matmul
+        )
+        x = torch.randn(3, 2)
+        weight = torch.randn(2, 2, 4)
+        group_list = torch.tensor([1, 3], dtype=torch.int64)
+
+        with mock.patch.dict(
+            sys.modules, {"torch_npu": fake_torch_npu}
+        ):
+            result = self.moe.Qwen3MoeExperts._run_grouped_matmul(
+                x, weight, group_list
+            )
+
+        self.assertIs(result, x)
+        self.assertEqual(calls[0]["split_item"], 2)
+        self.assertEqual(calls[0]["group_type"], 0)
+        self.assertEqual(calls[0]["group_list_type"], 0)
+        self.assertIs(calls[0]["x"][0], x)
+        self.assertIs(calls[0]["weight"][0], weight)
+        self.assertIs(calls[0]["group_list"], group_list)
+
+    def test_auto_backend_keeps_cpu_on_eager_path(self):
+        experts = self.moe.Qwen3MoeExperts(
+            hidden_size=2,
+            num_experts=2,
+            intermediate_size=2,
+            dtype=torch.float32,
+        )
+        experts.gate_up_weight.data.zero_()
+        experts.down_weight.data.zero_()
+        hidden_states = torch.ones(1, 2)
+        selected_experts = torch.tensor([[0]])
+        routing_weights = torch.ones(1, 1)
+
+        with mock.patch.object(
+            experts,
+            "_forward_grouped_local",
+            side_effect=AssertionError("CPU must not use GMM"),
+        ):
+            output = experts(
+                hidden_states, selected_experts, routing_weights
+            )
+
+        torch.testing.assert_close(output, torch.zeros_like(output))
+
+    def test_alignment_validation_reports_numeric_error(self):
+        experts = self.moe.Qwen3MoeExperts(
+            hidden_size=2,
+            num_experts=2,
+            intermediate_size=2,
+            dtype=torch.float32,
+        )
+
+        with self.assertRaisesRegex(
+            RuntimeError, "MoE GMM alignment failed.*max_abs_diff"
+        ):
+            experts._validate_local_outputs(
+                torch.zeros(2, 2),
+                torch.ones(2, 2),
+                rtol=1e-2,
+                atol=1e-2,
+            )
+
+    def test_backend_environment_rejects_unknown_value(self):
+        with mock.patch.dict(
+            os.environ, {"LITE_LLAMA_MOE_BACKEND": "unknown"}
+        ):
+            with self.assertRaisesRegex(ValueError, "LITE_LLAMA_MOE_BACKEND"):
+                self.moe.Qwen3MoeExperts(
+                    hidden_size=2,
+                    num_experts=2,
+                    intermediate_size=2,
+                )
+
+    def test_npu_routing_source_has_no_host_visible_tolist(self):
+        source = (
+            ROOT / "lite_llama/kernels/moe_routing.py"
+        ).read_text(encoding="utf-8")
+        module = ast.parse(source)
+        functions = {
+            node.name: node
+            for node in ast.walk(module)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        }
+        for name in ("prepare_moe_routing_npu", "finalize_moe_routing_npu"):
+            self.assertIn(name, functions)
+            function_source = ast.get_source_segment(source, functions[name])
+            self.assertNotIn(".tolist(", function_source)
+
+        kernel_names = {
+            node.name
+            for node in ast.walk(module)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and node.name.startswith("_moe_")
+        }
+        self.assertIn("_moe_count_and_gather_kernel", kernel_names)
+        self.assertIn("_moe_weighted_scatter_kernel", kernel_names)
 
 
 class Qwen3MoeSwiGLUStrideTest(unittest.TestCase):

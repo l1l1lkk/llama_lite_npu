@@ -21,7 +21,7 @@ from .tp_utils import (
     TPConfig, init_tp, detect_tp_env, get_tp_config,
     shard_attention_q, shard_attention_kv, shard_attention_o,
     shard_ffn_gate_up, shard_ffn_down, shard_lm_head,
-    shard_moe_gate_up, shard_moe_down,
+    prepare_moe_gate_up_for_gmm, prepare_moe_down_for_gmm,
 )
 
 logger = get_logger(__name__)
@@ -161,6 +161,7 @@ class ModelExecutor:
         # --- TP weight sharding (on CPU) ---
         if tp.enabled:
             logger.info("Sharding weights for TP (rank=%d/%d)", tp.rank, tp.world_size)
+        if tp.enabled or model_config.model_type.lower() == "qwen3_moe":
             num_layers = _get_num_layers_from_config(model_config)
             state_dict = _shard_state_dict(state_dict, num_layers, tp, model_config)
 
@@ -521,13 +522,13 @@ def _shard_state_dict(
         gate_up_key = f"{moe_prefix}.experts.gate_up_weight"
         down_key = f"{moe_prefix}.experts.down_weight"
         if gate_up_key in state_dict:
-            state_dict[gate_up_key] = shard_moe_gate_up(
+            state_dict[gate_up_key] = prepare_moe_gate_up_for_gmm(
                 state_dict[gate_up_key],
                 model_config.moe_intermediate_size,
                 tp,
             )
         if down_key in state_dict:
-            state_dict[down_key] = shard_moe_down(
+            state_dict[down_key] = prepare_moe_down_for_gmm(
                 state_dict[down_key], tp
             )
 

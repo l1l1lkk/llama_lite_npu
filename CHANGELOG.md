@@ -2,6 +2,29 @@
 
 所有触发版本升级的变更按发布时间倒序记录。详细规则见[版本管理与发布规范](docs/versioning.md)。
 
+## [0.0.3rc1] - 2026-06-11
+
+将Qwen3-30B-A3B MoE专家执行从动态Python循环升级为Ascend Grouped MatMul与Triton设备侧路由。
+
+### 核心能力
+
+- Gate/Up与Down投影分别使用`torch_npu.npu_grouped_matmul`；
+- Triton在NPU侧完成专家计数、按专家Gather和routing weight加权Scatter；
+- 移除GMM热路径中的`torch.unique(...).tolist()`及逐专家Python循环；
+- 模型加载时将现有`.pth`专家权重一次性转换为GMM原生`[expert, input, output]`布局，无需重新转换权重；
+- 保留`eager`参考后端，并支持每个Sparse MoE层在TP AllReduce前进行数值对齐。
+
+### 验证状态
+
+- 17项Qwen3 MoE CPU单元与契约测试通过；
+- 新增2项Atlas NPU真实GMM数值测试，本地无NPU环境时明确跳过；
+- Python静态编译通过；
+- Atlas 910B3端到端数值与性能结果需在目标服务器完成后写入，不在本版本文档中填写预测数据。
+
+### 文档
+
+- [v0.0.3rc1完整版本报告](docs/releases/v0.0.3rc1.md)
+
 ## [0.0.2rc2] - 2026-06-10
 
 修复Qwen3-30B-A3B MoE在Prefill阶段因SwiGLU错误读取非连续Gate/Up视图而产生无关回答的问题。
@@ -73,3 +96,4 @@
 [0.0.1rc1]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.1rc1
 [0.0.2rc1]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.2rc1
 [0.0.2rc2]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.2rc2
+[0.0.3rc1]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.3rc1

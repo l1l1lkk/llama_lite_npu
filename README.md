@@ -9,7 +9,7 @@
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.7-orange)
 ![Ascend](https://img.shields.io/badge/Ascend-910B3-red)
-![Version](https://img.shields.io/badge/version-0.0.2rc2-blue)
+![Version](https://img.shields.io/badge/version-0.0.3rc1-blue)
 ![Status](https://img.shields.io/badge/status-active_development-yellow)
 
 </div>
@@ -29,9 +29,9 @@ Lite Llama NPU 的目标不是封装 Transformers，而是实现一条可以观�
 
 ## 最新版本
 
-当前版本：**0.0.2rc2**（2026-06-10）
+当前版本：**0.0.3rc1**（2026-06-11）
 
-- [v0.0.2rc2完整版本报告](docs/releases/v0.0.2rc2.md)
+- [v0.0.3rc1完整版本报告](docs/releases/v0.0.3rc1.md)
 - [完整CHANGELOG](CHANGELOG.md)
 - [版本管理与发布规范](docs/versioning.md)
 
@@ -70,13 +70,15 @@ Lite Llama NPU 的目标不是封装 Transformers，而是实现一条可以观�
 - **算子融合**
   - K/V Linear 融合；
   - SwiGLU 自定义算子；
+  - Qwen3 MoE Gate/Up与Down使用Ascend Grouped MatMul；
+  - Triton融合MoE专家分组Gather与routing weight加权Scatter；
   - Skip + RMSNorm 融合；
   - RoPE、RMSNorm、Softmax、KV 更新等 Triton Ascend 内核。
 - **图模式**
   - Decode NPU Graph按128-token长度Bucket进行capture/replay；
   - 同一Bucket复用固定Shape Graph并更新动态KV元数据；
   - Shape 不满足 replay 条件时安全回退 Eager。
-  - Qwen3 MoE首版因动态专家路由显式使用Eager Decode。
+  - Qwen3 MoE已移除专家Python循环，但NPU Graph仍等待GMM动态分组兼容性验证。
 - **性能观测**
   - Ascend PyTorch Profiler；
   - CPU、CANN、NPU 算子、HBM 和 HCCL 通信数据；
@@ -115,7 +117,7 @@ Qwen3-32B、TP=2 时，每个 Decode Token 的主要 Linear 路径为：
 
 ## 最新版本性能
 
-以下记录当前已完成目标硬件验证的最新性能，即Qwen3-32B基线。Qwen3-30B-A3B尚未产生910B3实测数据，验证状态见[v0.0.2rc1版本报告](docs/releases/v0.0.2rc1.md)。
+以下记录当前已完成目标硬件验证的最新性能，即Qwen3-32B基线。Qwen3-30B-A3B GMM路径尚未产生910B3实测数据，验证方式见[v0.0.3rc1版本报告](docs/releases/v0.0.3rc1.md)。
 
 | 项目 | 配置 |
 |---|---|
@@ -242,6 +244,8 @@ ASCEND_RT_VISIBLE_DEVICES=4,5 python -m torch.distributed.run \
 ### Qwen3-30B-A3B 双卡交互推理
 
 ```bash
+export LITE_LLAMA_MOE_BACKEND=auto
+
 ASCEND_RT_VISIBLE_DEVICES=4,5 python -m torch.distributed.run \
   --nproc_per_node=2 \
   cli_qwen3_moe_tp.py \
@@ -252,7 +256,14 @@ ASCEND_RT_VISIBLE_DEVICES=4,5 python -m torch.distributed.run \
   --enable_thinking
 ```
 
-> 当前MoE版本使用动态专家执行并自动回退Eager Decode。Grouped MatMul与MoE NPU Graph属于后续性能版本。
+默认`auto`会在NPU且`torch_npu.npu_grouped_matmul`可用时启用GMM。排查数值问题时可使用：
+
+```bash
+export LITE_LLAMA_MOE_BACKEND=gmm
+export LITE_LLAMA_MOE_VALIDATE=1
+```
+
+验证模式会在每个MoE层同时运行GMM和eager参考计算，速度明显变慢；验证通过后应执行`unset LITE_LLAMA_MOE_VALIDATE`。当前MoE NPU Graph仍保持关闭。
 
 Thinking 模式：
 
@@ -379,6 +390,8 @@ Profiler 数据通常包含：
 - TP 通信为同步 AllReduce/AllGather，尚未实现计算通信重叠；
 - Q+KV、Gate+Up 尚未融合；
 - LM Head 当前会 AllGather 完整词表 logits；
+- Qwen3 MoE GMM已接入，但尚未完成Atlas 910B3性能基线；
+- Qwen3 MoE Decode NPU Graph仍未启用；
 - 暂未支持 W8A8、INT8、INT4、AWQ 和 SmoothQuant。
 
 ## 优化路线
@@ -395,6 +408,9 @@ Profiler 数据通常包含：
 - [x] OpenAI 兼容 API 与真实 SSE Streaming；
 - [x] EvalScope 指标适配；
 - [x] Ascend Profiler 与 HCCL 数据采集；
+- [x] Qwen3 MoE Ascend Grouped MatMul；
+- [x] Qwen3 MoE Triton路由Gather/Scatter；
+- [x] Qwen3 MoE逐层eager/GMM数值对齐；
 - [ ] Packed Prefill，彻底移除 Padding MatMul；
 - [ ] Q+KV 融合；
 - [ ] Gate+Up 融合；
@@ -415,8 +431,10 @@ lite_llama/
 │   ├── paged_attention.py     # Paged KV Cache
 │   └── npu_graph.py           # NPU Graph 实验路径
 ├── kernels/                   # Triton Ascend 自定义算子
+│   └── moe_routing.py         # MoE设备侧分组Gather/Scatter
 ├── models/
 │   ├── qwen3.py               # Qwen3 文本模型
+│   ├── qwen3_moe.py           # Qwen3 MoE模型
 │   ├── qwen3vl.py             # Qwen3-VL 文本与视觉连接
 │   └── qwen3vl_vision.py      # Qwen3-VL Vision Encoder
 ├── generate_stream.py         # 文本流式生成
