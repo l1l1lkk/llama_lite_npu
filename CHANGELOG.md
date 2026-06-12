@@ -2,6 +2,183 @@
 
 所有触发版本升级的变更按发布时间倒序记录。详细规则见[版本管理与发布规范](docs/versioning.md)。
 
+## [0.0.5rc3] - 2026-06-12
+
+同步最近版本的文档、Atlas实测结果和当前功能边界；相对v0.0.5rc2不修改推理执行逻辑。
+
+### 文档与实测
+
+- README新增模型、并行、Continuous Batching和NPU Graph支持矩阵；
+- MoE启动示例明确区分TP Graph与EP Eager；
+- 补录Qwen3-30B-A3B双卡EP Eager结果：5.5 tok/s、Batch 22.1 tok/s、
+  181.09ms/token；
+- Profiler示例更新为EP/TP Eager通信对照采集；
+- 明确EP当前使用本地专家计算加AllReduce，并非Token All-to-All；
+- 明确当前只支持单机多卡，尚未实现多机TP × EP二维并行；
+- README.zh与主README同步，避免继续展示上游CUDA/ROCm旧说明。
+
+### 文档
+
+- [v0.0.5rc3完整版本报告](docs/releases/v0.0.5rc3.md)
+
+## [0.0.5rc2] - 2026-06-12
+
+修复Qwen3 MoE Expert Parallel启动Decode NPU Graph时因`aclnnNonzero`导致进程退出的问题。
+
+### Bug修复
+
+- EP路由需要使用`torch.nonzero`压缩本地专家assignment；
+- Ascend `aclnnNonzero`会同步执行stream，不能进入NPU Graph Capture；
+- EP模式现在启动时直接禁用Decode Graph并明确记录Eager回退；
+- MoE TP模式和Dense模型继续保留现有NPU Graph路径；
+- 避免尝试失败的Capture污染stream，不能仅依赖异常捕获后继续执行。
+
+### 验证状态
+
+- 新增EP禁用Graph、TP保留Graph的回归测试；
+- 相关CPU测试和静态编译通过；
+- Atlas服务器需确认EP能够完成Warmup与正式Benchmark。
+
+### 文档
+
+- [v0.0.5rc2完整版本报告](docs/releases/v0.0.5rc2.md)
+
+## [0.0.5rc1] - 2026-06-11
+
+增加文本服务Continuous Batching、MoE Decode小Batch专家内核和单机Expert Parallel。
+
+### 核心能力
+
+- OpenAI兼容文本Server由单请求串行执行升级为共享Continuous Batching调度器；
+- 每个请求独立管理Paged KV request ID、序列长度、输出队列和结束释放；
+- TP进程使用Prefill、Decode、Release步骤级命令保持动态Batch一致；
+- 新增Triton Routed-GEMV专家后端，小Decode批次跳过通用专家排序与Gather/Scatter；
+- `auto`后端按`tokens * top_k`在Routed-GEMV和Ascend GMM间选择；
+- 新增`--moe_parallel_mode ep`，每卡持有部分完整专家并通过HCCL AllReduce合并局部输出；
+- CLI、Server和Benchmark均可选择MoE TP或EP执行模式。
+
+### 验证状态
+
+- 47项Continuous Batching、Paged KV、NPU Graph和Qwen3 MoE CPU测试通过；
+- 5项Atlas NPU测试入口在无NPU本地环境中按预期跳过；
+- Python静态编译通过；
+- 本地无Atlas NPU，Triton Ascend内核、EP双卡完整模型、服务并发与Graph Replay需要在910B3验证；
+- 本版本不填写预测性能，实测结果后续写入性能历史记录。
+
+### 文档
+
+- [v0.0.5rc1完整版本报告](docs/releases/v0.0.5rc1.md)
+
+## [0.0.4rc1] - 2026-06-11
+
+完成Qwen3 MoE Decode热路径Host同步清理，并开放带安全回退的NPU Graph Capture/Replay。
+
+### 核心能力
+
+- PagedAttention在Prefill阶段缓存CPU请求ID，Decode不再每个Token读取NPU请求Tensor；
+- 流式生成复用Token解码时已有的D2H结果判断EOS，删除额外的`eos_reached.all()`同步；
+- Qwen3 MoE允许按`(batch_size, 128-token bucket)`尝试NPU Graph Capture；
+- Graph Capture失败的Key只尝试一次，后续稳定回退Eager；
+- Benchmark输出Graph attempts、captured、replays和fallbacks计数；
+- 新增动态专家路由与GMM `group_list` Graph Replay的Atlas NPU测试。
+
+### 验证状态
+
+- Windows CPU契约与回归测试通过；
+- Atlas 910B3需运行新增NPU测试确认当前CANN/torch_npu组合支持GMM、Triton路由和HCCL Graph Replay；
+- 未填写预测性能，实测后写入性能历史记录。
+
+### 文档
+
+- [v0.0.4rc1完整版本报告](docs/releases/v0.0.4rc1.md)
+
+## [0.0.3rc2] - 2026-06-11
+
+修复Qwen3 MoE Triton路由Gather在Ascend Triton 3.2编译阶段失败的问题。
+
+### Bug修复
+
+- 不再读取`tl.atomic_add`返回的旧值作为专家分组写入位置；
+- 改为在NPU上使用`torch.argsort`生成专家顺序，再由Triton融合Gather与路由元数据写入；
+- 保持路由过程无CPU同步、无`.tolist()`和无逐专家Python循环；
+- 移除Ascend Triton不建议手动传入的`num_warps`参数。
+
+### 验证状态
+
+- 新增Ascend Triton原子返回值兼容性回归测试；
+- 19项Qwen3 MoE CPU单元与契约测试通过；
+- Atlas 910B3需重新执行NPU GMM测试和双卡端到端启动。
+
+### 文档
+
+- [v0.0.3rc2完整版本报告](docs/releases/v0.0.3rc2.md)
+
+## [0.0.3rc1] - 2026-06-11
+
+将Qwen3-30B-A3B MoE专家执行从动态Python循环升级为Ascend Grouped MatMul与Triton设备侧路由。
+
+### 核心能力
+
+- Gate/Up与Down投影分别使用`torch_npu.npu_grouped_matmul`；
+- Triton在NPU侧完成专家计数、按专家Gather和routing weight加权Scatter；
+- 移除GMM热路径中的`torch.unique(...).tolist()`及逐专家Python循环；
+- 模型加载时将现有`.pth`专家权重一次性转换为GMM原生`[expert, input, output]`布局，无需重新转换权重；
+- 保留`eager`参考后端，并支持每个Sparse MoE层在TP AllReduce前进行数值对齐。
+
+### 验证状态
+
+- 17项Qwen3 MoE CPU单元与契约测试通过；
+- 新增2项Atlas NPU真实GMM数值测试，本地无NPU环境时明确跳过；
+- Python静态编译通过；
+- Atlas 910B3端到端数值与性能结果需在目标服务器完成后写入，不在本版本文档中填写预测数据。
+
+### 文档
+
+- [v0.0.3rc1完整版本报告](docs/releases/v0.0.3rc1.md)
+
+## [0.0.2rc2] - 2026-06-10
+
+修复Qwen3-30B-A3B MoE在Prefill阶段因SwiGLU错误读取非连续Gate/Up视图而产生无关回答的问题。
+
+### Bug修复
+
+- SwiGLU Triton内核分别接收Gate、Up和输出张量的行跨度；
+- 修复融合Gate/Up经过`chunk()`后输入stride大于输出stride时的错误寻址；
+- Dense MLP连续张量路径保持兼容。
+
+### 验证状态
+
+- Qwen3 MoE单元测试由9项增加到10项并全部通过；
+- Python静态编译和`git diff --check`通过；
+- Atlas 910B3端到端回答正确性等待目标服务器验证。
+
+### 文档
+
+- [v0.0.2rc2完整版本报告](docs/releases/v0.0.2rc2.md)
+
+## [0.0.2rc1] - 2026-06-10
+
+新增Qwen3-30B-A3B MoE模型的正确性优先适配。
+
+### 核心能力
+
+- 新增`qwen3_moe`配置、模型注册和独立双卡CLI；
+- 复用现有Qwen3 Attention、RoPE、FlashAttention、Flash Decoding和Paged KV链路；
+- 支持128专家、TopK=8 Router以及按命中专家执行的SwiGLU专家MLP；
+- 支持专家内部Tensor Parallel，Router复制，专家中间维切分并在输出端AllReduce；
+- 权重转换器支持官方Qwen3-30B-A3B权重，并严格检查每层专家完整性；
+- MoE首版显式关闭Decode NPU Graph，避免动态专家路径被错误Capture。
+
+### 验证状态
+
+- 配置、Router、专家计算、权重堆叠、TP切分和Graph降级单元测试通过；
+- Windows CPU开发环境完成静态编译检查；
+- Atlas 910B3双卡权重加载、端到端生成和性能数据需要在目标服务器继续验证。
+
+### 文档
+
+- [v0.0.2rc1完整版本报告](docs/releases/v0.0.2rc1.md)
+
 ## [0.0.1rc1] - 2026-06-09
 
 首个带版本号的候选版本。
@@ -28,3 +205,11 @@
 - [v0.0.1rc1完整版本报告](docs/releases/v0.0.1rc1.md)
 
 [0.0.1rc1]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.1rc1
+[0.0.2rc1]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.2rc1
+[0.0.2rc2]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.2rc2
+[0.0.3rc1]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.3rc1
+[0.0.3rc2]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.3rc2
+[0.0.4rc1]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.4rc1
+[0.0.5rc1]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.5rc1
+[0.0.5rc2]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.5rc2
+[0.0.5rc3]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.5rc3

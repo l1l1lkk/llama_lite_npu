@@ -25,6 +25,7 @@ from transformers import (AutoConfig, AutoModelForCausalLM,
                           LlavaConfig, LlavaForConditionalGeneration)
 
 from lite_llama.utils.logger import get_logger
+from lite_llama.utils.qwen3_moe_weights import stack_qwen3_moe_weights
 
 logger = get_logger(__name__)
 
@@ -155,6 +156,26 @@ _SPEC = {
             "model.layers.{i}.mlp.gate_proj.weight":    "layers.{i}.mlp.gate_proj.weight",
             "model.layers.{i}.mlp.up_proj.weight":      "layers.{i}.mlp.up_proj.weight",
             "model.layers.{i}.mlp.down_proj.weight":    "layers.{i}.mlp.down_proj.weight",
+            "model.layers.{i}.input_layernorm.weight":  "layers.{i}.input_layernorm_weight",
+            "model.layers.{i}.post_attention_layernorm.weight": "layers.{i}.post_attention_layernorm_weight",
+        },
+        "merge_bias": False,
+    },
+
+    # Qwen-3 MoE
+    "qwen3_moe": {
+        "common": {
+            "model.embed_tokens.weight": "embed_tokens.weight",
+            "model.norm.weight":         "norm_weight",
+            "lm_head.weight":            "lm_head_weight",
+        },
+        "layer": {
+            "model.layers.{i}.self_attn.q_proj.weight": "layers.{i}.self_attn.q_proj_weight",
+            "model.layers.{i}.self_attn.k_proj.weight": "layers.{i}.self_attn.k_proj_weight",
+            "model.layers.{i}.self_attn.v_proj.weight": "layers.{i}.self_attn.v_proj_weight",
+            "model.layers.{i}.self_attn.q_norm.weight": "layers.{i}.self_attn.q_norm_weight",
+            "model.layers.{i}.self_attn.k_norm.weight": "layers.{i}.self_attn.k_norm_weight",
+            "model.layers.{i}.self_attn.o_proj.weight": "layers.{i}.self_attn.o_proj_weight",
             "model.layers.{i}.input_layernorm.weight":  "layers.{i}.input_layernorm_weight",
             "model.layers.{i}.post_attention_layernorm.weight": "layers.{i}.post_attention_layernorm_weight",
         },
@@ -321,6 +342,22 @@ def convert(checkpoints_dir: Path,
 
         logger.info("Vision blocks: %d, deepstack mergers: %d", vision_depth, len(deepstack_indexes))
 
+    if model_type == "qwen3_moe":
+        num_experts = layers_info["num_experts"]
+        new_sd.update(
+            stack_qwen3_moe_weights(
+                hf_state,
+                num_layers=num_layers,
+                num_experts=num_experts,
+                consume=True,
+            )
+        )
+        logger.info(
+            "Qwen3 MoE experts stacked: layers=%d experts_per_layer=%d",
+            num_layers,
+            num_experts,
+        )
+
     # ---------- 2. 对 LLM 部分执行 KV 合并 ----------
     if model_type.startswith("qwen") or model_type.startswith("llama"):
         llm_prefix = "language_model." if model_type == "qwen3_vl" else ""
@@ -361,6 +398,7 @@ def detect_model_type(checkpoints_dir: Path) -> str:
     alias = {
         "qwen2":     "qwen2",
         "qwen3":     "qwen3",
+        "qwen3_moe": "qwen3_moe",
         "llama":     "llama",
         "llava":     "llava",
         "qwen3_vl":  "qwen3_vl",
@@ -412,7 +450,10 @@ def get_num_layers(checkpoints_dir: Path, model_type: str) -> dict:
             "vision_depth": getattr(vis_cfg, "depth", 27),
             "deepstack_indexes": list(deepstack),
         }
-    return {"num_layers": cfg.num_hidden_layers}
+    result = {"num_layers": cfg.num_hidden_layers}
+    if model_type == "qwen3_moe":
+        result["num_experts"] = cfg.num_experts
+    return result
 
 
 def main() -> None:
@@ -429,7 +470,7 @@ def main() -> None:
     ckpt_dir: Path = args.checkpoints_dir.resolve()
     
     # 1️⃣ **直接从 config.json 读取 model_type** ↓
-    model_type = detect_model_type(ckpt_dir)
+    model_type = args.model_type or detect_model_type(ckpt_dir)
     logger.info("检测到 model_type = %s", model_type)
 
     # 2️⃣ 获取层数

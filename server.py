@@ -18,9 +18,11 @@ Endpoints:
 from __future__ import annotations
 
 import argparse
+import asyncio
 import base64
 import io
 import json
+import threading
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -88,6 +90,12 @@ _model_name = "default"
 _rank = 0
 _is_tp = False
 _tp_lock = None  # threading.Lock for single-request-at-a-time in TP mode
+_continuous_batching = False
+_continuous_backend = None
+_continuous_scheduler = None
+_scheduler_thread = None
+_scheduler_stop = None
+_scheduler_poll_seconds = 0.001
 
 
 def load_generator(
@@ -96,6 +104,7 @@ def load_generator(
     *,
     page_size: int = 16,
     compiled_model: bool = True,
+    moe_parallel_mode: str = "tp",
 ):
     global _generator, _is_vl, _model_name
     import json
@@ -122,6 +131,7 @@ def load_generator(
             tokenizer_path=checkpoints_dir,
             compiled_model=compiled_model,
             page_size=page_size,
+            moe_parallel_mode=moe_parallel_mode,
             device=device,
         )
 
@@ -188,15 +198,171 @@ def _tp_worker_loop():
             pass
 
 
+def _serialize_batch_request(request) -> dict:
+    return {
+        "request_id": request.request_id,
+        "prompt_tokens": request.prompt_tokens,
+        "max_new_tokens": request.max_new_tokens,
+        "temperature": request.temperature,
+        "top_p": request.top_p,
+        "generated_token_ids": request.generated_token_ids,
+        "model_request_id": request.model_request_id,
+    }
+
+
+class _TpCoordinatedContinuousBackend:
+    """Broadcast scheduler operations before executing them on rank 0."""
+
+    def __init__(self, local_backend):
+        self.local_backend = local_backend
+
+    @property
+    def eos_token_id(self):
+        return self.local_backend.eos_token_id
+
+    def tokenize(self, prompt):
+        return self.local_backend.tokenize(prompt)
+
+    def decode_tokens(self, token_ids):
+        return self.local_backend.decode_tokens(token_ids)
+
+    @staticmethod
+    def _broadcast(operation: str, requests) -> None:
+        command = [{
+            "operation": operation,
+            "requests": [
+                _serialize_batch_request(request)
+                for request in requests
+            ],
+        }]
+        torch.distributed.broadcast_object_list(command, src=0)
+
+    def prefill(self, requests):
+        self._broadcast("prefill", requests)
+        return self.local_backend.prefill(requests)
+
+    def decode(self, requests):
+        self._broadcast("decode", requests)
+        return self.local_backend.decode(requests)
+
+    def release(self, requests):
+        self._broadcast("release", requests)
+        return self.local_backend.release(requests)
+
+
+def _tp_continuous_worker_loop():
+    """Mirror rank-0 scheduler operations at model-step granularity."""
+    from lite_llama.continuous_batching import (
+        BatchRequest,
+        ContinuousBatchModelBackend,
+    )
+
+    backend = ContinuousBatchModelBackend(_generator)
+    requests_by_id = {}
+    while True:
+        command = [None]
+        torch.distributed.broadcast_object_list(command, src=0)
+        payload = command[0]
+        operation = payload["operation"]
+        if operation == "shutdown":
+            break
+
+        worker_requests = []
+        for item in payload["requests"]:
+            request_id = item["request_id"]
+            request = requests_by_id.get(request_id)
+            if request is None:
+                request = BatchRequest(
+                    request_id=request_id,
+                    prompt_tokens=item["prompt_tokens"],
+                    max_new_tokens=item["max_new_tokens"],
+                    temperature=item["temperature"],
+                    top_p=item["top_p"],
+                )
+                requests_by_id[request_id] = request
+            request.generated_token_ids = list(
+                item["generated_token_ids"]
+            )
+            if item["model_request_id"] is not None:
+                request.model_request_id = item["model_request_id"]
+            worker_requests.append(request)
+
+        if operation == "prefill":
+            backend.prefill(worker_requests)
+        elif operation == "decode":
+            backend.decode(worker_requests)
+        elif operation == "release":
+            backend.release(worker_requests)
+            for request in worker_requests:
+                requests_by_id.pop(request.request_id, None)
+        else:
+            raise RuntimeError(
+                f"unknown continuous batching TP operation: {operation}"
+            )
+
+
 # ---------------------------------------------------------------------------
 # App lifecycle
 # ---------------------------------------------------------------------------
+def _start_continuous_scheduler(
+    max_batch_size: int,
+    max_waiting_requests: int,
+    scheduler_poll_ms: float,
+) -> None:
+    global _continuous_backend, _continuous_scheduler
+    global _scheduler_thread, _scheduler_stop, _scheduler_poll_seconds
+
+    from lite_llama.continuous_batching import (
+        ContinuousBatchModelBackend,
+        ContinuousBatchScheduler,
+    )
+
+    local_backend = ContinuousBatchModelBackend(_generator)
+    _continuous_backend = (
+        _TpCoordinatedContinuousBackend(local_backend)
+        if _is_tp
+        else local_backend
+    )
+    _continuous_scheduler = ContinuousBatchScheduler(
+        backend=_continuous_backend,
+        max_batch_size=max_batch_size,
+        eos_token_id=_continuous_backend.eos_token_id,
+        decode_tokens=_continuous_backend.decode_tokens,
+        max_waiting_requests=max_waiting_requests,
+    )
+    _scheduler_poll_seconds = max(0.0001, scheduler_poll_ms / 1000.0)
+    _scheduler_stop = threading.Event()
+
+    def scheduler_loop():
+        while not _scheduler_stop.is_set():
+            did_work = _continuous_scheduler.step()
+            if not did_work:
+                _scheduler_stop.wait(_scheduler_poll_seconds)
+
+    _scheduler_thread = threading.Thread(
+        target=scheduler_loop,
+        name="lite-llama-continuous-batching",
+        daemon=True,
+    )
+    _scheduler_thread.start()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: generator is loaded by main() before uvicorn
     yield
     # Shutdown
-    global _generator
+    global _generator, _continuous_scheduler
+    if _scheduler_stop is not None:
+        _scheduler_stop.set()
+    if _scheduler_thread is not None:
+        _scheduler_thread.join(timeout=10)
+    if _continuous_scheduler is not None:
+        _continuous_scheduler.shutdown()
+    if _is_tp and _continuous_batching:
+        command = [{"operation": "shutdown", "requests": []}]
+        torch.distributed.broadcast_object_list(command, src=0)
+    _continuous_scheduler = None
     _generator = None
 
 
@@ -250,6 +416,102 @@ def _count_tokens(text: str) -> int:
     return len(_generator.tokenizer.encode(text, add_special_tokens=False))
 
 
+def _submit_continuous_request(
+    request_id: str,
+    prompt: str,
+    temperature: float,
+    top_p: float,
+    max_tokens: int,
+):
+    if _continuous_scheduler is None or _continuous_backend is None:
+        raise RuntimeError("continuous batching scheduler is not running")
+    prompt_tokens = _continuous_backend.tokenize(prompt)
+    return _continuous_scheduler.submit(
+        request_id=request_id,
+        prompt_tokens=prompt_tokens,
+        max_new_tokens=max_tokens,
+        temperature=temperature,
+        top_p=top_p,
+    )
+
+
+async def _collect_continuous_request(batch_request):
+    completion = ""
+    while True:
+        event = await asyncio.to_thread(batch_request.outputs.get)
+        if event.error:
+            raise RuntimeError(event.error)
+        completion += event.delta
+        if event.finished:
+            return completion, event.finish_reason
+
+
+async def _wait_continuous_chat(
+    prompt: str, req: ChatCompletionRequest, rid: str
+):
+    batch_request = _submit_continuous_request(
+        rid, prompt, req.temperature, req.top_p, req.max_tokens
+    )
+    try:
+        completion, finish_reason = await _collect_continuous_request(
+            batch_request
+        )
+    except Exception as error:
+        raise HTTPException(500, str(error))
+
+    prompt_tokens = _count_tokens(prompt)
+    completion_tokens = len(batch_request.generated_token_ids)
+    return {
+        "id": rid,
+        "object": "chat.completion",
+        "created": int(time.time()),
+        "model": _model_name,
+        "choices": [{
+            "index": 0,
+            "message": {"role": "assistant", "content": completion},
+            "finish_reason": finish_reason,
+        }],
+        "usage": {
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": prompt_tokens + completion_tokens,
+        },
+    }
+
+
+async def _wait_continuous_completion(
+    prompt: str, req: CompletionRequest, rid: str
+):
+    batch_request = _submit_continuous_request(
+        rid, prompt, req.temperature, req.top_p, req.max_tokens
+    )
+    try:
+        completion, finish_reason = await _collect_continuous_request(
+            batch_request
+        )
+    except Exception as error:
+        raise HTTPException(500, str(error))
+
+    prompt_tokens = _count_tokens(prompt)
+    completion_tokens = len(batch_request.generated_token_ids)
+    return {
+        "id": rid,
+        "object": "text_completion",
+        "created": int(time.time()),
+        "model": _model_name,
+        "choices": [{
+            "index": 0,
+            "text": completion,
+            "finish_reason": finish_reason,
+        }],
+        "usage": {
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": prompt_tokens + completion_tokens,
+        },
+    }
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
@@ -280,6 +542,14 @@ async def chat_completions(req: ChatCompletionRequest, raw: Request):
 
     request_id = f"chatcmpl-{uuid.uuid4().hex[:12]}"
 
+    if _continuous_batching and not _is_vl:
+        if req.stream:
+            return StreamingResponse(
+                _stream_continuous_chat(prompt, req, request_id),
+                media_type="text/event-stream",
+            )
+        return await _wait_continuous_chat(prompt, req, request_id)
+
     if req.stream:
         return StreamingResponse(
             _stream_chat(prompt, images, req, request_id),
@@ -297,6 +567,18 @@ async def completions(req: CompletionRequest, raw: Request):
     prompts = [req.prompt] if isinstance(req.prompt, str) else req.prompt
     request_id = f"cmpl-{uuid.uuid4().hex[:12]}"
 
+    if _continuous_batching and not _is_vl:
+        if req.stream:
+            return StreamingResponse(
+                _stream_continuous_completion(
+                    prompts[0], req, request_id
+                ),
+                media_type="text/event-stream",
+            )
+        return await _wait_continuous_completion(
+            prompts[0], req, request_id
+        )
+
     if req.stream:
         return StreamingResponse(
             _stream_completion(prompts[0], req, request_id),
@@ -309,6 +591,120 @@ async def completions(req: CompletionRequest, raw: Request):
 # ---------------------------------------------------------------------------
 # Generation helpers
 # ---------------------------------------------------------------------------
+async def _stream_continuous_chat(
+    prompt: str, req: ChatCompletionRequest, rid: str
+) -> AsyncGenerator[str, None]:
+    batch_request = _submit_continuous_request(
+        rid, prompt, req.temperature, req.top_p, req.max_tokens
+    )
+    completion = ""
+    finish_reason = "stop"
+    try:
+        while True:
+            event = await asyncio.to_thread(batch_request.outputs.get)
+            if event.error:
+                raise RuntimeError(event.error)
+            if event.delta:
+                completion += event.delta
+                chunk = {
+                    "id": rid,
+                    "object": "chat.completion.chunk",
+                    "created": int(time.time()),
+                    "model": _model_name,
+                    "choices": [{
+                        "index": 0,
+                        "delta": {"content": event.delta},
+                        "finish_reason": None,
+                    }],
+                }
+                yield (
+                    f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+                )
+            if event.finished:
+                finish_reason = event.finish_reason or "stop"
+                break
+
+        final_chunk = {
+            "id": rid,
+            "object": "chat.completion.chunk",
+            "created": int(time.time()),
+            "model": _model_name,
+            "choices": [{
+                "index": 0,
+                "delta": {},
+                "finish_reason": finish_reason,
+            }],
+        }
+        yield f"data: {json.dumps(final_chunk, ensure_ascii=False)}\n\n"
+
+        if req.stream_options and req.stream_options.include_usage:
+            prompt_tokens = _count_tokens(prompt)
+            completion_tokens = len(batch_request.generated_token_ids)
+            usage_chunk = {
+                "id": rid,
+                "object": "chat.completion.chunk",
+                "created": int(time.time()),
+                "model": _model_name,
+                "choices": [],
+                "usage": {
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                    "total_tokens": prompt_tokens + completion_tokens,
+                },
+            }
+            yield (
+                f"data: {json.dumps(usage_chunk, ensure_ascii=False)}\n\n"
+            )
+        yield "data: [DONE]\n\n"
+    except Exception as error:
+        yield (
+            f"data: {json.dumps({'error': str(error)}, ensure_ascii=False)}"
+            "\n\n"
+        )
+    finally:
+        if not batch_request.finished:
+            batch_request.cancel()
+
+
+async def _stream_continuous_completion(
+    prompt: str, req: CompletionRequest, rid: str
+) -> AsyncGenerator[str, None]:
+    batch_request = _submit_continuous_request(
+        rid, prompt, req.temperature, req.top_p, req.max_tokens
+    )
+    try:
+        while True:
+            event = await asyncio.to_thread(batch_request.outputs.get)
+            if event.error:
+                raise RuntimeError(event.error)
+            if event.delta:
+                chunk = {
+                    "id": rid,
+                    "object": "text_completion.chunk",
+                    "created": int(time.time()),
+                    "model": _model_name,
+                    "choices": [{
+                        "index": 0,
+                        "text": event.delta,
+                        "finish_reason": None,
+                    }],
+                }
+                yield (
+                    f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+                )
+            if event.finished:
+                break
+        yield "data: [DONE]\n\n"
+    except Exception as error:
+        yield (
+            f"data: {json.dumps({'error': str(error)}, ensure_ascii=False)}"
+            "\n\n"
+        )
+    finally:
+        if not batch_request.finished:
+            batch_request.cancel()
+
+
 def _sync_chat(prompt: str, images: list, req: ChatCompletionRequest, rid: str):
     t0 = time.time()
     try:
@@ -538,15 +934,55 @@ def main():
         action="store_false",
         help="Disable NPU Graph path.",
     )
+    parser.add_argument(
+        "--continuous_batching",
+        dest="continuous_batching",
+        action="store_true",
+        help="Enable text continuous batching (default).",
+    )
+    parser.add_argument(
+        "--no_continuous_batching",
+        dest="continuous_batching",
+        action="store_false",
+        help="Use the legacy request-at-a-time generation path.",
+    )
+    parser.add_argument(
+        "--max_batch_size",
+        type=int,
+        default=32,
+        help="Maximum number of active continuous-batching requests.",
+    )
+    parser.add_argument(
+        "--max_waiting_requests",
+        type=int,
+        default=1024,
+        help="Maximum number of queued requests.",
+    )
+    parser.add_argument(
+        "--scheduler_poll_ms",
+        type=float,
+        default=1.0,
+        help="Idle scheduler polling interval in milliseconds.",
+    )
+    parser.add_argument(
+        "--moe_parallel_mode",
+        choices=("tp", "ep"),
+        default="tp",
+        help=(
+            "MoE expert execution mode. Ignored by dense and VL models."
+        ),
+    )
     parser.set_defaults(compiled_model=True)
+    parser.set_defaults(continuous_batching=True)
     args = parser.parse_args()
 
     # Detect TP
     from lite_llama.executor.tp_utils import detect_tp_env
-    global _rank, _is_tp
+    global _rank, _is_tp, _continuous_batching
     tp = detect_tp_env()
     _rank = tp.rank if tp else 0
     _is_tp = tp is not None and tp.enabled
+    _continuous_batching = args.continuous_batching
 
     device = f"npu:{_rank}" if _is_tp else get_device(args.device)
     if _rank == 0:
@@ -554,27 +990,56 @@ def main():
         print(f"Device: {device}, TP: world_size={tp.world_size if _is_tp else 1}")
         print(f"PagedAttention page_size: {args.page_size}")
         print(f"NPU Graph: {'on' if args.compiled_model else 'off'}")
+        print(f"MoE parallel mode: {args.moe_parallel_mode.upper()}")
 
     load_generator(
         args.checkpoints_dir,
         device,
         page_size=args.page_size,
         compiled_model=args.compiled_model,
+        moe_parallel_mode=args.moe_parallel_mode,
     )
 
+    if _is_vl and _continuous_batching:
+        if _rank == 0:
+            print(
+                "Continuous batching is unavailable for vision models; "
+                "using the legacy request path."
+            )
+        _continuous_batching = False
+    if _continuous_batching and args.page_size <= 0:
+        raise RuntimeError(
+            "Continuous batching requires PagedAttention; set --page_size "
+            "to a positive value."
+        )
+
     if _rank == 0:
+        if _continuous_batching:
+            _start_continuous_scheduler(
+                max_batch_size=args.max_batch_size,
+                max_waiting_requests=args.max_waiting_requests,
+                scheduler_poll_ms=args.scheduler_poll_ms,
+            )
         print(f"Server starting on http://{args.host}:{args.port}")
         print(f"Endpoints:")
         print(f"  POST /v1/chat/completions")
         print(f"  POST /v1/completions")
         print(f"  GET  /v1/models")
         print(f"  GET  /health")
-        if _is_tp:
+        if _continuous_batching:
+            print(
+                "  [Continuous batching: "
+                f"max_batch_size={args.max_batch_size}]"
+            )
+        elif _is_tp:
             print(f"  [TP mode: single-request-at-a-time]")
         uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
     else:
         # Non-rank-0: TP worker loop — mirrors rank 0 generation
-        _tp_worker_loop()
+        if _continuous_batching:
+            _tp_continuous_worker_loop()
+        else:
+            _tp_worker_loop()
 
 
 if __name__ == "__main__":

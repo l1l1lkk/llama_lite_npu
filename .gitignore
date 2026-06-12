@@ -13,4 +13,6 @@ my_weight
 .idea
 logs
 lite_llama/logs
+profiler_output/
+outputs/
 .claude/

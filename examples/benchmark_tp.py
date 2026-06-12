@@ -267,6 +267,14 @@ def main():
                         help="PagedAttention page size; use 0 to disable.")
     parser.add_argument("--compiled_model", action="store_true",
                         help="Enable NPU Graph path for decode.")
+    parser.add_argument(
+        "--moe_parallel_mode",
+        choices=("tp", "ep"),
+        default="tp",
+        help=(
+            "MoE expert execution mode. Ignored by dense and VL models."
+        ),
+    )
     parser.add_argument("--warmup", type=int, default=2,
                         help="Number of warmup iterations")
     parser.add_argument("--iterations", type=int, default=5,
@@ -347,6 +355,7 @@ def main():
         print(f"  Thinking:    {'on' if args.enable_thinking else 'off'}")
         print(f"  Page size:   {args.page_size}")
         print(f"  NPU Graph:   {'on' if args.compiled_model else 'off'}")
+        print(f"  MoE parallel:{args.moe_parallel_mode.upper()}")
         print(f"  Profiler:    {'on' if args.profile else 'off'}")
         if args.profile:
             print(f"    Output:    {args.profile_dir}")
@@ -384,6 +393,7 @@ def main():
             max_seq_len=args.prompt_len + args.max_gen_len + 1024,
             compiled_model=args.compiled_model,
             page_size=args.page_size,
+            moe_parallel_mode=args.moe_parallel_mode,
             device=f"npu:{rank}",
         )
         dummy_image = None
@@ -484,6 +494,17 @@ def main():
     print(f"  Avg throughput:      {avg_throughput:.1f} tokens/s")
     print(f"  Avg per-token:       {avg_latency:.2f} ms")
     print(f"  Batch throughput:    {avg_throughput * args.batch_size:.1f} tokens/s")
+    graph_runner = getattr(
+        getattr(generator, "model_executor", None), "graph_runner", None
+    )
+    if graph_runner is not None:
+        print(
+            "  NPU Graph stats:     "
+            f"attempts={graph_runner.capture_attempt_count}, "
+            f"captured={graph_runner.capture_count}, "
+            f"replays={graph_runner.replay_count}, "
+            f"fallbacks={graph_runner.fallback_count}"
+        )
     print("=" * 70)
 
     # Show sample output

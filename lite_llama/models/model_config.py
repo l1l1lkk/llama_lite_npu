@@ -218,6 +218,38 @@ class Qwen3Config(BaseConfig):
 
 # ---------------------------------------------------------------------------- #
 @dataclass
+class Qwen3MoeConfig(Qwen3Config):
+    architectures: list[str] = field(
+        default_factory=lambda: ["Qwen3MoeForCausalLM"]
+    )
+    model_type: str = "qwen3_moe"
+    num_experts: int = 128
+    num_experts_per_tok: int = 8
+    moe_intermediate_size: int = 768
+    decoder_sparse_step: int = 1
+    mlp_only_layers: list[int] = field(default_factory=list)
+    norm_topk_prob: bool = True
+    output_router_logits: bool = False
+    router_aux_loss_coef: float = 0.001
+
+    def validate_tensor_parallel(self, world_size: int) -> None:
+        if world_size < 1:
+            raise ValueError("tensor parallel world_size must be positive")
+        for name, value in (
+            ("num_heads", self.num_heads),
+            ("num_kv_heads", self.num_kv_heads),
+            ("moe_intermediate_size", self.moe_intermediate_size),
+            ("vocab_size", self.vocab_size),
+        ):
+            if value is None or value % world_size != 0:
+                raise ValueError(
+                    f"{name}={value} must be divisible by tensor parallel "
+                    f"world_size={world_size}"
+                )
+
+
+# ---------------------------------------------------------------------------- #
+@dataclass
 class VisionConfig(BaseConfig):
     hidden_size: int = 768
     image_size: int = 224

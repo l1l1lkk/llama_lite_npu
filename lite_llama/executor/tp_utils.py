@@ -20,6 +20,7 @@ class TPConfig:
     world_size: int = 1
     rank: int = 0
     backend: str = "hccl"  # "hccl" for NPU, "nccl" for CUDA
+    moe_parallel_mode: str = "tp"  # "tp" or "ep"
 
     @property
     def enabled(self) -> bool:
@@ -156,6 +157,94 @@ def shard_ffn_down(
     if not tp.enabled:
         return weight
     return weight[:, _shard_slice(weight.shape[1], tp.world_size, tp.rank)].clone()
+
+
+def shard_moe_gate_up(
+    weight: torch.Tensor, intermediate_size: int, tp: TPConfig
+) -> torch.Tensor:
+    """Shard stacked MoE gate/up weights without mixing their row ranges.
+
+    ``weight`` uses ``[expert, gate_then_up, hidden]`` layout.
+    """
+    if not tp.enabled:
+        return weight
+    if weight.ndim != 3 or weight.shape[1] != 2 * intermediate_size:
+        raise ValueError(
+            "MoE gate/up weight must have shape "
+            f"[experts, {2 * intermediate_size}, hidden], got {tuple(weight.shape)}"
+        )
+    gate_slice = _shard_slice(intermediate_size, tp.world_size, tp.rank)
+    up_slice = _shard_slice(intermediate_size, tp.world_size, tp.rank)
+    gate = weight[:, gate_slice, :]
+    up = weight[:, intermediate_size + up_slice.start : intermediate_size + up_slice.stop, :]
+    return torch.cat((gate, up), dim=1).clone()
+
+
+def shard_moe_down(weight: torch.Tensor, tp: TPConfig) -> torch.Tensor:
+    """Shard stacked MoE down weights on their intermediate/input axis."""
+    if not tp.enabled:
+        return weight
+    if weight.ndim != 3:
+        raise ValueError(
+            f"MoE down weight must be three-dimensional, got {tuple(weight.shape)}"
+        )
+    return weight[:, :, _shard_slice(weight.shape[2], tp.world_size, tp.rank)].clone()
+
+
+def prepare_moe_gate_up_for_gmm(
+    weight: torch.Tensor,
+    intermediate_size: int,
+    tp: TPConfig,
+) -> torch.Tensor:
+    """Shard checkpoint gate/up weights and convert to ``[E, K, N]``."""
+    sharded = shard_moe_gate_up(weight, intermediate_size, tp)
+    return sharded.transpose(1, 2).contiguous()
+
+
+def prepare_moe_down_for_gmm(
+    weight: torch.Tensor,
+    tp: TPConfig,
+) -> torch.Tensor:
+    """Shard checkpoint down weights and convert to ``[E, K, N]``."""
+    sharded = shard_moe_down(weight, tp)
+    return sharded.transpose(1, 2).contiguous()
+
+
+def shard_moe_experts(
+    weight: torch.Tensor,
+    tp: TPConfig,
+) -> torch.Tensor:
+    """Shard complete experts across ranks for expert parallelism."""
+    if not tp.enabled:
+        return weight
+    if weight.ndim != 3:
+        raise ValueError(
+            f"MoE expert weight must be three-dimensional, got {tuple(weight.shape)}"
+        )
+    if weight.shape[0] % tp.world_size != 0:
+        raise ValueError(
+            f"num_experts={weight.shape[0]} must be divisible by "
+            f"expert parallel world_size={tp.world_size}"
+        )
+    return weight[
+        _shard_slice(weight.shape[0], tp.world_size, tp.rank)
+    ].clone()
+
+
+def prepare_moe_gate_up_for_ep(
+    weight: torch.Tensor,
+    tp: TPConfig,
+) -> torch.Tensor:
+    """Slice complete gate/up experts and convert to ``[E_local, K, N]``."""
+    return shard_moe_experts(weight, tp).transpose(1, 2).contiguous()
+
+
+def prepare_moe_down_for_ep(
+    weight: torch.Tensor,
+    tp: TPConfig,
+) -> torch.Tensor:
+    """Slice complete down experts and convert to ``[E_local, K, N]``."""
+    return shard_moe_experts(weight, tp).transpose(1, 2).contiguous()
 
 
 def shard_lm_head(

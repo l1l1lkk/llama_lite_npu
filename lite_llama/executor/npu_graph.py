@@ -27,6 +27,27 @@ except Exception:
 logger = logging.getLogger(__name__)
 
 
+def supports_decode_graph(
+    model_type: str,
+    moe_parallel_mode: str = "tp",
+) -> bool:
+    """Return whether the model may attempt decode graph capture.
+
+    Operator-level compatibility is determined by the real capture. Failed
+    batch/bucket keys are cached and fall back to eager execution.
+    """
+    model_type = model_type.lower()
+    if model_type in {"qwen3_vl", "llava"}:
+        return False
+    # EP compacts locally-owned assignments with torch.nonzero. Ascend's
+    # aclnnNonzero synchronizes its stream and cannot run while that stream is
+    # being captured; the failed capture may poison the stream instead of
+    # allowing a safe eager fallback.
+    if model_type == "qwen3_moe" and moe_parallel_mode == "ep":
+        return False
+    return True
+
+
 @dataclass
 class _CapturedGraph:
     graph: object
@@ -43,8 +64,9 @@ class NpuGraphRunner:
 
     PARTITION_SIZE = 128
 
-    def __init__(self, model):
+    def __init__(self, model, model_type: str = "unknown"):
         self.model = model
+        self.model_type = model_type
         self._graphs: dict[tuple[int, int], _CapturedGraph] = {}
         self._failed_keys: set[tuple[int, int]] = set()
         self._pool = (
@@ -53,6 +75,7 @@ class NpuGraphRunner:
             else None
         )
         self.capture_count = 0
+        self.capture_attempt_count = 0
         self.replay_count = 0
         self.fallback_count = 0
 
@@ -92,6 +115,7 @@ class NpuGraphRunner:
         if key in self._failed_keys:
             return False
 
+        self.capture_attempt_count += 1
         try:
             # Graph capture requires stable storage. AttentionInfo is mutated by
             # KV allocation after every decode step, so retain independent
@@ -129,14 +153,19 @@ class NpuGraphRunner:
                 b_req_idx=static_atten_info.b_req_idx,
             )
             self.capture_count += 1
-            logger.info("Captured NPU decode graph for batch=%d bucket=%d", *key)
+            logger.info(
+                "Captured NPU decode graph for model=%s batch=%d bucket=%d",
+                self.model_type,
+                *key,
+            )
             return True
         except Exception as exc:
             # A failed graph shape must not be captured again on every token.
             self._failed_keys.add(key)
             logger.warning(
-                "NPU graph capture failed for batch=%d bucket=%d; "
+                "NPU graph capture failed for model=%s batch=%d bucket=%d; "
                 "using eager execution: %s",
+                self.model_type,
                 key[0],
                 key[1],
                 exc,

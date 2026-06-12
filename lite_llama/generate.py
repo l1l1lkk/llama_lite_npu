@@ -60,6 +60,7 @@ class GenerateText:
         max_seq_len=1024,
         max_gpu_num_blocks=None,
         compiled_model=False,
+        moe_parallel_mode="tp",
         device=None,
     ):
         self.checkpoints_dir = checkpoints_dir
@@ -71,6 +72,7 @@ class GenerateText:
             max_seq_len=max_seq_len,
             max_gpu_num_blocks=max_gpu_num_blocks,
             compiled_model=compiled_model,
+            moe_parallel_mode=moe_parallel_mode,
             device=device,
         )
         self.model_config = self.model_executor.model_config

@@ -219,7 +219,12 @@ class Qwen3DecoderLayer(nn.Module):
 
 
 class Qwen3Model(nn.Module):
-    def __init__(self, config: Qwen3Config, tp_config: TPConfig = None):
+    def __init__(
+        self,
+        config: Qwen3Config,
+        tp_config: TPConfig = None,
+        decoder_layer_factory=None,
+    ):
         super().__init__()
         self.tp = tp_config or TPConfig()
         tp_w = self.tp.world_size
@@ -248,8 +253,12 @@ class Qwen3Model(nn.Module):
             torch.rand(vocab_size, hidden_size, dtype=torch.float16)
         )
 
+        if decoder_layer_factory is None:
+            decoder_layer_factory = lambda _layer_index: Qwen3DecoderLayer(
+                config, tp_config
+            )
         self.layers = nn.ModuleList(
-            [Qwen3DecoderLayer(config, tp_config) for _ in range(num_layers)]
+            [decoder_layer_factory(i) for i in range(num_layers)]
         )
 
     def forward(

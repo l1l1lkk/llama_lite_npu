@@ -1,13 +1,20 @@
 from dataclasses import dataclass
 import torch
 from typing import Type
-from ..models.model_config import LlamaConfig, Qwen2Config, Qwen3Config, Qwen3VLConfig
+from ..models.model_config import (
+    LlamaConfig,
+    Qwen2Config,
+    Qwen3Config,
+    Qwen3MoeConfig,
+    Qwen3VLConfig,
+)
 from transformers import LlavaConfig
 
 CONFIG_CLASS_MAP: dict[str, Type] = {
     "llama": LlamaConfig,
     "qwen2": Qwen2Config,
     "qwen3": Qwen3Config,
+    "qwen3_moe": Qwen3MoeConfig,
     "llava": LlavaConfig,
     "qwen3_vl": Qwen3VLConfig,
 }
