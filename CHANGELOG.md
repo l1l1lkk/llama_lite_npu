@@ -2,6 +2,30 @@
 
 所有触发版本升级的变更按发布时间倒序记录。详细规则见[版本管理与发布规范](docs/versioning.md)。
 
+## [0.0.6rc2] - 2026-06-12
+
+修复v0.0.6rc1首版Vocab Parallel Greedy按Batch逐行发起小Collective导致的性能回归。
+
+### Bug修复
+
+- Greedy对整个Batch一次性计算局部最大Logit和Token ID；
+- 将最大值和精确float32 Token ID打包为`[batch, 2]`，每个Decode Step只执行一次
+  AllGather；
+- 保持全局Greedy选择与旧版完整词表Argmax语义一致；
+- 移除Batch=4时每Token八次小AllGather产生的HCCL启动开销；
+- Benchmark在`temperature=0`时打印`Top-p: inactive (temperature=0)`，避免把默认
+  `top_p=0.9`误解为实际启用。
+
+### 验证状态
+
+- 采样单元测试覆盖Batch级单Collective、跨Rank全局Token选择和Top-P状态显示；
+- 本地CPU回归和Python静态编译通过；
+- Atlas 910B3需要复测是否消除v0.0.6rc1相对v0.0.5rc2约7.5%的Greedy回归。
+
+### 文档
+
+- [v0.0.6rc2完整版本报告](docs/releases/v0.0.6rc2.md)
+
 ## [0.0.6rc1] - 2026-06-12
 
 优化Qwen3 TP与Continuous Batching的Decode热路径，减少每Token的全词表通信、
@@ -242,3 +266,4 @@ Host同步、重复反分词和Python对象广播。
 [0.0.5rc2]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.5rc2
 [0.0.5rc3]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.5rc3
 [0.0.6rc1]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.6rc1
+[0.0.6rc2]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.6rc2

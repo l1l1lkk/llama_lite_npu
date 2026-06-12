@@ -9,7 +9,7 @@
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.7-orange)
 ![Ascend](https://img.shields.io/badge/Ascend-910B3-red)
-![Version](https://img.shields.io/badge/version-0.0.6rc1-blue)
+![Version](https://img.shields.io/badge/version-0.0.6rc2-blue)
 ![Status](https://img.shields.io/badge/status-active_development-yellow)
 
 </div>
@@ -29,17 +29,16 @@ Lite Llama NPU 的目标不是封装 Transformers，而是实现一条可以观�
 
 ## 最新版本
 
-当前版本：**0.0.6rc1**（2026-06-12）
+当前版本：**0.0.6rc2**（2026-06-12）
 
-- [v0.0.6rc1完整版本报告](docs/releases/v0.0.6rc1.md)
+- [v0.0.6rc2完整版本报告](docs/releases/v0.0.6rc2.md)
 - [完整CHANGELOG](CHANGELOG.md)
 - [版本管理与发布规范](docs/versioning.md)
 - [推理性能历史记录](docs/inference_performance_history.md)
 - [文档索引](docs/README.md)
 
-`v0.0.6rc1`集中优化Decode热路径：增加精确Vocab Parallel Sampling，将Continuous
-Batching的Token与Position状态保留在NPU，使用增量反分词，并以张量广播替换TP逐Step
-的Python对象控制消息。
+`v0.0.6rc2`修复首版Vocab Parallel Greedy的通信粒度回归：整个Batch每个Decode
+Step只发起一次候选AllGather；Benchmark同时明确标记Greedy模式下Top-P不生效。
 
 ## 主要能力
 
@@ -219,9 +218,10 @@ tokens、Decode NPU Graph成功Replay。
 
 两组均为Graph `attempts=3`、`captured=3`、`replays=1785`、`fallbacks=0`。Greedy
 比Top-P高约11.3%；Top-P需要额外执行全局归一化、候选Top-K通信、排序和随机采样。
-当前v0.0.6rc1 Greedy比v0.0.5rc2低约7.5%，原因是首版Vocab Parallel Sampling按
+v0.0.6rc1 Greedy比v0.0.5rc2低约7.5%，原因是首版Vocab Parallel Sampling按
 Batch逐行发起多个小Collective，HCCL启动开销超过了通信量降低带来的收益。该路径需要
-继续向量化，不能将当前结果视为最终优化收益。
+继续向量化，不能将当前结果视为最终优化收益。v0.0.6rc2已将Greedy改为整个Batch
+一次AllGather，等待Atlas复测。
 
 ## 环境安装
 
