@@ -7,7 +7,7 @@
 - [推理性能历史](inference_performance_history.md)：不同版本和测试工具的实测记录。
 - [性能优化说明](performance_optimization.md)：项目中的主要性能方向。
 - [Qwen3-VL支持方案](qwen3vl_support_plan.md)：多模态结构与实现说明。
-- [`v0.0.5rc3`版本报告](releases/v0.0.5rc3.md)：当前版本同步内容。
+- [`v0.0.6rc1`版本报告](releases/v0.0.6rc1.md)：Decode热路径优化与验证说明。
 
 ## 设计与实现记录
 

@@ -9,7 +9,7 @@
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.7-orange)
 ![Ascend](https://img.shields.io/badge/Ascend-910B3-red)
-![Version](https://img.shields.io/badge/version-0.0.5rc3-blue)
+![Version](https://img.shields.io/badge/version-0.0.6rc1-blue)
 ![Status](https://img.shields.io/badge/status-active_development-yellow)
 
 </div>
@@ -29,16 +29,17 @@ Lite Llama NPU 的目标不是封装 Transformers，而是实现一条可以观�
 
 ## 最新版本
 
-当前版本：**0.0.5rc3**（2026-06-12）
+当前版本：**0.0.6rc1**（2026-06-12）
 
-- [v0.0.5rc3完整版本报告](docs/releases/v0.0.5rc3.md)
+- [v0.0.6rc1完整版本报告](docs/releases/v0.0.6rc1.md)
 - [完整CHANGELOG](CHANGELOG.md)
 - [版本管理与发布规范](docs/versioning.md)
 - [推理性能历史记录](docs/inference_performance_history.md)
 - [文档索引](docs/README.md)
 
-`v0.0.5rc3`不改变推理执行逻辑，主要同步最近版本已经完成的Continuous
-Batching、MoE Routed-GEMV、单机Expert Parallel、EP Graph兼容性修复和Atlas实测结果。
+`v0.0.6rc1`集中优化Decode热路径：增加精确Vocab Parallel Sampling，将Continuous
+Batching的Token与Position状态保留在NPU，使用增量反分词，并以张量广播替换TP逐Step
+的Python对象控制消息。
 
 ## 主要能力
 
@@ -49,6 +50,7 @@ Batching、MoE Routed-GEMV、单机Expert Parallel、EP Graph兼容性修复和A
 - 支持 Qwen3-VL 多模态推理路径；
 - 保留 Llama、Qwen2、LLaVA 等模型实现；
 - 支持流式输出、Top-p、Temperature 和贪心采样；
+- Qwen3 TP支持Vocab Parallel Sampling，Greedy路径不再AllGather完整词表Logits；
 - 文本OpenAI服务支持Continuous Batching和请求级Paged KV管理；
 - 支持 Qwen3 Thinking 模式开启和关闭；
 - 提供 OpenAI 兼容接口：
@@ -123,8 +125,8 @@ Prompt
   │    ├─ TP Linear + HCCL
   │    ├─ Flash Decoding
   │    ├─ Paged KV / NPU Graph（可选）
-  │    ├─ LM Head + Vocab AllGather
-  │    └─ Sampling
+  │    ├─ Sharded LM Head
+  │    └─ Vocab Parallel Sampling
   │
   └─ Streaming Output / OpenAI API
 ```
@@ -138,9 +140,10 @@ Qwen3-32B、TP=2 时，每个 Decode Token 的主要 Linear 路径为：
 
 当前 K/V 已融合为一次投影；Q+KV、Gate+Up 融合仍是后续重点。
 
-## 最新版本性能
+## 最新实测性能
 
-当前保留两类最近实测：
+`v0.0.6rc1`尚未完成Atlas性能复测，下列数据是当前可复现的最近实测基线，不代表
+新版本性能结论：
 
 1. Qwen3-30B-A3B使用项目Benchmark观察MoE TP/EP执行路径；
 2. Qwen3-32B使用EvalScope保留与vLLM-Ascend的服务基线对比。
@@ -489,7 +492,8 @@ Profiler 数据通常包含：
 - TP 通信为同步 AllReduce/AllGather，尚未实现计算通信重叠；
 - 当前只支持单机多卡；设备映射、进程组和权重加载尚未完成多机适配；
 - Q+KV、Gate+Up 尚未融合；
-- LM Head 当前会 AllGather 完整词表 logits；
+- Top-P Vocab Parallel Sampling在候选集无法覆盖精确nucleus时会回退完整Logits Gather；
+- Continuous Batching的Rank 0仍需每Step执行一次批量Token D2H以服务HTTP流式输出；
 - Qwen3 MoE TP Graph兼容性取决于CANN、torch_npu、GMM、Triton和HCCL版本；不兼容时按Bucket回退Eager；
 - Qwen3 MoE Expert Parallel首版复用现有TP组，通过本地专家计算加AllReduce合并输出，并非Token All-to-All；
 - Qwen3 MoE EP包含动态`NonZero` assignment压缩，因此自动禁用Decode NPU Graph；
@@ -518,7 +522,10 @@ Profiler 数据通常包含：
 - [ ] Packed Prefill，彻底移除 Padding MatMul；
 - [ ] Q+KV 融合；
 - [ ] Gate+Up 融合；
-- [ ] Vocab Parallel Sampling，避免完整 Logits AllGather；
+- [x] Vocab Parallel Sampling，Greedy避免完整Logits AllGather，Top-P保留精确回退；
+- [x] Continuous Batching设备端Token/Position状态；
+- [x] 有界后缀增量反分词；
+- [x] Continuous Batching TP张量控制面；
 - [x] NPU Graph 固定 Shape/分桶与命中率统计；
 - [x] Continuous Batching；
 - [x] Decode小Batch Routed-GEMV专家内核；

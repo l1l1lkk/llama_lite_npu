@@ -2,6 +2,34 @@
 
 所有触发版本升级的变更按发布时间倒序记录。详细规则见[版本管理与发布规范](docs/versioning.md)。
 
+## [0.0.6rc1] - 2026-06-12
+
+优化Qwen3 TP与Continuous Batching的Decode热路径，减少每Token的全词表通信、
+Host同步、重复反分词和Python对象广播。
+
+### 核心能力
+
+- Qwen3 Dense、Qwen3 MoE和Qwen3-VL在TP模式下保留本地LM Head词表分片；
+- Greedy采样仅交换各Rank局部最大值和全局Token ID；
+- Top-P采样先交换有界候选集，并在无法证明候选集覆盖精确nucleus时自动回退完整
+  Logits Gather，保证采样语义不变；
+- Continuous Batching将最新Token和Decode Position保留在NPU；
+- Rank 0每个模型Step只执行一次批量Token D2H，worker Rank不再复制Token到Host；
+- 流式输出使用有界后缀增量反分词，边界不稳定时自动回退完整解码；
+- TP Continuous Batching控制面由`broadcast_object_list`改为固定头部和张量Payload。
+
+### 兼容性与验证
+
+- 不改变现有`.pth`权重、PagedAttention、NPU Graph Bucket和OpenAI API；
+- 完整Logprobs API仍按需Gather全词表Logits；
+- Legacy单请求与多模态请求初始化仍可使用对象广播，它们不位于逐Token热路径；
+- 本地相关CPU单元测试和Python静态编译通过；
+- Atlas 910B3 TP=2吞吐与输出一致性需要服务器实测，本版本不填写预测性能。
+
+### 文档
+
+- [v0.0.6rc1完整版本报告](docs/releases/v0.0.6rc1.md)
+
 ## [0.0.5rc3] - 2026-06-12
 
 同步最近版本的文档、Atlas实测结果和当前功能边界；相对v0.0.5rc2不修改推理执行逻辑。
@@ -213,3 +241,4 @@
 [0.0.5rc1]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.5rc1
 [0.0.5rc2]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.5rc2
 [0.0.5rc3]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.5rc3
+[0.0.6rc1]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.6rc1
