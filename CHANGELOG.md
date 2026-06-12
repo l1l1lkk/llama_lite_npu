@@ -2,6 +2,28 @@
 
 所有触发版本升级的变更按发布时间倒序记录。详细规则见[版本管理与发布规范](docs/versioning.md)。
 
+## [0.0.5rc2] - 2026-06-12
+
+修复Qwen3 MoE Expert Parallel启动Decode NPU Graph时因`aclnnNonzero`导致进程退出的问题。
+
+### Bug修复
+
+- EP路由需要使用`torch.nonzero`压缩本地专家assignment；
+- Ascend `aclnnNonzero`会同步执行stream，不能进入NPU Graph Capture；
+- EP模式现在启动时直接禁用Decode Graph并明确记录Eager回退；
+- MoE TP模式和Dense模型继续保留现有NPU Graph路径；
+- 避免尝试失败的Capture污染stream，不能仅依赖异常捕获后继续执行。
+
+### 验证状态
+
+- 新增EP禁用Graph、TP保留Graph的回归测试；
+- 相关CPU测试和静态编译通过；
+- Atlas服务器需确认EP能够完成Warmup与正式Benchmark。
+
+### 文档
+
+- [v0.0.5rc2完整版本报告](docs/releases/v0.0.5rc2.md)
+
 ## [0.0.5rc1] - 2026-06-11
 
 增加文本服务Continuous Batching、MoE Decode小Batch专家内核和单机Expert Parallel。

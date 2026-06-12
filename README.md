@@ -9,7 +9,7 @@
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.7-orange)
 ![Ascend](https://img.shields.io/badge/Ascend-910B3-red)
-![Version](https://img.shields.io/badge/version-0.0.5rc1-blue)
+![Version](https://img.shields.io/badge/version-0.0.5rc2-blue)
 ![Status](https://img.shields.io/badge/status-active_development-yellow)
 
 </div>
@@ -29,9 +29,9 @@ Lite Llama NPU 的目标不是封装 Transformers，而是实现一条可以观�
 
 ## 最新版本
 
-当前版本：**0.0.5rc1**（2026-06-11）
+当前版本：**0.0.5rc2**（2026-06-12）
 
-- [v0.0.5rc1完整版本报告](docs/releases/v0.0.5rc1.md)
+- [v0.0.5rc2完整版本报告](docs/releases/v0.0.5rc2.md)
 - [完整CHANGELOG](CHANGELOG.md)
 - [版本管理与发布规范](docs/versioning.md)
 - [推理性能历史记录](docs/inference_performance_history.md)
@@ -402,6 +402,7 @@ Profiler 数据通常包含：
 - Qwen3 MoE GMM首轮Atlas 910B3基线为5.0 tok/s，详细口径见性能历史记录；
 - Qwen3 MoE Decode NPU Graph兼容性取决于CANN、torch_npu、GMM、Triton和HCCL版本；不兼容时按Bucket回退Eager；
 - Qwen3 MoE Expert Parallel首版复用现有TP组，通过本地专家计算加AllReduce合并输出；
+- Qwen3 MoE EP包含动态`NonZero` assignment压缩，因此自动禁用Decode NPU Graph；
 - 暂未支持 W8A8、INT8、INT4、AWQ 和 SmoothQuant。
 
 ## 优化路线

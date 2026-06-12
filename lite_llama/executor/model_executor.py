@@ -278,13 +278,17 @@ class ModelExecutor:
         if self.compiled_model:
             from .npu_graph import supports_decode_graph
 
-            if supports_decode_graph(self.model_type):
+            if supports_decode_graph(
+                self.model_type,
+                moe_parallel_mode=self.tp.moe_parallel_mode,
+            ):
                 self.apply_npu_graph()
             else:
                 logger.warning(
-                    "NPU Graph is unavailable for model_type=%s; "
-                    "using eager decode.",
+                    "NPU Graph is unavailable for model_type=%s "
+                    "moe_parallel_mode=%s; using eager decode.",
                     self.model_type,
+                    self.tp.moe_parallel_mode,
                 )
 
     def _get_max_avaliable_tokens(self,model, gpu_memory_utilization=0.9, block_size=1):

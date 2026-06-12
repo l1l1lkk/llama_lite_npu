@@ -27,13 +27,25 @@ except Exception:
 logger = logging.getLogger(__name__)
 
 
-def supports_decode_graph(model_type: str) -> bool:
+def supports_decode_graph(
+    model_type: str,
+    moe_parallel_mode: str = "tp",
+) -> bool:
     """Return whether the model may attempt decode graph capture.
 
     Operator-level compatibility is determined by the real capture. Failed
     batch/bucket keys are cached and fall back to eager execution.
     """
-    return model_type.lower() not in {"qwen3_vl", "llava"}
+    model_type = model_type.lower()
+    if model_type in {"qwen3_vl", "llava"}:
+        return False
+    # EP compacts locally-owned assignments with torch.nonzero. Ascend's
+    # aclnnNonzero synchronizes its stream and cannot run while that stream is
+    # being captured; the failed capture may poison the stream instead of
+    # allowing a safe eager fallback.
+    if model_type == "qwen3_moe" and moe_parallel_mode == "ep":
+        return False
+    return True
 
 
 @dataclass

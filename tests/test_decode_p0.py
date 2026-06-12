@@ -118,6 +118,20 @@ class NpuGraphBucketTest(unittest.TestCase):
         self.assertTrue(npu_graph.supports_decode_graph("qwen3"))
         self.assertTrue(npu_graph.supports_decode_graph("qwen3_moe"))
 
+    def test_qwen3_moe_ep_disables_decode_graph_capture(self):
+        self.assertFalse(
+            npu_graph.supports_decode_graph(
+                "qwen3_moe", moe_parallel_mode="ep"
+            )
+        )
+
+    def test_qwen3_moe_tp_keeps_decode_graph_capture(self):
+        self.assertTrue(
+            npu_graph.supports_decode_graph(
+                "qwen3_moe", moe_parallel_mode="tp"
+            )
+        )
+
     def test_sequence_lengths_share_partition_bucket(self):
         self.assertEqual(npu_graph.NpuGraphRunner.sequence_bucket(1), 128)
         self.assertEqual(npu_graph.NpuGraphRunner.sequence_bucket(127), 128)
