@@ -3,6 +3,7 @@ import importlib.util
 import sys
 from pathlib import Path
 from types import SimpleNamespace
+from types import ModuleType
 
 import torch
 
@@ -15,6 +16,12 @@ MODULE_PATH = (
 
 
 def load_batching_module():
+    package_root = MODULE_PATH.parent
+    package = sys.modules.get("lite_llama")
+    if package is None:
+        package = ModuleType("lite_llama")
+        sys.modules["lite_llama"] = package
+    package.__path__ = [str(package_root)]
     spec = importlib.util.spec_from_file_location(
         "lite_llama_continuous_batching_test", MODULE_PATH
     )
@@ -147,6 +154,31 @@ class ContinuousBatchSchedulerTest(unittest.TestCase):
         scheduler.step()
         self.assertEqual(backend.prefill_calls, [["a"], ["b"]])
 
+    def test_incremental_decoder_limits_normal_decode_window(self):
+        module = load_batching_module()
+        request = module.BatchRequest(
+            request_id="bounded",
+            prompt_tokens=[1],
+            max_new_tokens=32,
+            temperature=0.0,
+            top_p=1.0,
+        )
+        decoded_lengths = []
+
+        def decode(ids):
+            decoded_lengths.append(len(ids))
+            return "".join(chr(96 + token_id) for token_id in ids)
+
+        for token_id in range(1, 17):
+            request.accept_token(
+                token_id,
+                eos_token_id=99,
+                decode_tokens=decode,
+            )
+
+        self.assertLessEqual(max(decoded_lengths), 9)
+        self.assertEqual(request.decoded_text, "abcdefghijklmnop")
+
     def test_stream_delta_uses_the_complete_decoded_prefix(self):
         request = load_batching_module().BatchRequest(
             request_id="utf8",
@@ -184,6 +216,8 @@ class FakeExecutor:
         self.decode_batches = []
         self.released = []
         self.active_request_ids = ()
+        self.forward_inputs = []
+        self.logits_are_sharded = False
 
     def reserve_paged_requests(self, prompt_lengths):
         result = []
@@ -212,6 +246,9 @@ class FakeExecutor:
             self.lengths.pop(req_idx, None)
 
     def forward(self, input_ids, position_ids):
+        self.forward_inputs.append(
+            (input_ids.detach().clone(), position_ids.detach().clone())
+        )
         batch_size, seq_len = input_ids.shape
         logits = torch.zeros((batch_size, seq_len, 128))
         for row, req_idx in enumerate(self.active_request_ids):
@@ -268,6 +305,45 @@ class ContinuousBatchModelBackendTest(unittest.TestCase):
         self.assertEqual(tokens, [41])
         self.assertEqual(executor.decode_batches[-1], (1,))
         self.assertEqual(executor.lengths[1], 3)
+
+    def test_decode_reuses_device_token_and_position_state(self):
+        module = load_batching_module()
+        executor = FakeExecutor()
+        generator = SimpleNamespace(
+            model_executor=executor,
+            tokenizer=SimpleNamespace(eos_token_id=99),
+        )
+        backend = module.ContinuousBatchModelBackend(generator)
+        request = module.BatchRequest("a", [1, 2], 4, 0.0, 1.0)
+
+        self.assertEqual(backend.prefill([request]), [40])
+        request.generated_token_ids[:] = [77]
+        executor.lengths[0] = 999
+
+        backend.decode([request])
+
+        decode_input, decode_positions = executor.forward_inputs[-1]
+        self.assertEqual(decode_input.tolist(), [[40]])
+        self.assertEqual(decode_positions.tolist(), [[2]])
+
+    def test_worker_backend_keeps_sampled_tokens_on_device_without_host_result(self):
+        module = load_batching_module()
+        executor = FakeExecutor()
+        generator = SimpleNamespace(
+            model_executor=executor,
+            tokenizer=SimpleNamespace(eos_token_id=99),
+        )
+        backend = module.ContinuousBatchModelBackend(
+            generator, return_host_tokens=False
+        )
+        request = module.BatchRequest("worker", [1], 4, 0.0, 1.0)
+
+        result = backend.prefill([request])
+
+        self.assertEqual(result, [])
+        self.assertEqual(
+            backend._device_tokens[request.model_request_id].tolist(), 40
+        )
 
 
 if __name__ == "__main__":

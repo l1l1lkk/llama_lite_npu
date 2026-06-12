@@ -14,6 +14,45 @@ from threading import Event, Lock
 from typing import Callable, Protocol, Sequence
 
 
+class IncrementalTokenDecoder:
+    """Decode a bounded suffix and fall back when token boundaries move."""
+
+    def __init__(
+        self,
+        decode_tokens: Callable[[Sequence[int]], str],
+        suffix_window: int = 8,
+    ) -> None:
+        self.decode_tokens = decode_tokens
+        self.suffix_window = max(1, int(suffix_window))
+        self.token_ids: list[int] = []
+        self.text = ""
+
+    def push(self, token_id: int) -> str:
+        previous_suffix_ids = self.token_ids[-self.suffix_window :]
+        previous_suffix = (
+            self.decode_tokens(previous_suffix_ids)
+            if previous_suffix_ids
+            else ""
+        )
+        self.token_ids.append(int(token_id))
+        current_suffix_ids = [*previous_suffix_ids, int(token_id)]
+        current_suffix = self.decode_tokens(current_suffix_ids)
+
+        if current_suffix.startswith(previous_suffix):
+            delta = current_suffix[len(previous_suffix) :]
+            self.text += delta
+            return delta
+
+        decoded_text = self.decode_tokens(self.token_ids)
+        delta = (
+            decoded_text[len(self.text) :]
+            if decoded_text.startswith(self.text)
+            else ""
+        )
+        self.text = decoded_text
+        return delta
+
+
 @dataclass(frozen=True)
 class BatchOutput:
     delta: str = ""
@@ -31,10 +70,12 @@ class BatchRequest:
         max_new_tokens: int,
         temperature: float,
         top_p: float,
+        control_id: int | None = None,
     ) -> None:
         if max_new_tokens < 1:
             raise ValueError("max_new_tokens must be positive")
         self.request_id = request_id
+        self.control_id = control_id
         self.prompt_tokens = list(prompt_tokens)
         self.max_new_tokens = max_new_tokens
         self.temperature = temperature
@@ -47,6 +88,7 @@ class BatchRequest:
         self.cancelled = False
         self.outputs: Queue[BatchOutput] = Queue()
         self.done = Event()
+        self._incremental_decoder: IncrementalTokenDecoder | None = None
 
     @property
     def last_token_id(self) -> int:
@@ -66,13 +108,14 @@ class BatchRequest:
         self.generated_token_ids.append(token_id)
         reached_eos = token_id == eos_token_id
         reached_limit = len(self.generated_token_ids) >= self.max_new_tokens
-        decoded_text = decode_tokens(self.generated_token_ids)
+        if self._incremental_decoder is None:
+            self._incremental_decoder = IncrementalTokenDecoder(decode_tokens)
         delta = (
             ""
             if reached_eos
-            else decoded_text[len(self.decoded_text):]
+            else self._incremental_decoder.push(token_id)
         )
-        self.decoded_text = decoded_text
+        self.decoded_text = self._incremental_decoder.text
         if delta:
             self.outputs.put(BatchOutput(delta=delta, token_id=token_id))
         if reached_eos or reached_limit:
@@ -138,6 +181,7 @@ class ContinuousBatchScheduler:
         self._pending: deque[BatchRequest] = deque()
         self._active: list[BatchRequest] = []
         self._lock = Lock()
+        self._next_control_id = 0
 
     @property
     def pending_count(self) -> int:
@@ -156,16 +200,18 @@ class ContinuousBatchScheduler:
         temperature: float,
         top_p: float,
     ) -> BatchRequest:
-        request = BatchRequest(
-            request_id=request_id,
-            prompt_tokens=prompt_tokens,
-            max_new_tokens=max_new_tokens,
-            temperature=temperature,
-            top_p=top_p,
-        )
         with self._lock:
             if len(self._pending) >= self.max_waiting_requests:
                 raise RuntimeError("continuous batching waiting queue is full")
+            request = BatchRequest(
+                request_id=request_id,
+                prompt_tokens=prompt_tokens,
+                max_new_tokens=max_new_tokens,
+                temperature=temperature,
+                top_p=top_p,
+                control_id=self._next_control_id,
+            )
+            self._next_control_id += 1
             self._pending.append(request)
         return request
 
@@ -264,10 +310,13 @@ class ContinuousBatchScheduler:
 class ContinuousBatchModelBackend:
     """Paged-KV model adapter used by :class:`ContinuousBatchScheduler`."""
 
-    def __init__(self, generator) -> None:
+    def __init__(self, generator, return_host_tokens: bool = True) -> None:
         self.generator = generator
         self.executor = generator.model_executor
         self.tokenizer = generator.tokenizer
+        self.return_host_tokens = bool(return_host_tokens)
+        self._device_tokens: dict[int, object] = {}
+        self._device_positions: dict[int, object] = {}
         if not self.executor.use_paged_attn:
             raise RuntimeError(
                 "continuous batching requires --page_size greater than zero"
@@ -286,41 +335,40 @@ class ContinuousBatchModelBackend:
             skip_special_tokens=True,
         )
 
-    @staticmethod
-    def _sample_row(logits, request: BatchRequest):
+    def _sample_device(self, logits, requests: Sequence[BatchRequest]):
+        from lite_llama.sampling import sample_next_token
+
+        return sample_next_token(
+            logits,
+            temperature=[request.temperature for request in requests],
+            top_p=[request.top_p for request in requests],
+            vocab_parallel=bool(
+                getattr(self.executor, "logits_are_sharded", False)
+            ),
+        )
+
+    def _remember_sampled_tokens(
+        self,
+        requests: Sequence[BatchRequest],
+        sampled,
+        *,
+        initial_positions: Sequence[int] | None = None,
+    ) -> None:
         import torch
 
-        if request.temperature <= 0:
-            return torch.argmax(logits, dim=-1)
-        probabilities = torch.softmax(
-            logits.float() / request.temperature, dim=-1
-        )
-        sorted_probabilities, sorted_indices = torch.sort(
-            probabilities, descending=True
-        )
-        cumulative = torch.cumsum(sorted_probabilities, dim=-1)
-        remove = cumulative - sorted_probabilities > request.top_p
-        sorted_probabilities.masked_fill_(remove, 0.0)
-        sorted_probabilities.div_(sorted_probabilities.sum())
-        sampled_position = torch.multinomial(
-            sorted_probabilities, num_samples=1
-        )
-        return sorted_indices.gather(0, sampled_position).squeeze(0)
+        for row, request in enumerate(requests):
+            req_idx = int(request.model_request_id)
+            self._device_tokens[req_idx] = sampled[row].reshape(())
+            if initial_positions is not None:
+                self._device_positions[req_idx] = torch.tensor(
+                    int(initial_positions[row]),
+                    dtype=torch.long,
+                    device=self.executor.device,
+                )
 
-    def _sample(self, logits, requests: Sequence[BatchRequest]) -> list[int]:
-        import torch
-
-        sampled = torch.stack(
-            [
-                self._sample_row(logits[row, -1], request)
-                for row, request in enumerate(requests)
-            ]
-        ).reshape(-1)
-        if (
-            torch.distributed.is_available()
-            and torch.distributed.is_initialized()
-        ):
-            torch.distributed.broadcast(sampled, src=0)
+    def _tokens_to_host(self, sampled) -> list[int]:
+        if not self.return_host_tokens:
+            return []
         return sampled.detach().cpu().tolist()
 
     def prefill(self, requests: Sequence[BatchRequest]) -> Sequence[int]:
@@ -364,18 +412,27 @@ class ContinuousBatchModelBackend:
                     device=self.executor.device,
                 ).unsqueeze(0).expand(len(group_requests), -1)
                 logits = self.executor.forward(input_ids, position_ids)
-                group_tokens = self._sample(logits, group_requests)
+                sampled = self._sample_device(logits, group_requests)
+                self._remember_sampled_tokens(
+                    group_requests,
+                    sampled,
+                    initial_positions=[prompt_length] * len(group_requests),
+                )
+                group_tokens = self._tokens_to_host(sampled)
                 self.executor.extend_paged_requests(group_ids)
-                for (original_index, _), token_id in zip(
-                    indexed_requests, group_tokens
-                ):
-                    results[original_index] = token_id
+                if self.return_host_tokens:
+                    for (original_index, _), token_id in zip(
+                        indexed_requests, group_tokens
+                    ):
+                        results[original_index] = token_id
         except BaseException:
             self.executor.release_paged_request_ids(request_ids)
             for request in requests:
                 request.model_request_id = None
             raise
 
+        if not self.return_host_tokens:
+            return []
         return [int(token_id) for token_id in results]
 
     def decode(self, requests: Sequence[BatchRequest]) -> Sequence[int]:
@@ -387,28 +444,19 @@ class ContinuousBatchModelBackend:
             int(request.model_request_id) for request in requests
         )
         self.executor.activate_paged_decode_batch(request_ids)
-        input_ids = torch.tensor(
-            [[request.last_token_id] for request in requests],
-            dtype=torch.long,
-            device=self.executor.device,
-        )
-        position_ids = torch.tensor(
-            [
-                [
-                    self.executor.req_tokens_manager.req_token_count[
-                        req_idx
-                    ]
-                    - 1
-                ]
-                for req_idx in request_ids
-            ],
-            dtype=torch.long,
-            device=self.executor.device,
-        )
+        input_ids = torch.stack(
+            [self._device_tokens[req_idx] for req_idx in request_ids]
+        ).reshape(-1, 1)
+        position_ids = torch.stack(
+            [self._device_positions[req_idx] for req_idx in request_ids]
+        ).reshape(-1, 1)
         logits = self.executor.forward(input_ids, position_ids)
-        tokens = self._sample(logits, requests)
+        sampled = self._sample_device(logits, requests)
+        self._remember_sampled_tokens(requests, sampled)
+        for req_idx in request_ids:
+            self._device_positions[req_idx].add_(1)
         self.executor.extend_paged_requests(request_ids)
-        return tokens
+        return self._tokens_to_host(sampled)
 
     def release(self, requests: Sequence[BatchRequest]) -> None:
         request_ids = tuple(
@@ -418,5 +466,8 @@ class ContinuousBatchModelBackend:
         )
         if request_ids:
             self.executor.release_paged_request_ids(request_ids)
+            for req_idx in request_ids:
+                self._device_tokens.pop(req_idx, None)
+                self._device_positions.pop(req_idx, None)
         for request in requests:
             request.model_request_id = None

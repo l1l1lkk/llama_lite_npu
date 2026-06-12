@@ -239,6 +239,10 @@ class ModelExecutor:
         self.max_seq_len = self.llm_config.max_seq_len
         self.model_type = model_config.model_type
         self.model = model
+        self.logits_are_sharded = (
+            self.tp.enabled
+            and self.model_type in {"qwen3", "qwen3_moe", "qwen3_vl"}
+        )
         self.model_runner = None
         self.compiled_model = compiled_model
         self.page_size = getattr(self.llm_config, "page_size", 0)

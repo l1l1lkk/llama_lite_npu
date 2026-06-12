@@ -13,6 +13,7 @@ import torch
 from PIL import Image
 
 from .executor.model_executor import ModelExecutor
+from .sampling import sample_next_token
 from .utils.device import get_device
 from .utils.file_interface import get_model_name_from_path
 
@@ -163,15 +164,12 @@ class Qwen3VLGeneratorStream:
             decode_select_index = self.model_executor.decode_alloc_kv_cache(bsz)
             all_select_index_list.append(decode_select_index)
 
-            if temperature > 0:
-                probs = torch.softmax(logits[:, -1] / temperature, dim=-1)
-                next_token = sample_top_p(probs, top_p)
-            else:
-                next_token = torch.argmax(logits[:, -1], dim=-1)
-
-            # TP: ensure all ranks use the same sampled token
-            if torch.distributed.is_initialized():
-                torch.distributed.broadcast(next_token, src=0)
+            next_token = sample_next_token(
+                logits,
+                temperature=temperature,
+                top_p=top_p,
+                vocab_parallel=self.model_executor.logits_are_sharded,
+            )
 
             input_ids = next_token
             mask = ~input_text_mask[:, cur_pos]

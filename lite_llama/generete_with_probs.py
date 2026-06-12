@@ -3,6 +3,7 @@ import torch
 from typing import Literal, Optional, TypedDict
 import torch.nn.functional as F
 from transformers import AutoTokenizer
+from .sampling import gather_vocab_parallel_logits, sample_next_token
 
 from .executor.model_executor import ModelExecutor
 from .utils.device import get_device
@@ -164,13 +165,12 @@ class GenerateText:
             decode_select_index = self.model_executor.decode_alloc_kv_cache(bsz)
             all_select_index_list.append(decode_select_index)
 
-            # 对最后一个位置进行 softmax
-            last_logits = logits[:, -1, :]
-            if temperature > 0:
-                probs = F.softmax(last_logits / temperature, dim=-1)
-                next_token = sample_top_p(probs, top_p).reshape(-1)
-            else:
-                next_token = torch.argmax(last_logits, dim=-1)
+            next_token = sample_next_token(
+                logits,
+                temperature=temperature,
+                top_p=top_p,
+                vocab_parallel=self.model_executor.logits_are_sharded,
+            )
             input_ids = next_token  # [batch_size, 1]
 
             # 对仍在生成过程（非输入部分）的位置写入next_token
@@ -188,6 +188,9 @@ class GenerateText:
                 # 获取实际的token目标值
                 target = tokens[:, cur_pos]
                 # 使用 log_softmax 代替 cross_entropy，可以只提取相应token的logprob
+                last_logits = logits[:, -1, :]
+                if self.model_executor.logits_are_sharded:
+                    last_logits = gather_vocab_parallel_logits(last_logits)
                 log_probs = F.log_softmax(last_logits, dim=-1)
                 step_logprobs = torch.gather(log_probs, 1, target.unsqueeze(1)).squeeze(
                     1

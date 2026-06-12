@@ -74,6 +74,15 @@ def get_tp_group():
     return _TP_GROUP
 
 
+def tp_is_initialized() -> bool:
+    """Return whether the configured TP group can execute collectives."""
+    return (
+        get_tp_config().enabled
+        and torch.distributed.is_available()
+        and torch.distributed.is_initialized()
+    )
+
+
 # ---------------------------------------------------------------------------
 # Communication primitives
 # ---------------------------------------------------------------------------

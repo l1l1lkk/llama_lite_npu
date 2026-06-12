@@ -198,23 +198,14 @@ def _tp_worker_loop():
             pass
 
 
-def _serialize_batch_request(request) -> dict:
-    return {
-        "request_id": request.request_id,
-        "prompt_tokens": request.prompt_tokens,
-        "max_new_tokens": request.max_new_tokens,
-        "temperature": request.temperature,
-        "top_p": request.top_p,
-        "generated_token_ids": request.generated_token_ids,
-        "model_request_id": request.model_request_id,
-    }
-
-
 class _TpCoordinatedContinuousBackend:
-    """Broadcast scheduler operations before executing them on rank 0."""
+    """Mirror scheduler operations with tensor-only TP control messages."""
 
     def __init__(self, local_backend):
+        from lite_llama.executor.tp_control import TensorCommandChannel
+
         self.local_backend = local_backend
+        self.channel = TensorCommandChannel(local_backend.executor.device)
 
     @property
     def eos_token_id(self):
@@ -226,28 +217,32 @@ class _TpCoordinatedContinuousBackend:
     def decode_tokens(self, token_ids):
         return self.local_backend.decode_tokens(token_ids)
 
-    @staticmethod
-    def _broadcast(operation: str, requests) -> None:
-        command = [{
-            "operation": operation,
-            "requests": [
-                _serialize_batch_request(request)
-                for request in requests
-            ],
-        }]
-        torch.distributed.broadcast_object_list(command, src=0)
-
     def prefill(self, requests):
-        self._broadcast("prefill", requests)
+        from lite_llama.executor.tp_control import encode_prefill
+
+        self.channel.send(encode_prefill(requests))
         return self.local_backend.prefill(requests)
 
     def decode(self, requests):
-        self._broadcast("decode", requests)
+        from lite_llama.executor.tp_control import encode_decode
+
+        self.channel.send(
+            encode_decode([request.control_id for request in requests])
+        )
         return self.local_backend.decode(requests)
 
     def release(self, requests):
-        self._broadcast("release", requests)
+        from lite_llama.executor.tp_control import encode_release
+
+        self.channel.send(
+            encode_release([request.control_id for request in requests])
+        )
         return self.local_backend.release(requests)
+
+    def shutdown_workers(self):
+        from lite_llama.executor.tp_control import encode_shutdown
+
+        self.channel.send(encode_shutdown())
 
 
 def _tp_continuous_worker_loop():
@@ -256,48 +251,54 @@ def _tp_continuous_worker_loop():
         BatchRequest,
         ContinuousBatchModelBackend,
     )
+    from lite_llama.executor.tp_control import TensorCommandChannel
 
-    backend = ContinuousBatchModelBackend(_generator)
+    backend = ContinuousBatchModelBackend(
+        _generator,
+        return_host_tokens=False,
+    )
+    channel = TensorCommandChannel(backend.executor.device)
     requests_by_id = {}
     while True:
-        command = [None]
-        torch.distributed.broadcast_object_list(command, src=0)
-        payload = command[0]
-        operation = payload["operation"]
-        if operation == "shutdown":
+        command = channel.receive()
+        if command.operation == "shutdown":
             break
 
         worker_requests = []
-        for item in payload["requests"]:
-            request_id = item["request_id"]
-            request = requests_by_id.get(request_id)
-            if request is None:
+        if command.operation == "prefill":
+            for index, control_id in enumerate(command.control_ids):
                 request = BatchRequest(
-                    request_id=request_id,
-                    prompt_tokens=item["prompt_tokens"],
-                    max_new_tokens=item["max_new_tokens"],
-                    temperature=item["temperature"],
-                    top_p=item["top_p"],
+                    request_id=f"tp-worker-{control_id}",
+                    control_id=control_id,
+                    prompt_tokens=command.prompt_tokens[index],
+                    max_new_tokens=command.max_new_tokens[index],
+                    temperature=command.temperatures[index],
+                    top_p=command.top_ps[index],
                 )
-                requests_by_id[request_id] = request
-            request.generated_token_ids = list(
-                item["generated_token_ids"]
-            )
-            if item["model_request_id"] is not None:
-                request.model_request_id = item["model_request_id"]
-            worker_requests.append(request)
+                requests_by_id[control_id] = request
+                worker_requests.append(request)
+        else:
+            for control_id in command.control_ids:
+                request = requests_by_id.get(control_id)
+                if request is None:
+                    raise RuntimeError(
+                        f"unknown continuous batching control_id: "
+                        f"{control_id}"
+                    )
+                worker_requests.append(request)
 
-        if operation == "prefill":
+        if command.operation == "prefill":
             backend.prefill(worker_requests)
-        elif operation == "decode":
+        elif command.operation == "decode":
             backend.decode(worker_requests)
-        elif operation == "release":
+        elif command.operation == "release":
             backend.release(worker_requests)
             for request in worker_requests:
-                requests_by_id.pop(request.request_id, None)
+                requests_by_id.pop(request.control_id, None)
         else:
             raise RuntimeError(
-                f"unknown continuous batching TP operation: {operation}"
+                f"unknown continuous batching TP operation: "
+                f"{command.operation}"
             )
 
 
@@ -360,8 +361,7 @@ async def lifespan(app: FastAPI):
     if _continuous_scheduler is not None:
         _continuous_scheduler.shutdown()
     if _is_tp and _continuous_batching:
-        command = [{"operation": "shutdown", "requests": []}]
-        torch.distributed.broadcast_object_list(command, src=0)
+        _continuous_backend.shutdown_workers()
     _continuous_scheduler = None
     _generator = None
 

@@ -6,7 +6,7 @@ from typing import Optional, Tuple
 from .model_config import Qwen3Config
 from .RotaryEmbedding import Qwen3RotaryEmbedding
 from ..kernels import *
-from ..executor.tp_utils import TPConfig, tp_all_reduce, tp_all_gather
+from ..executor.tp_utils import TPConfig, tp_all_reduce
 
 
 class Attention(nn.Module):
@@ -296,9 +296,9 @@ class Qwen3Model(nn.Module):
 
         h, _ = skip_rmsnorm(h, residual, self.norm_weight.data, self.rmsnorm_eps)
 
-        # TP: column-sharded lm_head, then all-gather full logits
+        # TP: keep the LM-head vocabulary shard local. Sampling performs only
+        # the collectives required by the selected strategy.
         output = F.linear(h, self.lm_head_weight.data)
-        output = tp_all_gather(output, dim=-1)
         return output
 
     def get_input_embeddings(self, input_ids: torch.Tensor) -> torch.Tensor:
