@@ -15,6 +15,8 @@
 
 | 日期 | 项目版本 | 模型 | 测试工具 | TP / Batch或并发 | 输入 / 输出 | NPU Graph | 执行路径 | 核心吞吐 | 单Token指标 | 备注 |
 |---|---|---|---|---|---|---|---|---:|---:|---|
+| 2026-06-12 | 0.0.6rc1 | Qwen3-32B | `benchmark_tp.py` | TP=2 / Batch=4 | 约128 / 256 | 开启 | Vocab Parallel Greedy；temperature=0 | 19.7 tok/s；Batch 78.6 tok/s | 50.87 ms/token | 5次平均13.023s；模型与KV约54.2GB；Graph attempts=3、captured=3、replays=1785、fallbacks=0 |
+| 2026-06-12 | 0.0.6rc1 | Qwen3-32B | `benchmark_tp.py` | TP=2 / Batch=4 | 约128 / 256 | 开启 | 精确Vocab Parallel Top-P；temperature=0.6、top_p=0.9 | 17.7 tok/s；Batch 70.9 tok/s | 56.41 ms/token | 5次平均14.441s；模型与KV约54.2GB；Graph attempts=3、captured=3、replays=1785、fallbacks=0 |
 | 2026-06-12 | 0.0.5rc2 | Qwen3-30B-A3B | `benchmark_tp.py` | EP=2 / Batch=4 | 约128 / 256 | 关闭 | Expert Parallel Eager；MoE backend需由启动日志确认 | 5.5 tok/s；Batch 22.1 tok/s | 181.09 ms/token | 5次平均46.359s；模型与KV约54.6GB；EP Graph按设计自动禁用 |
 | 2026-06-11 | 0.0.4rc1 | Qwen3-30B-A3B | `benchmark_tp.py` | TP=2 / Batch=4 | 约128 / 256 | 开启 | GMM + Triton路由 + Decode Graph | 31.7 tok/s；Batch 126.9 tok/s | 31.53 ms/token | 5次平均8.071s；Graph attempts=3、captured=3、replays=1785、fallbacks=0 |
 | 2026-06-11 | 0.0.3rc2 | Qwen3-30B-A3B | `benchmark_tp.py` | TP=2 / Batch=4 | 约128 / 256 | 关闭 | `auto`，应解析为GMM + Triton路由 | 5.0 tok/s；Batch 20.0 tok/s | 199.81 ms/token | 5次平均51.152s；模型与KV约54.6GB |
@@ -31,11 +33,25 @@
 
 | 模型 | Avg throughput | Batch throughput | ms/token |
 |---|---:|---:|---:|
+| Qwen3-32B Dense v0.0.6rc1 Graph Greedy | 19.7 tok/s | 78.6 tok/s | 50.87 |
+| Qwen3-32B Dense v0.0.6rc1 Graph Top-P | 17.7 tok/s | 70.9 tok/s | 56.41 |
 | Qwen3-30B-A3B MoE 0.0.2（P0～P3前） | 1.0 tok/s | 4.1 tok/s | 987.06 |
 | Qwen3-32B Dense历史最佳基线 | 5.4 tok/s | 21.6 tok/s | 185.56 |
 | Qwen3-30B-A3B MoE v0.0.3rc2 | 5.0 tok/s | 20.0 tok/s | 199.81 |
 | Qwen3-30B-A3B MoE v0.0.5rc2 EP Eager | 5.5 tok/s | 22.1 tok/s | 181.09 |
 | Qwen3-30B-A3B MoE v0.0.4rc1 | 31.7 tok/s | 126.9 tok/s | 31.53 |
+
+v0.0.6rc1的两组Qwen3-32B结果使用完全相同的Graph和Benchmark配置，仅改变采样策略：
+
+- Greedy吞吐为19.7 tok/s，比Top-P的17.7 tok/s高约11.3%；
+- Top-P平均生成时间增加1.418s，增幅约10.9%；
+- Top-P单Token耗时增加5.54ms，增幅约10.9%；
+- 两组均为`captured=3`、`replays=1785`、`fallbacks=0`，差异不是Graph回退导致。
+
+Greedy路径只需在每个Rank求局部最大值并交换少量最大值和Token ID。精确Top-P还需要
+全局Softmax归一化、各Rank Top-K候选提取、候选AllGather、排序、累计概率和Multinomial
+采样，因此17.7 tok/s是符合当前实现预期的结果。该差异反映采样开销，不代表模型精度
+下降。
 
 从v0.0.3rc2的MoE TP Eager基线到v0.0.5rc2的EP Eager结果：
 

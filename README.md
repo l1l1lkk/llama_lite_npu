@@ -206,6 +206,19 @@ AllReduce合并，且无法进入Decode Graph，两卡低并发下不会自然�
 
 > 该对比不是严格同口径Benchmark：本项目使用FP16，对方使用BF16；输入模板、平均输入/输出长度和EvalScope版本也可能不同。数据用于当前工程基座观察，详细口径见[版本报告](docs/releases/v0.0.1rc1.md)。
 
+### v0.0.6rc1 Qwen3-32B采样路径实测
+
+共同配置：2 × Atlas 910B3、FP16、TP=2、Batch=4、Prompt约128 tokens、生成256
+tokens、Decode NPU Graph成功Replay。
+
+| 采样策略 | Avg throughput | Batch throughput | 单Token耗时 | 平均时间 |
+|---|---:|---:|---:|---:|
+| Greedy，temperature=0 | 19.7 tok/s | 78.6 tok/s | 50.87ms | 13.023s |
+| Top-P，temperature=0.6、top_p=0.9 | 17.7 tok/s | 70.9 tok/s | 56.41ms | 14.441s |
+
+两组均为Graph `attempts=3`、`captured=3`、`replays=1785`、`fallbacks=0`。Greedy
+比Top-P高约11.3%；Top-P需要额外执行全局归一化、候选Top-K通信、排序和随机采样。
+
 ## 环境安装
 
 ### 前置条件
