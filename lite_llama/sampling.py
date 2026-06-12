@@ -18,6 +18,13 @@ import torch
 NumberOrSequence = Union[float, Sequence[float], torch.Tensor]
 
 
+def format_top_p_setting(temperature: float, top_p: float) -> str:
+    """Describe whether Top-P participates in the selected sampling mode."""
+    if float(temperature) <= 0:
+        return "inactive (temperature=0)"
+    return str(float(top_p))
+
+
 def _last_token_logits(logits: torch.Tensor) -> torch.Tensor:
     if logits.ndim == 3:
         return logits[:, -1, :]
@@ -169,6 +176,37 @@ def gather_vocab_parallel_logits(local_logits: torch.Tensor) -> torch.Tensor:
     return torch.cat(chunks, dim=-1)
 
 
+def _sample_vocab_parallel_greedy(
+    local_logits: torch.Tensor,
+    *,
+    config,
+    group,
+) -> torch.Tensor:
+    """Select an entire Greedy batch with one small candidate collective."""
+    local_values, local_ids = torch.max(local_logits, dim=-1)
+    global_ids = local_ids.to(torch.long) + (
+        int(config.rank) * local_logits.shape[-1]
+    )
+    if (int(config.rank) + 1) * local_logits.shape[-1] > 2**24:
+        raise RuntimeError(
+            "vocabulary-parallel token IDs exceed exact float32 range"
+        )
+
+    packed_candidates = torch.stack(
+        [local_values.float(), global_ids.float()],
+        dim=-1,
+    )
+    gathered = _all_gather_stack(
+        packed_candidates,
+        config.world_size,
+        group,
+    )
+    return select_greedy_from_shards(
+        gathered[..., 0],
+        gathered[..., 1].to(torch.long),
+    )
+
+
 def _sample_vocab_parallel_row(
     local_logits: torch.Tensor,
     *,
@@ -301,6 +339,12 @@ def sample_next_token(
     batch_size = local_logits.shape[0]
     temperatures = _parameter_values(temperature, batch_size)
     top_ps = _parameter_values(top_p, batch_size)
+    if all(row_temperature <= 0 for row_temperature in temperatures):
+        return _sample_vocab_parallel_greedy(
+            local_logits,
+            config=config,
+            group=group,
+        )
     sampled = [
         _sample_vocab_parallel_row(
             local_logits[row],

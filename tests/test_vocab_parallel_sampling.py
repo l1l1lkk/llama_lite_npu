@@ -1,6 +1,7 @@
 import unittest
 import importlib.util
 from pathlib import Path
+from types import SimpleNamespace
 
 import torch
 
@@ -38,6 +39,33 @@ class LocalSamplingTest(unittest.TestCase):
 
 
 class VocabularyParallelHelperTest(unittest.TestCase):
+    def test_greedy_batch_uses_one_candidate_collective(self):
+        module = load_sampling_module()
+        calls = []
+
+        def fake_all_gather(tensor, world_size, group):
+            calls.append(tensor.clone())
+            remote = torch.tensor(
+                [[7.0, 4.0], [4.0, 5.0]],
+                dtype=torch.float32,
+            )
+            return torch.stack([tensor, remote], dim=0)
+
+        module._all_gather_stack = fake_all_gather
+        logits = torch.tensor(
+            [[1.0, 5.0, 3.0], [9.0, 2.0, 1.0]]
+        )
+
+        tokens = module._sample_vocab_parallel_greedy(
+            logits,
+            config=SimpleNamespace(rank=0, world_size=2),
+            group=None,
+        )
+
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0].shape, (2, 2))
+        self.assertEqual(tokens.tolist(), [4, 0])
+
     def test_greedy_selects_global_id_across_vocab_shards(self):
         select_greedy_from_shards = (
             load_sampling_module().select_greedy_from_shards
@@ -108,6 +136,19 @@ class VocabularyParallelHelperTest(unittest.TestCase):
         )
 
         self.assertFalse(complete)
+
+    def test_top_p_label_is_inactive_for_greedy(self):
+        module = load_sampling_module()
+
+        self.assertEqual(
+            module.format_top_p_setting(0.0, 0.9),
+            "inactive (temperature=0)",
+        )
+
+    def test_top_p_label_preserves_active_value(self):
+        module = load_sampling_module()
+
+        self.assertEqual(module.format_top_p_setting(0.6, 0.9), "0.9")
 
 
 if __name__ == "__main__":
