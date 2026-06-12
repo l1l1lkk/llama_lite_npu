@@ -2,6 +2,25 @@
 
 所有触发版本升级的变更按发布时间倒序记录。详细规则见[版本管理与发布规范](docs/versioning.md)。
 
+## [0.0.5rc3] - 2026-06-12
+
+同步最近版本的文档、Atlas实测结果和当前功能边界；相对v0.0.5rc2不修改推理执行逻辑。
+
+### 文档与实测
+
+- README新增模型、并行、Continuous Batching和NPU Graph支持矩阵；
+- MoE启动示例明确区分TP Graph与EP Eager；
+- 补录Qwen3-30B-A3B双卡EP Eager结果：5.5 tok/s、Batch 22.1 tok/s、
+  181.09ms/token；
+- Profiler示例更新为EP/TP Eager通信对照采集；
+- 明确EP当前使用本地专家计算加AllReduce，并非Token All-to-All；
+- 明确当前只支持单机多卡，尚未实现多机TP × EP二维并行；
+- README.zh与主README同步，避免继续展示上游CUDA/ROCm旧说明。
+
+### 文档
+
+- [v0.0.5rc3完整版本报告](docs/releases/v0.0.5rc3.md)
+
 ## [0.0.5rc2] - 2026-06-12
 
 修复Qwen3 MoE Expert Parallel启动Decode NPU Graph时因`aclnnNonzero`导致进程退出的问题。
@@ -190,3 +209,7 @@
 [0.0.2rc2]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.2rc2
 [0.0.3rc1]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.3rc1
 [0.0.3rc2]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.3rc2
+[0.0.4rc1]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.4rc1
+[0.0.5rc1]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.5rc1
+[0.0.5rc2]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.5rc2
+[0.0.5rc3]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.5rc3

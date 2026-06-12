@@ -9,7 +9,7 @@
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.7-orange)
 ![Ascend](https://img.shields.io/badge/Ascend-910B3-red)
-![Version](https://img.shields.io/badge/version-0.0.5rc2-blue)
+![Version](https://img.shields.io/badge/version-0.0.5rc3-blue)
 ![Status](https://img.shields.io/badge/status-active_development-yellow)
 
 </div>
@@ -29,19 +29,23 @@ Lite Llama NPU 的目标不是封装 Transformers，而是实现一条可以观�
 
 ## 最新版本
 
-当前版本：**0.0.5rc2**（2026-06-12）
+当前版本：**0.0.5rc3**（2026-06-12）
 
-- [v0.0.5rc2完整版本报告](docs/releases/v0.0.5rc2.md)
+- [v0.0.5rc3完整版本报告](docs/releases/v0.0.5rc3.md)
 - [完整CHANGELOG](CHANGELOG.md)
 - [版本管理与发布规范](docs/versioning.md)
 - [推理性能历史记录](docs/inference_performance_history.md)
+- [文档索引](docs/README.md)
+
+`v0.0.5rc3`不改变推理执行逻辑，主要同步最近版本已经完成的Continuous
+Batching、MoE Routed-GEMV、单机Expert Parallel、EP Graph兼容性修复和Atlas实测结果。
 
 ## 主要能力
 
 ### 模型与推理
 
 - 支持 Qwen3 文本模型，重点验证 Qwen3-32B；
-- 支持 Qwen3-30B-A3B MoE模型的FP16双卡正确性路径；
+- 支持 Qwen3-30B-A3B MoE模型的FP16单机多卡推理；
 - 支持 Qwen3-VL 多模态推理路径；
 - 保留 Llama、Qwen2、LLaVA 等模型实现；
 - 支持流式输出、Top-p、Temperature 和贪心采样；
@@ -53,12 +57,24 @@ Lite Llama NPU 的目标不是封装 Transformers，而是实现一条可以观�
   - `GET /v1/models`
   - `GET /health`
 
+### 当前支持矩阵
+
+| 模型路径 | 交互CLI | OpenAI服务 | TP | EP | Continuous Batching | Decode NPU Graph |
+|---|---:|---:|---:|---:|---:|---:|
+| Qwen3 Dense | 是 | 是 | 是 | 不适用 | 是 | 是 |
+| Qwen3-30B-A3B MoE | 是 | 是 | 是 | 单机实验支持 | 是 | TP可用；EP自动关闭 |
+| Qwen3-VL | 是 | 是 | 是 | 不适用 | 否 | 否 |
+| Llama / Qwen2 / LLaVA | 保留实现 | 部分路径 | 依模型而定 | 否 | 否 | 非当前验证重点 |
+
+> “支持”表示项目中存在对应执行链路；当前持续回归和Atlas性能验证重点是Qwen3
+> Dense与Qwen3-30B-A3B。多机并行、量化和生产级容错尚未实现。
+
 ### 昇腾推理优化
 
 - **Tensor Parallelism**
   - Q、KV、O、Gate、Up、Down 和 LM Head 权重分片；
   - MoE Router复制与专家内部Tensor Parallel；
-  - Qwen3 MoE支持完整专家按Rank切分的Expert Parallel；
+  - Qwen3 MoE支持完整专家按Rank切分的单机Expert Parallel；
   - HCCL AllReduce、AllGather；
   - 支持 `torchrun` 单机多卡推理。
 - **Attention**
@@ -76,13 +92,15 @@ Lite Llama NPU 的目标不是封装 Transformers，而是实现一条可以观�
   - Qwen3 MoE Gate/Up与Down使用Ascend Grouped MatMul；
   - Triton融合MoE专家分组Gather与routing weight加权Scatter；
   - Triton Routed-GEMV用于Decode小Batch专家计算；
+  - `auto`后端按assignment规模在Routed-GEMV与GMM间选择；
   - Skip + RMSNorm 融合；
   - RoPE、RMSNorm、Softmax、KV 更新等 Triton Ascend 内核。
 - **图模式**
   - Decode NPU Graph按128-token长度Bucket进行capture/replay；
   - 同一Bucket复用固定Shape Graph并更新动态KV元数据；
-  - Shape 不满足 replay 条件时安全回退 Eager。
-  - Qwen3 MoE允许Capture动态专家路由，失败Bucket只尝试一次并稳定回退Eager；
+  - Shape 不满足 replay 条件时安全回退 Eager；
+  - Qwen3 MoE TP允许Capture动态专家路由，失败Bucket只尝试一次并稳定回退Eager；
+  - Qwen3 MoE EP因动态`NonZero` assignment压缩自动关闭Graph，避免Capture stream同步错误；
   - Benchmark输出Graph Capture、Replay和Fallback计数。
 - **性能观测**
   - Ascend PyTorch Profiler；
@@ -122,9 +140,28 @@ Qwen3-32B、TP=2 时，每个 Decode Token 的主要 Linear 路径为：
 
 ## 最新版本性能
 
-以下保留当前可与vLLM-Ascend对照的Qwen3-32B EvalScope基线。`v0.0.5rc1`
-新增功能尚未完成Atlas性能测试；最近一次Qwen3-30B-A3B实测属于`v0.0.4rc1`，
-结果和不同版本的历史数据见[推理性能历史记录](docs/inference_performance_history.md)。
+当前保留两类最近实测：
+
+1. Qwen3-30B-A3B使用项目Benchmark观察MoE TP/EP执行路径；
+2. Qwen3-32B使用EvalScope保留与vLLM-Ascend的服务基线对比。
+
+不同工具的吞吐定义不同，不能把下面两组数据直接横向比较。完整历史见
+[推理性能历史记录](docs/inference_performance_history.md)。
+
+### Qwen3-30B-A3B双卡实测
+
+共同配置：2 × Atlas 910B3、FP16、Batch=4、Prompt约128 tokens、生成256 tokens。
+
+| 版本与路径 | NPU Graph | Avg throughput | Batch throughput | 单Token耗时 |
+|---|---:|---:|---:|---:|
+| v0.0.5rc2 EP Eager | 关闭 | 5.5 tok/s | 22.1 tok/s | 181.09 ms |
+| v0.0.4rc1 TP Graph | 开启 | 31.7 tok/s | 126.9 tok/s | 31.53 ms |
+
+EP Eager相对旧MoE TP Eager基线的5.0 tok/s提升约10%，但两卡EP与TP的理论单卡专家
+计算量接近。当前EP主要用于验证完整专家切分和扩展能力；由于仍采用本地专家计算后
+AllReduce合并，且无法进入Decode Graph，两卡低并发下不会自然获得数量级加速。
+
+### Qwen3-32B EvalScope基线
 
 | 项目 | 配置 |
 |---|---|
@@ -248,7 +285,24 @@ ASCEND_RT_VISIBLE_DEVICES=4,5 python -m torch.distributed.run \
   --checkpoints_dir /data/models/Qwen3-32B/
 ```
 
-### Qwen3-30B-A3B 双卡交互推理
+### Qwen3-30B-A3B双卡TP + NPU Graph
+
+```bash
+export LITE_LLAMA_MOE_BACKEND=auto
+
+ASCEND_RT_VISIBLE_DEVICES=4,5 python -m torch.distributed.run \
+  --nproc_per_node=2 \
+  cli_qwen3_moe_tp.py \
+  --checkpoints_dir /data/models/Qwen3-30B-A3B/ \
+  --page_size 16 \
+  --max_seq_len 4096 \
+  --max_gen_len 1024 \
+  --moe_parallel_mode tp \
+  --compiled_model \
+  --enable_thinking
+```
+
+### Qwen3-30B-A3B双卡EP Eager
 
 ```bash
 export LITE_LLAMA_MOE_BACKEND=auto
@@ -261,18 +315,22 @@ ASCEND_RT_VISIBLE_DEVICES=4,5 python -m torch.distributed.run \
   --max_seq_len 4096 \
   --max_gen_len 1024 \
   --moe_parallel_mode ep \
-  --compiled_model \
+  --no_compiled_model \
   --enable_thinking
 ```
 
-默认`auto`会在NPU且`torch_npu.npu_grouped_matmul`可用时启用GMM。排查数值问题时可使用：
+默认`auto`在Decode小Batch使用Routed-GEMV，assignment数量超过阈值后尝试Ascend
+Grouped MatMul。可通过`LITE_LLAMA_MOE_BACKEND=auto|eager|gmm|routed_gemv`
+显式选择。排查数值问题时可使用：
 
 ```bash
 export LITE_LLAMA_MOE_BACKEND=gmm
 export LITE_LLAMA_MOE_VALIDATE=1
 ```
 
-验证模式会在每个MoE层同时运行GMM和eager参考计算，速度明显变慢；验证通过后应执行`unset LITE_LLAMA_MOE_VALIDATE`。MoE NPU Graph默认开启；如果当前CANN/torch_npu组合不支持动态GMM Graph，日志会记录一次Capture失败并对该Bucket持续使用Eager。
+验证模式会在每个MoE层同时运行优化后端和eager参考计算，速度明显变慢；验证通过后应
+执行`unset LITE_LLAMA_MOE_VALIDATE`。MoE TP可尝试NPU Graph；MoE EP当前固定使用
+Eager，即使传入`--compiled_model`也会在启动时自动禁用Graph并打印说明。
 
 Thinking 模式：
 
@@ -303,6 +361,8 @@ ASCEND_RT_VISIBLE_DEVICES=4,5 python -m torch.distributed.run \
 
 ### OpenAI 兼容服务
 
+Dense Qwen3：
+
 ```bash
 ASCEND_RT_VISIBLE_DEVICES=4,5 python -m torch.distributed.run \
   --nproc_per_node=2 \
@@ -313,6 +373,27 @@ ASCEND_RT_VISIBLE_DEVICES=4,5 python -m torch.distributed.run \
   --page_size 16 \
   --compiled_model
 ```
+
+MoE EP Continuous Batching：
+
+```bash
+export LITE_LLAMA_MOE_BACKEND=auto
+
+ASCEND_RT_VISIBLE_DEVICES=4,5 python -m torch.distributed.run \
+  --nproc_per_node=2 \
+  server.py \
+  --checkpoints_dir /data/models/Qwen3-30B-A3B/ \
+  --host 0.0.0.0 \
+  --port 8213 \
+  --page_size 16 \
+  --moe_parallel_mode ep \
+  --no_compiled_model \
+  --continuous_batching \
+  --max_batch_size 32
+```
+
+Continuous Batching在文本服务中默认开启，并要求`page_size > 0`。视觉模型会自动回退到
+原请求级执行路径。
 
 调用示例：
 
@@ -350,26 +431,35 @@ evalscope perf \
 
 ## Ascend Profiler 与 MindStudio Insight
 
-采集算子、内存和 HCCL 通信数据：
+采集MoE EP Eager算子、内存和HCCL通信数据：
 
 ```bash
+export LITE_LLAMA_MOE_BACKEND=routed_gemv
+
 ASCEND_RT_VISIBLE_DEVICES=4,5 python -m torch.distributed.run \
   --nproc_per_node=2 \
   examples/benchmark_tp.py \
-  --checkpoints_dir /data/models/Qwen3-32B/ \
+  --checkpoints_dir /data/models/Qwen3-30B-A3B/ \
   --batch_size 4 \
   --prompt_len 128 \
-  --max_gen_len 32 \
+  --max_gen_len 256 \
   --page_size 16 \
-  --compiled_model \
+  --moe_parallel_mode ep \
   --warmup 2 \
   --iterations 3 \
   --profile \
-  --profile_dir ./profiler_output \
+  --profile_dir ./profiler_output/ep_eager \
+  --profile_wait 0 \
+  --profile_warmup 1 \
+  --profile_active 1 \
   --profile_level Level1 \
   --profile_aic_metrics PipeUtilization \
+  --no_profile_memory \
   --no_profile_data_simplification
 ```
+
+通信分析应再采集一份仅将`--moe_parallel_mode ep`改为`tp`的Eager对照。Profiler自身
+会显著降低吞吐，采集结果只用于分析Timeline、算子和通信，不能作为正式性能成绩。
 
 将 `profiler_output` 下载到本地并导入 MindStudio Insight，可查看：
 
@@ -397,12 +487,13 @@ Profiler 数据通常包含：
 - NPU Graph 仍是实验实现，动态 shape 可能导致 replay 回退；
 - Continuous Batching首版仅支持文本模型，尚未实现Chunked Prefill和抢占；
 - TP 通信为同步 AllReduce/AllGather，尚未实现计算通信重叠；
+- 当前只支持单机多卡；设备映射、进程组和权重加载尚未完成多机适配；
 - Q+KV、Gate+Up 尚未融合；
 - LM Head 当前会 AllGather 完整词表 logits；
-- Qwen3 MoE GMM首轮Atlas 910B3基线为5.0 tok/s，详细口径见性能历史记录；
-- Qwen3 MoE Decode NPU Graph兼容性取决于CANN、torch_npu、GMM、Triton和HCCL版本；不兼容时按Bucket回退Eager；
-- Qwen3 MoE Expert Parallel首版复用现有TP组，通过本地专家计算加AllReduce合并输出；
+- Qwen3 MoE TP Graph兼容性取决于CANN、torch_npu、GMM、Triton和HCCL版本；不兼容时按Bucket回退Eager；
+- Qwen3 MoE Expert Parallel首版复用现有TP组，通过本地专家计算加AllReduce合并输出，并非Token All-to-All；
 - Qwen3 MoE EP包含动态`NonZero` assignment压缩，因此自动禁用Decode NPU Graph；
+- 两卡EP Eager当前为5.5 tok/s，主要价值是验证专家切分能力，不代表EP已具备规模扩展效率；
 - 暂未支持 W8A8、INT8、INT4、AWQ 和 SmoothQuant。
 
 ## 优化路线
@@ -432,7 +523,11 @@ Profiler 数据通常包含：
 - [x] Continuous Batching；
 - [x] Decode小Batch Routed-GEMV专家内核；
 - [x] Qwen3 MoE单机Expert Parallel；
+- [x] Qwen3 MoE EP Graph不兼容路径自动降级；
 - [ ] 通信与计算重叠；
+- [ ] 固定容量EP Dispatch Buffer，移除动态`NonZero`；
+- [ ] Token All-to-All Dispatch/Combine；
+- [ ] TP × EP二维并行组与多机设备映射；
 - [ ] W8A8/INT8/INT4 量化；
 - [ ] Qwen3.5/Qwen3.6 Hybrid Attention 模型适配。
 
@@ -446,12 +541,14 @@ lite_llama/
 │   ├── paged_attention.py     # Paged KV Cache
 │   └── npu_graph.py           # NPU Graph 实验路径
 ├── kernels/                   # Triton Ascend 自定义算子
-│   └── moe_routing.py         # MoE设备侧分组Gather/Scatter
+│   ├── moe_routing.py         # MoE设备侧分组Gather/Scatter
+│   └── moe_routed_gemv.py     # Decode小Batch专家内核
 ├── models/
 │   ├── qwen3.py               # Qwen3 文本模型
 │   ├── qwen3_moe.py           # Qwen3 MoE模型
 │   ├── qwen3vl.py             # Qwen3-VL 文本与视觉连接
 │   └── qwen3vl_vision.py      # Qwen3-VL Vision Encoder
+├── continuous_batching.py     # 文本动态Batch调度与模型后端
 ├── generate_stream.py         # 文本流式生成
 └── qwen3vl_generate_stream.py # 多模态流式生成
 
