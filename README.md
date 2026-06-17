@@ -453,6 +453,40 @@ evalscope perf \
   --stream
 ```
 
+
+## Prefix Cache benchmark
+
+Use this script against `server.py` to compare repeated prompts with random prompts. Direct `benchmark_tp.py` does not exercise the server-side Continuous Batching Prefix Cache.
+
+Repeated exact prompt, greedy path, expected to show Prefix Cache TTFT benefit after the first request:
+
+```bash
+python examples/benchmark_prefix_cache.py \
+  --url http://127.0.0.1:8213/v1/chat/completions \
+  --model Qwen3-32B \
+  --dataset same \
+  --number 20 \
+  --parallel 1 \
+  --max-tokens 256 \
+  --temperature 0
+```
+
+Random prompts, no-cache baseline under the same script:
+
+```bash
+python examples/benchmark_prefix_cache.py \
+  --url http://127.0.0.1:8213/v1/chat/completions \
+  --model Qwen3-32B \
+  --dataset random \
+  --number 20 \
+  --parallel 1 \
+  --prompt-len 128 \
+  --max-tokens 256 \
+  --temperature 0
+```
+
+For EvalScope random baseline, keep using the EvalScope command above. EvalScope is less convenient for guaranteed identical prompts, so the project script is preferred for Prefix Cache validation.
+
 ## Ascend Profiler 与 MindStudio Insight
 
 采集MoE EP Eager算子、内存和HCCL通信数据：
