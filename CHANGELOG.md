@@ -2,6 +2,33 @@
 
 所有触发版本升级的变更按发布时间倒序记录。详细规则见[版本管理与发布规范](docs/versioning.md)。
 
+## [0.0.7rc3] - 2026-06-17
+
+Complete the safe runtime pieces of the v0.0.7 scheduler/KV-engine refactor.
+
+### Core changes
+
+- Added scheduler-level KV-pressure preemption. When prefill/decode reports KV capacity pressure, the scheduler can release one active request, requeue it, and rebuild its context from `prompt_tokens + generated_token_ids` without duplicating streamed tokens.
+- Added `--max_preemptions` server option for continuous batching; default is `1`, and `0` disables preemption.
+- Added live PagedAttention page reference counts, so shared/future prefix-cache pages are not returned to the free pool until the last reference is released.
+- Added request page introspection for Paged KV debugging and future prefix-cache integration.
+- Added mixed-length no-padding prefill packing metadata (`MixedLengthPrefillPacker`) as the stable contract for future packed prefill kernels.
+- Existing chunked-prefill planner remains the explicit chunk contract; runtime execution stays conservative until the Attention path supports suffix-prefill safely.
+
+### Compatibility and limitations
+
+- Default behavior remains unchanged unless KV capacity pressure occurs or `--max_preemptions` is changed.
+- True live prefix-cache reuse and no-padding/chunked prefill execution still require Attention/KV writer changes and are not falsely enabled in this release.
+- No Atlas performance numbers are recorded for this release.
+
+### Tests
+
+- Added tests for KV page refcounts, mixed-length prefill packing, preempted-request context rebuild, and scheduler KV-pressure recovery.
+
+### Docs
+
+- [v0.0.7rc3 release report](docs/releases/v0.0.7rc3.md)
+
 ## [0.0.7rc2] - 2026-06-17
 
 Bugfix release for TP continuous batching idle stability on Ascend.

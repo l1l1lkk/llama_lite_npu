@@ -38,9 +38,12 @@ class FakeBackend:
         self.prefill_calls = []
         self.decode_calls = []
         self.released = []
+        self.prefill_errors = []
 
     def prefill(self, requests):
         self.prefill_calls.append([request.request_id for request in requests])
+        if self.prefill_errors:
+            raise self.prefill_errors.pop(0)
         return [
             self.prefill_tokens[request.request_id].pop(0)
             for request in requests
@@ -55,6 +58,9 @@ class FakeBackend:
 
     def release(self, requests):
         self.released.extend(request.request_id for request in requests)
+
+    def preempt(self, requests):
+        self.release(requests)
 
 
 class ContinuousBatchSchedulerTest(unittest.TestCase):
@@ -249,6 +255,32 @@ class ContinuousBatchSchedulerTest(unittest.TestCase):
 
         self.assertEqual(request.outputs.get_nowait().delta, "?")
         self.assertEqual(request.outputs.get_nowait().delta, "?")
+
+    def test_kv_capacity_error_preempts_active_request_and_requeues_new_request(self):
+        module = load_batching_module()
+        scheduler, backend = self._make_scheduler(max_batch_size=2)
+        backend.prefill_tokens = {"active": [10], "new": [20]}
+        backend.decode_tokens = {"active": [11]}
+
+        active = scheduler.submit("active", [1, 2], 4, 0.0, 1.0)
+        scheduler.step()
+        self.assertEqual(active.generated_token_ids, [10])
+
+        backend.prefill_errors.append(module.KVCacheCapacityError("Paged KV capacity exhausted"))
+        new = scheduler.submit("new", [3, 4], 4, 0.0, 1.0)
+
+        self.assertTrue(scheduler.step())
+        self.assertEqual(backend.released, ["active"])
+        self.assertEqual(active.preemptions, 1)
+        self.assertEqual(scheduler.pending_count, 2)
+        self.assertIsNone(new.model_request_id)
+
+    def test_preempted_request_prefill_uses_prompt_plus_generated_context(self):
+        module = load_batching_module()
+        request = module.BatchRequest("r", [1, 2], 4, 0.0, 1.0)
+        request.generated_token_ids.extend([10, 11])
+
+        self.assertEqual(request.model_context_tokens, [1, 2, 10, 11])
 
 
 class FakeExecutor:

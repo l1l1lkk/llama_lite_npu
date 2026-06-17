@@ -14,6 +14,10 @@ from threading import Event, Lock
 from typing import Callable, Protocol, Sequence
 
 
+class KVCacheCapacityError(RuntimeError):
+    """Raised when the live KV cache cannot admit or extend a request."""
+
+
 class IncrementalTokenDecoder:
     """Decode a bounded suffix and fall back when token boundaries move."""
 
@@ -81,6 +85,7 @@ class BatchRequest:
         self.temperature = temperature
         self.top_p = top_p
         self.generated_token_ids: list[int] = []
+        self.preemptions = 0
         self.decoded_text = ""
         self.model_request_id: int | None = None
         self.finished = False
@@ -95,6 +100,15 @@ class BatchRequest:
         if not self.generated_token_ids:
             raise RuntimeError("request has no generated token")
         return self.generated_token_ids[-1]
+
+    @property
+    def model_context_tokens(self) -> list[int]:
+        """Tokens that must exist in KV before sampling the next token."""
+        return [*self.prompt_tokens, *self.generated_token_ids]
+
+    def mark_preempted(self) -> None:
+        self.preemptions += 1
+        self.model_request_id = None
 
     def accept_token(
         self,
@@ -159,6 +173,9 @@ class ContinuousBatchBackend(Protocol):
     def release(self, requests: Sequence[BatchRequest]) -> None:
         ...
 
+    def preempt(self, requests: Sequence[BatchRequest]) -> None:
+        ...
+
 
 class ContinuousBatchScheduler:
     """Admit waiting requests and execute one decode step per scheduling tick."""
@@ -174,6 +191,7 @@ class ContinuousBatchScheduler:
         max_decode_tokens: int | None = None,
         chunked_prefill: bool = False,
         prefill_chunk_size: int | None = None,
+        max_preemptions: int = 1,
     ) -> None:
         if max_batch_size < 1:
             raise ValueError("max_batch_size must be positive")
@@ -196,6 +214,9 @@ class ContinuousBatchScheduler:
             raise ValueError(
                 "prefill_chunk_size must be set when chunked_prefill is enabled"
             )
+        self.max_preemptions = int(max_preemptions)
+        if self.max_preemptions < 0:
+            raise ValueError("max_preemptions must be non-negative")
         self._pending: deque[BatchRequest] = deque()
         self._active: list[BatchRequest] = []
         self._lock = Lock()
@@ -255,7 +276,9 @@ class ContinuousBatchScheduler:
                     request.finish("cancelled")
                     continue
 
-                prompt_tokens = len(request.prompt_tokens)
+                prompt_tokens = len(request.model_context_tokens)
+                if self.chunked_prefill and self.prefill_chunk_size:
+                    prompt_tokens = min(prompt_tokens, self.prefill_chunk_size)
                 if remaining_prefill_tokens is not None:
                     if prompt_tokens > remaining_prefill_tokens:
                         if admitted:
@@ -314,6 +337,51 @@ class ContinuousBatchScheduler:
             if request not in finished
         ]
 
+    @staticmethod
+    def _is_kv_capacity_error(error: BaseException) -> bool:
+        if isinstance(error, KVCacheCapacityError):
+            return True
+        message = str(error).lower()
+        return (
+            "kv" in message
+            and (
+                "capacity" in message
+                or "exhaust" in message
+                or "allocation failed" in message
+                or "out of memory" in message
+                or "oom" in message
+            )
+        )
+
+    def _requeue_front(self, requests: Sequence[BatchRequest]) -> None:
+        with self._lock:
+            for request in reversed(list(requests)):
+                if not request.finished and not request.cancelled:
+                    self._pending.appendleft(request)
+
+    def _preempt_one(self, candidates: Sequence[BatchRequest]) -> BatchRequest | None:
+        eligible = [
+            request
+            for request in candidates
+            if (
+                not request.finished
+                and not request.cancelled
+                and request.preemptions < self.max_preemptions
+            )
+        ]
+        if not eligible:
+            return None
+        # Prefer preempting the longest live context. That frees the most KV
+        # pages and mirrors common decode-scheduler pressure handling.
+        victim = max(eligible, key=lambda request: len(request.model_context_tokens))
+        if hasattr(self.backend, "preempt"):
+            self.backend.preempt([victim])
+        else:
+            self.backend.release([victim])
+        victim.mark_preempted()
+        self._requeue_front([victim])
+        return victim
+
     def step(self) -> bool:
         """Run one scheduler tick. Return whether any work was performed."""
         prior_active = self._release_finished(self._active)
@@ -323,18 +391,31 @@ class ContinuousBatchScheduler:
         )
         admitted = self._admit(self.max_batch_size - len(prior_active))
         did_work = bool(decode_active or admitted or deferred_active)
+        uncommitted_admitted = list(admitted)
 
         try:
             if admitted:
                 prefill_tokens = self.backend.prefill(admitted)
                 self._apply_tokens(admitted, prefill_tokens)
                 admitted = self._release_finished(admitted)
+                uncommitted_admitted = []
 
             if decode_active:
                 decode_tokens = self.backend.decode(decode_active)
                 self._apply_tokens(decode_active, decode_tokens)
                 decode_active = self._release_finished(decode_active)
         except BaseException as error:
+            if self._is_kv_capacity_error(error):
+                if uncommitted_admitted:
+                    for request in uncommitted_admitted:
+                        request.model_request_id = None
+                    self._requeue_front(uncommitted_admitted)
+                victim = self._preempt_one(prior_active)
+                if victim is not None:
+                    self._active = [
+                        request for request in prior_active if request is not victim
+                    ]
+                    return True
             affected = list(prior_active) + list(admitted)
             for request in affected:
                 request.fail(error)
@@ -431,8 +512,9 @@ class ContinuousBatchModelBackend:
 
         if not requests:
             return []
+        context_lengths = [len(request.model_context_tokens) for request in requests]
         request_ids = self.executor.reserve_paged_requests(
-            [len(request.prompt_tokens) for request in requests]
+            context_lengths
         )
         for request, req_idx in zip(requests, request_ids):
             request.model_request_id = req_idx
@@ -440,7 +522,7 @@ class ContinuousBatchModelBackend:
         results: list[int | None] = [None] * len(requests)
         groups: dict[int, list[tuple[int, BatchRequest]]] = {}
         for index, request in enumerate(requests):
-            groups.setdefault(len(request.prompt_tokens), []).append(
+            groups.setdefault(len(request.model_context_tokens), []).append(
                 (index, request)
             )
 
@@ -457,7 +539,7 @@ class ContinuousBatchModelBackend:
                     group_ids, prompt_length
                 )
                 input_ids = torch.tensor(
-                    [request.prompt_tokens for request in group_requests],
+                    [request.model_context_tokens for request in group_requests],
                     dtype=torch.long,
                     device=self.executor.device,
                 )
@@ -526,3 +608,6 @@ class ContinuousBatchModelBackend:
                 self._device_positions.pop(req_idx, None)
         for request in requests:
             request.model_request_id = None
+
+    def preempt(self, requests: Sequence[BatchRequest]) -> None:
+        self.release(requests)

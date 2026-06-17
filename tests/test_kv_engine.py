@@ -72,5 +72,20 @@ class ChunkedPrefillPlannerTest(unittest.TestCase):
             load_kv_module().ChunkedPrefillPlanner(chunk_size=0)
 
 
+class MixedLengthPrefillPackerTest(unittest.TestCase):
+    def test_packs_mixed_length_prompts_without_padding(self):
+        packer = load_kv_module().MixedLengthPrefillPacker()
+
+        plan = packer.pack(((10, 11), (20,), (30, 31, 32)))
+
+        self.assertEqual(plan.flat_token_ids, (10, 11, 20, 30, 31, 32))
+        self.assertEqual(plan.flat_position_ids, (0, 1, 0, 0, 1, 2))
+        self.assertEqual(
+            [(row.request_index, row.start, row.length, row.end) for row in plan.requests],
+            [(0, 0, 2, 2), (1, 2, 1, 3), (2, 3, 3, 6)],
+        )
+        self.assertEqual(plan.total_tokens, 6)
+
+
 if __name__ == "__main__":
     unittest.main()

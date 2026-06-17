@@ -239,6 +239,9 @@ class _TpCoordinatedContinuousBackend:
         )
         return self.local_backend.release(requests)
 
+    def preempt(self, requests):
+        return self.release(requests)
+
     def shutdown_workers(self):
         from lite_llama.executor.tp_control import encode_shutdown
 
@@ -313,6 +316,7 @@ def _start_continuous_scheduler(
     max_decode_tokens: int | None = None,
     chunked_prefill: bool = False,
     prefill_chunk_size: int | None = None,
+    max_preemptions: int = 1,
 ) -> None:
     global _continuous_backend, _continuous_scheduler
     global _scheduler_thread, _scheduler_stop, _scheduler_poll_seconds
@@ -338,6 +342,7 @@ def _start_continuous_scheduler(
         max_decode_tokens=max_decode_tokens,
         chunked_prefill=chunked_prefill,
         prefill_chunk_size=prefill_chunk_size,
+        max_preemptions=max_preemptions,
     )
     _scheduler_poll_seconds = max(0.0001, scheduler_poll_ms / 1000.0)
     _scheduler_stop = threading.Event()
@@ -1005,6 +1010,15 @@ def main():
         help="Chunk size used when --chunked_prefill is enabled.",
     )
     parser.add_argument(
+        "--max_preemptions",
+        type=int,
+        default=1,
+        help=(
+            "Maximum KV-pressure preemptions per request in continuous "
+            "batching. Set 0 to fail instead of preempting."
+        ),
+    )
+    parser.add_argument(
         "--moe_parallel_mode",
         choices=("tp", "ep"),
         default="tp",
@@ -1063,6 +1077,7 @@ def main():
                 max_decode_tokens=args.max_decode_tokens,
                 chunked_prefill=args.chunked_prefill,
                 prefill_chunk_size=args.prefill_chunk_size,
+                max_preemptions=args.max_preemptions,
             )
         print(f"Server starting on http://{args.host}:{args.port}")
         print(f"Endpoints:")
@@ -1076,7 +1091,8 @@ def main():
                 f"max_batch_size={args.max_batch_size}, "
                 f"max_prefill_tokens={args.max_prefill_tokens}, "
                 f"max_decode_tokens={args.max_decode_tokens}, "
-                f"chunked_prefill={args.chunked_prefill}]"
+                f"chunked_prefill={args.chunked_prefill}, "
+                f"max_preemptions={args.max_preemptions}]"
             )
         elif _is_tp:
             print(f"  [TP mode: single-request-at-a-time]")

@@ -9,7 +9,7 @@
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.7-orange)
 ![Ascend](https://img.shields.io/badge/Ascend-910B3-red)
-![Version](https://img.shields.io/badge/version-0.0.7rc2-blue)
+![Version](https://img.shields.io/badge/version-0.0.7rc3-blue)
 ![Status](https://img.shields.io/badge/status-active_development-yellow)
 
 </div>
@@ -29,15 +29,15 @@ Lite Llama NPU 的目标不是封装 Transformers，而是实现一条可以观�
 
 ## 最新版本
 
-Current version: **0.0.7rc2** (2026-06-17)
+Current version: **0.0.7rc3** (2026-06-17)
 
-- [v0.0.7rc2完整版本报告](docs/releases/v0.0.7rc2.md)
+- [v0.0.7rc3 release report](docs/releases/v0.0.7rc3.md)
 - [完整CHANGELOG](CHANGELOG.md)
 - [版本管理与发布规范](docs/versioning.md)
 - [推理性能历史记录](docs/inference_performance_history.md)
 - [文档索引](docs/README.md)
 
-`v0.0.7rc2` fixes TP Continuous Batching idle stability on Ascend: the server control plane now uses a CPU `StoreCommandChannel` instead of long-idle HCCL tensor broadcast, avoiding rank1 watchdog timeout `507048` while waiting for requests.
+`v0.0.7rc3` adds KV-pressure preemption, live Paged KV page refcounts, and mixed-length prefill packing metadata. True live Prefix Cache reuse and no-padding/chunked prefill execution remain explicit follow-up work because they require coordinated Attention/KV-writer changes.
 
 ## 主要能力
 
@@ -106,7 +106,9 @@ Current version: **0.0.7rc2** (2026-06-17)
 - **Scheduler and KV engine**
   - Continuous Batching supports request-count and token-budget admission;
   - KV block refcount, Prefix Cache metadata, and Chunked Prefill planner are available as foundation APIs;
-  - Prefix Cache and Chunked Prefill are not yet wired into live KV reuse.
+  - Paged KV pages now carry live refcounts for safe shared-page ownership;
+  - KV-pressure preemption can release/requeue active requests and rebuild context from prompt plus generated tokens;
+  - Prefix Cache and Chunked/No-Pad Prefill execution are not yet wired into live model execution.
   - Ascend PyTorch Profiler；
   - CPU、CANN、NPU 算子、HBM 和 HCCL 通信数据；
   - MindStudio Insight Timeline、算子、内存和集群分析。
@@ -510,7 +512,7 @@ Profiler 数据通常包含：
 - TP 通信为同步 AllReduce/AllGather，尚未实现计算通信重叠；
 - 当前只支持单机多卡；设备映射、进程组和权重加载尚未完成多机适配；
 - Q+KV、Gate+Up 尚未融合；
-- v0.0.7rc2 Prefix Cache and Chunked Prefill are metadata/planning foundations and do not yet imply measured throughput gains;
+- v0.0.7rc3 Prefix Cache and Chunked/No-Pad Prefill execution are still foundation/planning paths and do not yet imply measured throughput gains;
 - Top-P Vocab Parallel Sampling在候选集无法覆盖精确nucleus时会回退完整Logits Gather；
 - Continuous Batching的Rank 0仍需每Step执行一次批量Token D2H以服务HTTP流式输出；
 - Qwen3 MoE TP Graph兼容性取决于CANN、torch_npu、GMM、Triton和HCCL版本；不兼容时按Bucket回退Eager；

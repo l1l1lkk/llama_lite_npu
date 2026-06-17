@@ -73,8 +73,10 @@ class PagedKVCacheManager:
             for _ in range(num_layers)
         ]
 
-        # Free page pool: True = free, False = allocated
+        # Free page pool: True = free, False = allocated.  Refcounts are kept
+        # on Host because page ownership is scheduler metadata, not model data.
         self.page_free = torch.ones(num_pages, dtype=torch.bool, device="cpu")
+        self.page_refcount = torch.zeros(num_pages, dtype=torch.int32, device="cpu")
         self.num_free_pages = num_pages
 
     # ------------------------------------------------------------------
@@ -88,17 +90,36 @@ class PagedKVCacheManager:
 
         free_indices = torch.nonzero(self.page_free).squeeze(-1)[:num_needed]
         self.page_free[free_indices] = False
+        self.page_refcount[free_indices] = 1
         self.num_free_pages -= num_needed
         return free_indices
 
+    def add_ref(self, page_indices: torch.Tensor):
+        """Add references to already allocated pages."""
+        if len(page_indices) == 0:
+            return
+        page_indices = page_indices.to(device="cpu", dtype=torch.long)
+        if torch.any(self.page_refcount[page_indices] <= 0):
+            raise ValueError("cannot add ref to a free KV page")
+        self.page_refcount[page_indices] += 1
+
     def free(self, page_indices: torch.Tensor):
-        """Return pages to the free pool."""
-        self.page_free[page_indices] = True
-        self.num_free_pages += len(page_indices)
+        """Drop one reference and return pages to the pool at refcount zero."""
+        if len(page_indices) == 0:
+            return
+        page_indices = page_indices.to(device="cpu", dtype=torch.long)
+        if torch.any(self.page_refcount[page_indices] <= 0):
+            raise ValueError("KV page refcount would become negative")
+        self.page_refcount[page_indices] -= 1
+        released = page_indices[self.page_refcount[page_indices] == 0]
+        if len(released) > 0:
+            self.page_free[released] = True
+            self.num_free_pages += int(len(released))
 
     def free_all(self):
         """Reset all pages to free."""
         self.page_free[:] = True
+        self.page_refcount[:] = 0
         self.num_free_pages = self.num_pages
 
     # ------------------------------------------------------------------
@@ -281,3 +302,9 @@ class PagedReqTokensManager:
         if req_idx not in self.free_req_indices:
             self.free_req_indices.append(req_idx)
             self.free_req_indices.sort()
+
+    def request_pages(self, req_idx: int) -> Tuple[int, ...]:
+        """Return Host page ids owned by a request."""
+        if req_idx not in self.req_page_table:
+            raise KeyError(f"request {req_idx} is not allocated")
+        return tuple(int(page_id) for page_id in self.req_page_table[req_idx].tolist())

@@ -27,6 +27,68 @@ class PrefillChunk:
         return self.end - self.start
 
 
+@dataclass(frozen=True)
+class PackedPrefillRequest:
+    """One request row in a mixed-length prefill packing plan."""
+
+    request_index: int
+    start: int
+    length: int
+
+    @property
+    def end(self) -> int:
+        return self.start + self.length
+
+
+@dataclass(frozen=True)
+class PackedPrefillPlan:
+    """CPU-side plan for no-padding prefill execution.
+
+    The current model path still consumes dense ``[batch, seq]`` tensors.
+    This plan gives the scheduler and future kernels a stable contract for
+    flattened token execution without changing model numerics prematurely.
+    """
+
+    flat_token_ids: tuple[int, ...]
+    flat_position_ids: tuple[int, ...]
+    requests: tuple[PackedPrefillRequest, ...]
+
+    @property
+    def total_tokens(self) -> int:
+        return len(self.flat_token_ids)
+
+    @property
+    def batch_size(self) -> int:
+        return len(self.requests)
+
+
+class MixedLengthPrefillPacker:
+    """Build flattened token/position metadata for mixed-length prefill."""
+
+    def pack(self, prompt_token_ids: Sequence[Sequence[int]]) -> PackedPrefillPlan:
+        flat_tokens: list[int] = []
+        flat_positions: list[int] = []
+        rows: list[PackedPrefillRequest] = []
+        cursor = 0
+        for row, token_ids in enumerate(prompt_token_ids):
+            tokens = [int(token_id) for token_id in token_ids]
+            rows.append(
+                PackedPrefillRequest(
+                    request_index=row,
+                    start=cursor,
+                    length=len(tokens),
+                )
+            )
+            flat_tokens.extend(tokens)
+            flat_positions.extend(range(len(tokens)))
+            cursor += len(tokens)
+        return PackedPrefillPlan(
+            flat_token_ids=tuple(flat_tokens),
+            flat_position_ids=tuple(flat_positions),
+            requests=tuple(rows),
+        )
+
+
 class KVBlockRefCounter:
     """Track logical KV block ownership and sharing reference counts."""
 
