@@ -15,6 +15,8 @@
 
 | 日期 | 项目版本 | 模型 | 测试工具 | TP / Batch或并发 | 输入 / 输出 | NPU Graph | 执行路径 | 核心吞吐 | 单Token指标 | 备注 |
 |---|---|---|---|---|---|---|---|---:|---:|---|
+| 2026-06-17 | 0.0.6rc2 | Qwen3-32B | `benchmark_tp.py` | TP=2 / Batch=4 | 约128 / 256 | 开启 | Batch级Vocab Parallel Greedy；temperature=0；Top-P inactive | 22.1 tok/s；Batch 88.6 tok/s | 45.16 ms/token | 5次平均11.560s；模型与KV约54.3GB；Graph attempts=3、captured=3、replays=1785、fallbacks=0 |
+| 2026-06-17 | 0.0.6rc2 | Qwen3-32B | `benchmark_tp.py` | TP=2 / Batch=4 | 约128 / 256 | 开启 | 精确Vocab Parallel Top-P；temperature=0.6、top_p=0.9 | 17.9 tok/s；Batch 71.7 tok/s | 55.83 ms/token | 5次平均14.293s；模型与KV约54.3GB；Graph attempts=3、captured=3、replays=1785、fallbacks=0 |
 | 2026-06-12 | 0.0.5rc2 | Qwen3-32B | `benchmark_tp.py` | TP=2 / Batch=4 | 约128 / 256 | 开启 | 完整词表Logits AllGather + Greedy；temperature=0 | 21.3 tok/s；Batch 85.0 tok/s | 47.04 ms/token | 5次平均12.043s；模型与KV约54.2GB；Graph attempts=3、captured=3、replays=1785、fallbacks=0 |
 | 2026-06-12 | 0.0.6rc1 | Qwen3-32B | `benchmark_tp.py` | TP=2 / Batch=4 | 约128 / 256 | 开启 | Vocab Parallel Greedy；temperature=0 | 19.7 tok/s；Batch 78.6 tok/s | 50.87 ms/token | 5次平均13.023s；模型与KV约54.2GB；Graph attempts=3、captured=3、replays=1785、fallbacks=0 |
 | 2026-06-12 | 0.0.6rc1 | Qwen3-32B | `benchmark_tp.py` | TP=2 / Batch=4 | 约128 / 256 | 开启 | 精确Vocab Parallel Top-P；temperature=0.6、top_p=0.9 | 17.7 tok/s；Batch 70.9 tok/s | 56.41 ms/token | 5次平均14.441s；模型与KV约54.2GB；Graph attempts=3、captured=3、replays=1785、fallbacks=0 |
@@ -34,6 +36,8 @@
 
 | 模型 | Avg throughput | Batch throughput | ms/token |
 |---|---:|---:|---:|
+| Qwen3-32B Dense v0.0.6rc2 Graph Greedy | 22.1 tok/s | 88.6 tok/s | 45.16 |
+| Qwen3-32B Dense v0.0.6rc2 Graph Top-P | 17.9 tok/s | 71.7 tok/s | 55.83 |
 | Qwen3-32B Dense v0.0.5rc2 Graph Greedy | 21.3 tok/s | 85.0 tok/s | 47.04 |
 | Qwen3-32B Dense v0.0.6rc1 Graph Greedy | 19.7 tok/s | 78.6 tok/s | 50.87 |
 | Qwen3-32B Dense v0.0.6rc1 Graph Top-P | 17.7 tok/s | 70.9 tok/s | 56.41 |
@@ -66,6 +70,20 @@ Greedy路径只需在每个Rank求局部最大值并交换少量最大值和Toke
 词表Logits，但AllGather位于模型Forward/NPU Graph中，通信调用次数更少。当前双卡小
 Batch场景受HCCL启动延迟影响，减少通信字节没有抵消增加通信次数的成本。后续应把
 Greedy改成整个Batch一次性求局部最大值并批量通信，同时将Top-P候选通信向量化。
+
+v0.0.6rc2完成Batch级Greedy通信修复后：
+
+- Greedy吞吐由v0.0.6rc1的19.7提升到22.1 tok/s，提升约12.2%；
+- Greedy单Token耗时由50.87ms下降到45.16ms，降低约11.2%；
+- 相对v0.0.5rc2的21.3 tok/s，v0.0.6rc2高约3.8%；
+- Top-P由17.7提升到17.9 tok/s，仅提升约1.1%，基本不变。
+
+该结果说明rc2准确修复了rc1的Greedy通信粒度回归，并略高于旧版完整词表AllGather路径。
+但收益没有达到“显著加速”的原因是：旧版完整Logits AllGather在Decode Graph内，调用次数少
+且通信带宽利用较好；新版虽然降低通信字节数，但局部Argmax、候选打包和小AllGather仍在
+Graph外执行，Decode总耗时主要仍由Transformer层MatMul、Attention、HCCL AllReduce和
+Graph外采样开销共同决定。Top-P路径尚未做Batch级向量化，仍包含全局归一化、候选通信、
+排序和随机采样，因此这次rc2对Top-P提升很小。
 
 从v0.0.3rc2的MoE TP Eager基线到v0.0.5rc2的EP Eager结果：
 

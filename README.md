@@ -205,7 +205,7 @@ AllReduce合并，且无法进入Decode Graph，两卡低并发下不会自然�
 
 > 该对比不是严格同口径Benchmark：本项目使用FP16，对方使用BF16；输入模板、平均输入/输出长度和EvalScope版本也可能不同。数据用于当前工程基座观察，详细口径见[版本报告](docs/releases/v0.0.1rc1.md)。
 
-### v0.0.6rc1 Qwen3-32B采样路径实测
+### v0.0.6rc2 Qwen3-32B采样路径实测
 
 共同配置：2 × Atlas 910B3、FP16、TP=2、Batch=4、Prompt约128 tokens、生成256
 tokens、Decode NPU Graph成功Replay。
@@ -213,15 +213,15 @@ tokens、Decode NPU Graph成功Replay。
 | 采样策略 | Avg throughput | Batch throughput | 单Token耗时 | 平均时间 |
 |---|---:|---:|---:|---:|
 | v0.0.5rc2 Greedy，temperature=0 | 21.3 tok/s | 85.0 tok/s | 47.04ms | 12.043s |
-| Greedy，temperature=0 | 19.7 tok/s | 78.6 tok/s | 50.87ms | 13.023s |
-| Top-P，temperature=0.6、top_p=0.9 | 17.7 tok/s | 70.9 tok/s | 56.41ms | 14.441s |
+| v0.0.6rc1 Greedy，temperature=0 | 19.7 tok/s | 78.6 tok/s | 50.87ms | 13.023s |
+| v0.0.6rc2 Greedy，temperature=0 | 22.1 tok/s | 88.6 tok/s | 45.16ms | 11.560s |
+| v0.0.6rc1 Top-P，temperature=0.6、top_p=0.9 | 17.7 tok/s | 70.9 tok/s | 56.41ms | 14.441s |
+| v0.0.6rc2 Top-P，temperature=0.6、top_p=0.9 | 17.9 tok/s | 71.7 tok/s | 55.83ms | 14.293s |
 
-两组均为Graph `attempts=3`、`captured=3`、`replays=1785`、`fallbacks=0`。Greedy
-比Top-P高约11.3%；Top-P需要额外执行全局归一化、候选Top-K通信、排序和随机采样。
-v0.0.6rc1 Greedy比v0.0.5rc2低约7.5%，原因是首版Vocab Parallel Sampling按
-Batch逐行发起多个小Collective，HCCL启动开销超过了通信量降低带来的收益。该路径需要
-继续向量化，不能将当前结果视为最终优化收益。v0.0.6rc2已将Greedy改为整个Batch
-一次AllGather，等待Atlas复测。
+以上Graph统计均为`attempts=3`、`captured=3`、`replays=1785`、`fallbacks=0`。
+v0.0.6rc2修复了rc1的Greedy小Collective回归，Greedy比rc1提升约12.2%，比v0.0.5rc2
+高约3.8%。Top-P仅比rc1高约1.1%，因为本次修复只覆盖Greedy；Top-P仍需要全局归一化、
+候选通信、排序和随机采样。
 
 ## 环境安装
 
