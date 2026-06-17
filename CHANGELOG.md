@@ -2,6 +2,22 @@
 
 所有触发版本升级的变更按发布时间倒序记录。详细规则见[版本管理与发布规范](docs/versioning.md)。
 
+## [0.0.7rc2] - 2026-06-17
+
+Bugfix release for TP continuous batching idle stability on Ascend.
+
+### Bug fix
+
+- Replaced continuous-batching TP control-plane HCCL tensor broadcast with CPU `StoreCommandChannel` backed by `torch.distributed.TCPStore`.
+- Fixed rank 1 idle-time watchdog failure: `ACL stream synchronize failed, error code:507048` / `fftsplus timeout`.
+- Worker ranks now block on CPU store metadata while idle and only enter NPU/HCCL for actual model execution.
+- Added regression tests to prevent server continuous batching from using `TensorCommandChannel` again.
+
+### Docs
+
+- [v0.0.7rc2 release report](docs/releases/v0.0.7rc2.md)
+- [Bug records](docs/bug_records.md)
+
 ## [0.0.7rc1] - 2026-06-17
 
 Scheduler and KV-engine refactor foundation release.

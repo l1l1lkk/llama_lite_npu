@@ -199,13 +199,13 @@ def _tp_worker_loop():
 
 
 class _TpCoordinatedContinuousBackend:
-    """Mirror scheduler operations with tensor-only TP control messages."""
+    """Mirror scheduler operations with a CPU-side TP control channel."""
 
     def __init__(self, local_backend):
-        from lite_llama.executor.tp_control import TensorCommandChannel
+        from lite_llama.executor.tp_control import StoreCommandChannel
 
         self.local_backend = local_backend
-        self.channel = TensorCommandChannel(local_backend.executor.device)
+        self.channel = StoreCommandChannel()
 
     @property
     def eos_token_id(self):
@@ -251,13 +251,13 @@ def _tp_continuous_worker_loop():
         BatchRequest,
         ContinuousBatchModelBackend,
     )
-    from lite_llama.executor.tp_control import TensorCommandChannel
+    from lite_llama.executor.tp_control import StoreCommandChannel
 
     backend = ContinuousBatchModelBackend(
         _generator,
         return_host_tokens=False,
     )
-    channel = TensorCommandChannel(backend.executor.device)
+    channel = StoreCommandChannel()
     requests_by_id = {}
     while True:
         command = channel.receive()

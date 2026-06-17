@@ -8,6 +8,9 @@ model execution.
 
 from __future__ import annotations
 
+import json
+import os
+from datetime import timedelta
 from typing import NamedTuple, Sequence
 
 
@@ -131,6 +134,97 @@ def decode_command(header, integers, floats) -> DecodedCommand:
         temperatures=temperatures,
         top_ps=top_ps,
     )
+
+
+
+
+def encode_store_payload(encoded) -> bytes:
+    """Serialize a command without creating device tensors.
+
+    This is used by the TP continuous-batching CPU control plane.  The payload
+    is intentionally plain JSON because command metadata is tiny compared with
+    model compute and must remain debuggable.
+    """
+
+    header, integers, floats = encoded
+    return json.dumps(
+        {
+            "header": [int(value) for value in header],
+            "integers": [int(value) for value in integers],
+            "floats": [float(value) for value in floats],
+        },
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+
+def decode_store_payload(payload) -> DecodedCommand:
+    if isinstance(payload, bytes):
+        payload = payload.decode("utf-8")
+    data = json.loads(payload)
+    return decode_command(
+        data.get("header", []),
+        data.get("integers", []),
+        data.get("floats", []),
+    )
+
+
+class StoreCommandChannel:
+    """CPU-side TP command channel for continuous batching.
+
+    HCCL collectives should not be used as an idle command queue: worker ranks
+    may wait for long periods between HTTP requests, and long-lived NPU stream
+    waits can hit Ascend runtime watchdog timeouts.  This channel uses
+    ``torch.distributed.TCPStore`` for control metadata and lets ranks enter
+    NPU/HCCL only when real model work starts.
+    """
+
+    def __init__(
+        self,
+        src: int = 0,
+        store=None,
+        prefix: str = "lite_llama_tp_cb",
+        timeout_seconds: int | None = None,
+    ) -> None:
+        self.src = int(src)
+        self.prefix = str(prefix).rstrip("/")
+        self.sequence = 0
+        self.store = store if store is not None else self._create_default_store(
+            timeout_seconds=timeout_seconds
+        )
+
+    @staticmethod
+    def _create_default_store(timeout_seconds: int | None = None):
+        import torch
+
+        if not torch.distributed.is_available() or not torch.distributed.is_initialized():
+            raise RuntimeError(
+                "StoreCommandChannel requires an initialized torch.distributed process group"
+            )
+        rank = torch.distributed.get_rank()
+        world_size = torch.distributed.get_world_size()
+        host = os.environ.get("MASTER_ADDR", "127.0.0.1")
+        master_port = int(os.environ.get("MASTER_PORT", "29500"))
+        port = int(os.environ.get("LITE_LLAMA_TP_STORE_PORT", master_port + 2000))
+        timeout = timedelta(seconds=int(timeout_seconds or os.environ.get("LITE_LLAMA_TP_STORE_TIMEOUT", "7200")))
+        return torch.distributed.TCPStore(
+            host,
+            port,
+            world_size,
+            rank == 0,
+            timeout,
+        )
+
+    def _key(self) -> str:
+        return f"{self.prefix}/{self.sequence}"
+
+    def send(self, encoded) -> None:
+        self.store.set(self._key(), encode_store_payload(encoded))
+        self.sequence += 1
+
+    def receive(self) -> DecodedCommand:
+        payload = self.store.get(self._key())
+        self.sequence += 1
+        return decode_store_payload(payload)
 
 
 class TensorCommandChannel:

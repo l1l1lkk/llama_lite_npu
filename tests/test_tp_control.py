@@ -51,6 +51,64 @@ class TensorCommandCodecTest(unittest.TestCase):
         self.assertEqual(decoded.temperatures, [0.6, 0.0])
         self.assertEqual(decoded.top_ps, [0.9, 1.0])
 
+
+    def test_store_payload_round_trip_uses_cpu_serialization(self):
+        module = load_module()
+        requests = [
+            SimpleNamespace(
+                control_id=1,
+                prompt_tokens=[101, 102, 103],
+                max_new_tokens=8,
+                temperature=0.0,
+                top_p=1.0,
+            )
+        ]
+
+        payload = module.encode_store_payload(module.encode_prefill(requests))
+        decoded = module.decode_store_payload(payload)
+
+        self.assertEqual(decoded.operation, "prefill")
+        self.assertEqual(decoded.control_ids, [1])
+        self.assertEqual(decoded.prompt_tokens, [[101, 102, 103]])
+        self.assertEqual(decoded.max_new_tokens, [8])
+        self.assertEqual(decoded.temperatures, [0.0])
+        self.assertEqual(decoded.top_ps, [1.0])
+
+    def test_store_command_channel_does_not_allocate_device_tensors(self):
+        module = load_module()
+        source = MODULE_PATH.read_text(encoding="utf-8")
+        start = source.index("class StoreCommandChannel")
+        end = source.index("class TensorCommandChannel")
+        store_source = source[start:end]
+
+        self.assertNotIn("torch.tensor", store_source)
+        self.assertNotIn("torch.empty", store_source)
+        self.assertNotIn("torch.distributed.broadcast", store_source)
+
+
+    def test_store_command_channel_send_receive_with_cpu_store(self):
+        module = load_module()
+
+        class FakeStore:
+            def __init__(self):
+                self.values = {}
+
+            def set(self, key, value):
+                self.values[key] = value
+
+            def get(self, key):
+                return self.values[key]
+
+        store = FakeStore()
+        sender = module.StoreCommandChannel(store=store)
+        receiver = module.StoreCommandChannel(store=store)
+        sender.send(module.encode_decode([7, 8]))
+
+        decoded = receiver.receive()
+
+        self.assertEqual(decoded.operation, "decode")
+        self.assertEqual(decoded.control_ids, [7, 8])
+
     def test_decode_release_and_shutdown_round_trip(self):
         module = load_module()
 

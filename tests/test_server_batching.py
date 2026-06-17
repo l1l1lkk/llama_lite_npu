@@ -40,12 +40,13 @@ class ServerContinuousBatchingContractTest(unittest.TestCase):
         self.assertIn("decode", self.source)
         self.assertIn("release", self.source)
 
-    def test_continuous_batching_uses_tensor_command_channel(self):
-        self.assertIn("TensorCommandChannel", self.source)
+    def test_continuous_batching_uses_cpu_store_command_channel(self):
+        self.assertIn("StoreCommandChannel", self.source)
         start = self.source.index("class _TpCoordinatedContinuousBackend")
         end = self.source.index("def _tp_continuous_worker_loop")
         coordinator_source = self.source[start:end]
         self.assertNotIn("broadcast_object_list", coordinator_source)
+        self.assertNotIn("TensorCommandChannel", coordinator_source)
 
 
 if __name__ == "__main__":
