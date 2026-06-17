@@ -170,6 +170,10 @@ class ContinuousBatchScheduler:
         eos_token_id: int,
         decode_tokens: Callable[[Sequence[int]], str],
         max_waiting_requests: int = 1024,
+        max_prefill_tokens: int | None = None,
+        max_decode_tokens: int | None = None,
+        chunked_prefill: bool = False,
+        prefill_chunk_size: int | None = None,
     ) -> None:
         if max_batch_size < 1:
             raise ValueError("max_batch_size must be positive")
@@ -178,10 +182,35 @@ class ContinuousBatchScheduler:
         self.eos_token_id = int(eos_token_id)
         self.decode_tokens = decode_tokens
         self.max_waiting_requests = max_waiting_requests
+        self.max_prefill_tokens = self._validate_optional_positive(
+            max_prefill_tokens, "max_prefill_tokens"
+        )
+        self.max_decode_tokens = self._validate_optional_positive(
+            max_decode_tokens, "max_decode_tokens"
+        )
+        self.chunked_prefill = bool(chunked_prefill)
+        self.prefill_chunk_size = self._validate_optional_positive(
+            prefill_chunk_size, "prefill_chunk_size"
+        )
+        if self.chunked_prefill and self.prefill_chunk_size is None:
+            raise ValueError(
+                "prefill_chunk_size must be set when chunked_prefill is enabled"
+            )
         self._pending: deque[BatchRequest] = deque()
         self._active: list[BatchRequest] = []
         self._lock = Lock()
         self._next_control_id = 0
+
+    @staticmethod
+    def _validate_optional_positive(
+        value: int | None, name: str
+    ) -> int | None:
+        if value is None:
+            return None
+        value = int(value)
+        if value < 1:
+            raise ValueError(f"{name} must be positive")
+        return value
 
     @property
     def pending_count(self) -> int:
@@ -217,15 +246,38 @@ class ContinuousBatchScheduler:
 
     def _admit(self, capacity: int) -> list[BatchRequest]:
         admitted: list[BatchRequest] = []
+        remaining_prefill_tokens = self.max_prefill_tokens
         with self._lock:
             while capacity > 0 and self._pending:
-                request = self._pending.popleft()
+                request = self._pending[0]
                 if request.cancelled:
+                    self._pending.popleft()
                     request.finish("cancelled")
                     continue
-                admitted.append(request)
+
+                prompt_tokens = len(request.prompt_tokens)
+                if remaining_prefill_tokens is not None:
+                    if prompt_tokens > remaining_prefill_tokens:
+                        if admitted:
+                            break
+                        # Avoid starvation: one oversized request may run alone.
+                        remaining_prefill_tokens = 0
+                    else:
+                        remaining_prefill_tokens -= prompt_tokens
+
+                admitted.append(self._pending.popleft())
                 capacity -= 1
+                if remaining_prefill_tokens == 0:
+                    break
         return admitted
+
+    def _select_decode_requests(
+        self, requests: Sequence[BatchRequest]
+    ) -> tuple[list[BatchRequest], list[BatchRequest]]:
+        if self.max_decode_tokens is None:
+            return list(requests), []
+        limit = min(len(requests), int(self.max_decode_tokens))
+        return list(requests[:limit]), list(requests[limit:])
 
     def _apply_tokens(
         self,
@@ -266,8 +318,11 @@ class ContinuousBatchScheduler:
         """Run one scheduler tick. Return whether any work was performed."""
         prior_active = self._release_finished(self._active)
         self._active = prior_active
+        decode_active, deferred_active = self._select_decode_requests(
+            prior_active
+        )
         admitted = self._admit(self.max_batch_size - len(prior_active))
-        did_work = bool(prior_active or admitted)
+        did_work = bool(decode_active or admitted or deferred_active)
 
         try:
             if admitted:
@@ -275,10 +330,10 @@ class ContinuousBatchScheduler:
                 self._apply_tokens(admitted, prefill_tokens)
                 admitted = self._release_finished(admitted)
 
-            if prior_active:
-                decode_tokens = self.backend.decode(prior_active)
-                self._apply_tokens(prior_active, decode_tokens)
-                prior_active = self._release_finished(prior_active)
+            if decode_active:
+                decode_tokens = self.backend.decode(decode_active)
+                self._apply_tokens(decode_active, decode_tokens)
+                decode_active = self._release_finished(decode_active)
         except BaseException as error:
             affected = list(prior_active) + list(admitted)
             for request in affected:
@@ -291,7 +346,7 @@ class ContinuousBatchScheduler:
             self._active = []
             return did_work
 
-        self._active = prior_active + admitted
+        self._active = deferred_active + decode_active + admitted
         return did_work
 
     def shutdown(self) -> None:

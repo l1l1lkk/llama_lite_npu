@@ -9,7 +9,7 @@
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.7-orange)
 ![Ascend](https://img.shields.io/badge/Ascend-910B3-red)
-![Version](https://img.shields.io/badge/version-0.0.6rc2-blue)
+![Version](https://img.shields.io/badge/version-0.0.7rc1-blue)
 ![Status](https://img.shields.io/badge/status-active_development-yellow)
 
 </div>
@@ -29,16 +29,15 @@ Lite Llama NPU 的目标不是封装 Transformers，而是实现一条可以观�
 
 ## 最新版本
 
-当前版本：**0.0.6rc2**（2026-06-12）
+Current version: **0.0.7rc1** (2026-06-17)
 
-- [v0.0.6rc2完整版本报告](docs/releases/v0.0.6rc2.md)
+- [v0.0.7rc1完整版本报告](docs/releases/v0.0.7rc1.md)
 - [完整CHANGELOG](CHANGELOG.md)
 - [版本管理与发布规范](docs/versioning.md)
 - [推理性能历史记录](docs/inference_performance_history.md)
 - [文档索引](docs/README.md)
 
-`v0.0.6rc2`修复首版Vocab Parallel Greedy的通信粒度回归：整个Batch每个Decode
-Step只发起一次候选AllGather；Benchmark同时明确标记Greedy模式下Top-P不生效。
+`v0.0.7rc1` starts the scheduler and KV-engine refactor: Continuous Batching now supports prefill/decode token budgets, and the project adds KV block refcount metadata, block-aligned Prefix Cache metadata, and a Chunked Prefill planning entry. Defaults remain compatible; performance numbers will be updated after Atlas 910B3 measurement.
 
 ## 主要能力
 
@@ -104,6 +103,10 @@ Step只发起一次候选AllGather；Benchmark同时明确标记Greedy模式下T
   - Qwen3 MoE EP因动态`NonZero` assignment压缩自动关闭Graph，避免Capture stream同步错误；
   - Benchmark输出Graph Capture、Replay和Fallback计数。
 - **性能观测**
+- **Scheduler and KV engine**
+  - Continuous Batching supports request-count and token-budget admission;
+  - KV block refcount, Prefix Cache metadata, and Chunked Prefill planner are available as foundation APIs;
+  - Prefix Cache and Chunked Prefill are not yet wired into live KV reuse.
   - Ascend PyTorch Profiler；
   - CPU、CANN、NPU 算子、HBM 和 HCCL 通信数据；
   - MindStudio Insight Timeline、算子、内存和集群分析。
@@ -205,7 +208,7 @@ AllReduce合并，且无法进入Decode Graph，两卡低并发下不会自然�
 
 > 该对比不是严格同口径Benchmark：本项目使用FP16，对方使用BF16；输入模板、平均输入/输出长度和EvalScope版本也可能不同。数据用于当前工程基座观察，详细口径见[版本报告](docs/releases/v0.0.1rc1.md)。
 
-### v0.0.6rc2 Qwen3-32B采样路径实测
+### v0.0.6rc2 Qwen3-32B sampling-path benchmark
 
 共同配置：2 × Atlas 910B3、FP16、TP=2、Batch=4、Prompt约128 tokens、生成256
 tokens、Decode NPU Graph成功Replay。
@@ -214,14 +217,12 @@ tokens、Decode NPU Graph成功Replay。
 |---|---:|---:|---:|---:|
 | v0.0.5rc2 Greedy，temperature=0 | 21.3 tok/s | 85.0 tok/s | 47.04ms | 12.043s |
 | v0.0.6rc1 Greedy，temperature=0 | 19.7 tok/s | 78.6 tok/s | 50.87ms | 13.023s |
-| v0.0.6rc2 Greedy，temperature=0 | 22.1 tok/s | 88.6 tok/s | 45.16ms | 11.560s |
+| v0.0.6rc2 Greedy, temperature=0 | 22.1 tok/s | 88.6 tok/s | 45.16ms | 11.560s |
 | v0.0.6rc1 Top-P，temperature=0.6、top_p=0.9 | 17.7 tok/s | 70.9 tok/s | 56.41ms | 14.441s |
-| v0.0.6rc2 Top-P，temperature=0.6、top_p=0.9 | 17.9 tok/s | 71.7 tok/s | 55.83ms | 14.293s |
+| v0.0.6rc2 Top-P, temperature=0.6, top_p=0.9 | 17.9 tok/s | 71.7 tok/s | 55.83ms | 14.293s |
 
 以上Graph统计均为`attempts=3`、`captured=3`、`replays=1785`、`fallbacks=0`。
-v0.0.6rc2修复了rc1的Greedy小Collective回归，Greedy比rc1提升约12.2%，比v0.0.5rc2
-高约3.8%。Top-P仅比rc1高约1.1%，因为本次修复只覆盖Greedy；Top-P仍需要全局归一化、
-候选通信、排序和随机采样。
+v0.0.6rc2 fixed the rc1 Greedy small-collective regression: Greedy improved about 12.2% over rc1 and about 3.8% over v0.0.5rc2. Top-P improved about 1.1% because that path still needs global normalization, candidate communication, sorting, and random sampling.
 
 ## 环境安装
 
@@ -509,6 +510,7 @@ Profiler 数据通常包含：
 - TP 通信为同步 AllReduce/AllGather，尚未实现计算通信重叠；
 - 当前只支持单机多卡；设备映射、进程组和权重加载尚未完成多机适配；
 - Q+KV、Gate+Up 尚未融合；
+- v0.0.7rc1 Prefix Cache and Chunked Prefill are metadata/planning foundations and do not yet imply measured throughput gains;
 - Top-P Vocab Parallel Sampling在候选集无法覆盖精确nucleus时会回退完整Logits Gather；
 - Continuous Batching的Rank 0仍需每Step执行一次批量Token D2H以服务HTTP流式输出；
 - Qwen3 MoE TP Graph兼容性取决于CANN、torch_npu、GMM、Triton和HCCL版本；不兼容时按Bucket回退Eager；

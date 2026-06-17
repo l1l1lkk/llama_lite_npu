@@ -154,6 +154,54 @@ class ContinuousBatchSchedulerTest(unittest.TestCase):
         scheduler.step()
         self.assertEqual(backend.prefill_calls, [["a"], ["b"]])
 
+
+    def test_prefill_token_budget_limits_admission(self):
+        scheduler, backend = self._make_scheduler(max_batch_size=4)
+        scheduler.max_prefill_tokens = 4
+        backend.prefill_tokens = {"a": [10], "b": [20], "c": [30]}
+        backend.decode_tokens = {"a": [99], "b": [99], "c": [99]}
+
+        scheduler.submit("a", [1, 2, 3], 4, 0.0, 1.0)
+        scheduler.submit("b", [4, 5, 6], 4, 0.0, 1.0)
+        scheduler.submit("c", [7, 8], 4, 0.0, 1.0)
+
+        scheduler.step()
+
+        self.assertEqual(backend.prefill_calls, [["a"]])
+        self.assertEqual(scheduler.pending_count, 2)
+
+        scheduler.step()
+        self.assertEqual(backend.prefill_calls, [["a"], ["b"]])
+
+    def test_prefill_token_budget_admits_one_oversized_request(self):
+        scheduler, backend = self._make_scheduler(max_batch_size=4)
+        scheduler.max_prefill_tokens = 2
+        backend.prefill_tokens = {"long": [10], "short": [20]}
+        backend.decode_tokens = {"long": [99]}
+
+        scheduler.submit("long", [1, 2, 3, 4], 4, 0.0, 1.0)
+        scheduler.submit("short", [5], 4, 0.0, 1.0)
+
+        scheduler.step()
+
+        self.assertEqual(backend.prefill_calls, [["long"]])
+        self.assertEqual(scheduler.pending_count, 1)
+
+    def test_decode_token_budget_limits_active_decode_rows(self):
+        scheduler, backend = self._make_scheduler(max_batch_size=4)
+        scheduler.max_decode_tokens = 1
+        backend.prefill_tokens = {"a": [10], "b": [20]}
+        backend.decode_tokens = {"a": [11, 99], "b": [21, 99]}
+
+        scheduler.submit("a", [1], 4, 0.0, 1.0)
+        scheduler.submit("b", [2], 4, 0.0, 1.0)
+        scheduler.step()
+        scheduler.step()
+
+        self.assertEqual(backend.decode_calls, [["a"]])
+        scheduler.step()
+        self.assertEqual(backend.decode_calls, [["a"], ["b"]])
+
     def test_incremental_decoder_limits_normal_decode_window(self):
         module = load_batching_module()
         request = module.BatchRequest(
@@ -188,8 +236,8 @@ class ContinuousBatchSchedulerTest(unittest.TestCase):
             top_p=1.0,
         )
         decoded = {
-            (10,): "你",
-            (10, 11): "你好",
+            (10,): "?",
+            (10, 11): "??",
         }
 
         for token_id in (10, 11):
@@ -199,8 +247,8 @@ class ContinuousBatchSchedulerTest(unittest.TestCase):
                 decode_tokens=lambda ids: decoded[tuple(ids)],
             )
 
-        self.assertEqual(request.outputs.get_nowait().delta, "你")
-        self.assertEqual(request.outputs.get_nowait().delta, "好")
+        self.assertEqual(request.outputs.get_nowait().delta, "?")
+        self.assertEqual(request.outputs.get_nowait().delta, "?")
 
 
 class FakeExecutor:

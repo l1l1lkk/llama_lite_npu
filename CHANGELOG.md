@@ -2,6 +2,31 @@
 
 所有触发版本升级的变更按发布时间倒序记录。详细规则见[版本管理与发布规范](docs/versioning.md)。
 
+## [0.0.7rc1] - 2026-06-17
+
+Scheduler and KV-engine refactor foundation release.
+
+### Core changes
+
+- Continuous Batching adds `max_prefill_tokens` for prefill token-budget admission per scheduler tick.
+- Oversized prompts can be admitted alone to avoid long-prompt starvation.
+- Continuous Batching adds `max_decode_tokens` for active decode-row budgeting per scheduler tick.
+- Added CPU-side `KVBlockRefCounter` for logical KV block refcount metadata.
+- Added `PrefixCache` for block-aligned longest-prefix matching metadata.
+- Added `ChunkedPrefillPlanner` as the planning entry for future chunked prefill execution.
+- Server CLI adds `--max_prefill_tokens`, `--max_decode_tokens`, `--chunked_prefill`, and `--prefill_chunk_size`.
+
+### Compatibility and limitations
+
+- Defaults remain compatible: when token budgets are omitted, scheduling still follows `max_batch_size`.
+- Prefix cache is metadata-only and is not wired into live PagedAttention KV reuse yet.
+- Chunked prefill is a planning/configuration entry and does not change model execution semantics yet.
+- No predicted Atlas 910B3 performance numbers are recorded in this release.
+
+### Docs
+
+- [v0.0.7rc1 release report](docs/releases/v0.0.7rc1.md)
+
 ## [0.0.6rc2] - 2026-06-12
 
 修复v0.0.6rc1首版Vocab Parallel Greedy按Batch逐行发起小Collective导致的性能回归。

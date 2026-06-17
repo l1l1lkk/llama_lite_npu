@@ -309,6 +309,10 @@ def _start_continuous_scheduler(
     max_batch_size: int,
     max_waiting_requests: int,
     scheduler_poll_ms: float,
+    max_prefill_tokens: int | None = None,
+    max_decode_tokens: int | None = None,
+    chunked_prefill: bool = False,
+    prefill_chunk_size: int | None = None,
 ) -> None:
     global _continuous_backend, _continuous_scheduler
     global _scheduler_thread, _scheduler_stop, _scheduler_poll_seconds
@@ -330,6 +334,10 @@ def _start_continuous_scheduler(
         eos_token_id=_continuous_backend.eos_token_id,
         decode_tokens=_continuous_backend.decode_tokens,
         max_waiting_requests=max_waiting_requests,
+        max_prefill_tokens=max_prefill_tokens,
+        max_decode_tokens=max_decode_tokens,
+        chunked_prefill=chunked_prefill,
+        prefill_chunk_size=prefill_chunk_size,
     )
     _scheduler_poll_seconds = max(0.0001, scheduler_poll_ms / 1000.0)
     _scheduler_stop = threading.Event()
@@ -965,6 +973,38 @@ def main():
         help="Idle scheduler polling interval in milliseconds.",
     )
     parser.add_argument(
+        "--max_prefill_tokens",
+        type=int,
+        default=None,
+        help=(
+            "Optional continuous-batching prefill token budget per "
+            "scheduler tick. Disabled when omitted."
+        ),
+    )
+    parser.add_argument(
+        "--max_decode_tokens",
+        type=int,
+        default=None,
+        help=(
+            "Optional continuous-batching decode row budget per "
+            "scheduler tick. Disabled when omitted."
+        ),
+    )
+    parser.add_argument(
+        "--chunked_prefill",
+        action="store_true",
+        help=(
+            "Enable the v0.0.7 chunked-prefill planning path. "
+            "Execution remains conservative and should be treated as experimental."
+        ),
+    )
+    parser.add_argument(
+        "--prefill_chunk_size",
+        type=int,
+        default=None,
+        help="Chunk size used when --chunked_prefill is enabled.",
+    )
+    parser.add_argument(
         "--moe_parallel_mode",
         choices=("tp", "ep"),
         default="tp",
@@ -1019,6 +1059,10 @@ def main():
                 max_batch_size=args.max_batch_size,
                 max_waiting_requests=args.max_waiting_requests,
                 scheduler_poll_ms=args.scheduler_poll_ms,
+                max_prefill_tokens=args.max_prefill_tokens,
+                max_decode_tokens=args.max_decode_tokens,
+                chunked_prefill=args.chunked_prefill,
+                prefill_chunk_size=args.prefill_chunk_size,
             )
         print(f"Server starting on http://{args.host}:{args.port}")
         print(f"Endpoints:")
@@ -1029,7 +1073,10 @@ def main():
         if _continuous_batching:
             print(
                 "  [Continuous batching: "
-                f"max_batch_size={args.max_batch_size}]"
+                f"max_batch_size={args.max_batch_size}, "
+                f"max_prefill_tokens={args.max_prefill_tokens}, "
+                f"max_decode_tokens={args.max_decode_tokens}, "
+                f"chunked_prefill={args.chunked_prefill}]"
             )
         elif _is_tp:
             print(f"  [TP mode: single-request-at-a-time]")
