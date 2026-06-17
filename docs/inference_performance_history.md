@@ -137,3 +137,60 @@ NPU Graph状态
 MoE backend
 吞吐、TPOT或ms/token
 ```
+
+
+## 2026-06-17 v0.0.7rc1 EvalScope Server Measurements
+
+Environment and command shape:
+
+- Model: Qwen3-32B
+- Hardware: 2 x Atlas 910B3
+- Runtime: OpenAI-compatible `server.py` with Continuous Batching enabled
+- Branch/version: `release/0.0.7rc1`
+- TP: 2
+- PagedAttention: `page_size=16`
+- Decode NPU Graph: enabled by server startup option
+- Scheduler: `max_batch_size=32`, `max_prefill_tokens=1024`, `max_decode_tokens=8`
+- Dataset: EvalScope random
+- Prompt/output target: 128 prompt tokens, 256 max output tokens
+- Stream: enabled
+
+### Raw results
+
+| Test | Concurrency | Requests | Temperature / Top-p | Avg input tokens | Avg output tokens | Output throughput | Total throughput | Req throughput | Avg latency | TTFT | TPOT | ITL |
+|---|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `v007_greedy_p1` | 1 | 20 | temperature=0 | 156.000 | 256.000 | 24.2603 tok/s | 39.0439 tok/s | 0.0948 req/s | 10.5516 s | 0.6670 s | 0.0388 s | 0.0386 s |
+| `v007_greedy_p4` | 4 | 40 | temperature=0 | 155.975 | 254.125 | 63.3523 tok/s | 102.2360 tok/s | 0.2493 req/s | 15.7068 s | 2.2958 s | 0.0530 s | 0.0529 s |
+| `v007_topp_p4` | 4 | 40 | temperature=0.6, top_p=0.9 | 156.000 | 231.325 | 57.7176 tok/s | 96.6409 tok/s | 0.2495 req/s | 15.7261 s | 1.4861 s | 0.0629 s | 0.0616 s |
+
+### Interpretation
+
+Greedy concurrency scaling, comparing `v007_greedy_p4` with `v007_greedy_p1`:
+
+- Output throughput: 24.2603 -> 63.3523 tok/s, +161.1%, 2.61x.
+- Total throughput: 39.0439 -> 102.2360 tok/s, +161.8%, 2.62x.
+- Request throughput: 0.0948 -> 0.2493 req/s, +162.9%, 2.63x.
+- Average latency: 10.5516 -> 15.7068 s, +48.9%.
+- TPOT: 38.8 -> 53.0 ms, +36.6%.
+
+This shows the scheduler/KV refactor mainly improves service-side aggregate throughput under concurrent requests. It does not make a single decode stream faster by itself. The concurrency efficiency is about 65% of ideal 4x scaling, which is reasonable for this stage because decode still shares model compute, TP communication, sampling, HTTP streaming, and scheduler overhead.
+
+Top-P overhead, comparing `v007_topp_p4` with `v007_greedy_p4`:
+
+- Output throughput: 63.3523 -> 57.7176 tok/s, -8.9%.
+- Total throughput: 102.2360 -> 96.6409 tok/s, -5.5%.
+- TPOT: 53.0 -> 62.9 ms, +18.7%.
+- ITL: 52.9 -> 61.6 ms, +16.4%.
+- Request throughput is effectively unchanged: 0.2493 -> 0.2495 req/s.
+
+Top-P is slower because it still needs probability normalization, candidate filtering/sorting, and random sampling work that Greedy avoids. The average output length is also shorter in this run, so request throughput is not directly comparable to output-token throughput.
+
+### What v0.0.7rc1 improved
+
+v0.0.7rc1 introduced token-budget scheduling and KV metadata foundations. In this measurement, the visible improvement is not from live KV prefix reuse yet; prefix cache and chunked prefill are metadata/planning only in this release. The measurable gain is that the server can batch concurrent decode work through Continuous Batching and maintain much higher aggregate throughput:
+
+- Greedy single concurrency output throughput: 24.2603 tok/s.
+- Greedy concurrency 4 output throughput: 63.3523 tok/s.
+- Aggregate output throughput gain from concurrency batching: +39.092 tok/s, +161.1%.
+
+This should be treated as a server-scheduling gain, not a MatMul/kernel-level gain.
