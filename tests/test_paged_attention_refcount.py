@@ -72,6 +72,34 @@ class PagedKVRefcountTest(unittest.TestCase):
         self.assertEqual(len(pages), 2)
         self.assertTrue(all(isinstance(page, int) for page in pages))
 
+    def test_share_req_from_pages_reuses_existing_pages_with_refcounts(self):
+        module = load_paged_module()
+        page_manager = module.PagedKVCacheManager(
+            num_layers=1,
+            num_kv_heads=1,
+            head_dim=8,
+            num_pages=4,
+            page_size=4,
+            device="cpu",
+        )
+        req_manager = module.PagedReqTokensManager(
+            max_requests=2,
+            max_seq_len=16,
+            page_manager=page_manager,
+            device="cpu",
+        )
+        self.assertTrue(req_manager.alloc_req(0, 5))
+        pages = req_manager.req_page_table[0]
+
+        self.assertTrue(req_manager.share_req_from_pages(1, pages, 5))
+
+        self.assertEqual(req_manager.get_token_indices(1, 5).tolist(), [0, 1, 2, 3, 4])
+        self.assertEqual(int(page_manager.page_refcount[pages[0]]), 2)
+        req_manager.free_req(0)
+        self.assertFalse(bool(page_manager.page_free[pages[0]]))
+        req_manager.free_req(1)
+        self.assertTrue(bool(page_manager.page_free[pages[0]]))
+
 
 if __name__ == "__main__":
     unittest.main()

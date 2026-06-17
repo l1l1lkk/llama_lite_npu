@@ -214,6 +214,41 @@ class PagedReqTokensManager:
             return None
         return req_idx
 
+    def share_req_from_pages(
+        self, req_idx: int, page_indices: torch.Tensor, num_tokens: int
+    ) -> bool:
+        """Map a request to existing pages and increment their refcounts."""
+        if req_idx not in self.free_req_indices:
+            return False
+        num_tokens = int(num_tokens)
+        if num_tokens < 1 or num_tokens > self.max_seq_len:
+            return False
+        required_pages = (num_tokens + self.page_mgr.page_size - 1) // self.page_mgr.page_size
+        if len(page_indices) < required_pages:
+            return False
+
+        pages = page_indices[:required_pages].to(device="cpu", dtype=torch.long)
+        self.page_mgr.add_ref(pages)
+        self.free_req_indices.remove(req_idx)
+        self.req_page_table[req_idx] = pages
+        self.req_token_count[req_idx] = num_tokens
+        self.req_active[req_idx] = True
+        self.page_mgr.build_token_table(
+            pages, num_tokens, self.b_req_tokens_table, req_idx,
+        )
+        return True
+
+    def reserve_shared_req(
+        self, page_indices: torch.Tensor, num_tokens: int
+    ) -> Optional[int]:
+        """Allocate a request id that shares existing KV pages."""
+        if not self.free_req_indices:
+            return None
+        req_idx = self.free_req_indices[0]
+        if not self.share_req_from_pages(req_idx, page_indices, num_tokens):
+            return None
+        return req_idx
+
     def batch_metadata(
         self, req_indices: List[int]
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:

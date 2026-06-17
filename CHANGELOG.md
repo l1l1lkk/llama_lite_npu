@@ -2,6 +2,38 @@
 
 所有触发版本升级的变更按发布时间倒序记录。详细规则见[版本管理与发布规范](docs/versioning.md)。
 
+## [0.0.7rc4] - 2026-06-17
+
+Runtime-benefit release for the v0.0.7 scheduler/KV-engine line.
+
+### Core changes
+
+- Added exact-prompt live Prefix Cache for greedy requests (`temperature=0`). Repeated identical prompts can skip the full prefill forward and share cached Paged KV pages plus the first sampled token.
+- Prefix Cache is intentionally disabled for sampling requests (`temperature>0`) to avoid changing stochastic generation semantics.
+- Added Paged KV request sharing APIs backed by page refcounts. Shared pages are released only after all request/cache references are gone.
+- Added bounded LRU ownership for cached prompt pages to avoid unbounded KV retention.
+- Improved chunked-prefill scheduling behavior: long prompts accumulate chunk credit and can be deferred while shorter prompts are admitted, improving mixed long/short prompt responsiveness without unsafe suffix-prefill execution.
+
+### Expected test-visible benefit
+
+- Repeated exact greedy prompts should show lower TTFT because prefill forward is skipped on cache hits.
+- Mixed long/short prompt concurrency should show better short-request responsiveness when `--chunked_prefill --prefill_chunk_size` and a prefill token budget are enabled.
+- Random datasets with no repeated prompts should not show Prefix Cache gains.
+
+### Limitations
+
+- This is exact full-prompt caching, not arbitrary partial-prefix reuse yet.
+- Chunked prefill is scheduler interleaving, not true suffix-prefill kernel execution.
+- Prefix Cache currently targets greedy correctness; stochastic Top-P requests stay on the uncached path.
+
+### Tests
+
+- Added regression tests for shared Paged KV pages, exact Prefix Cache hits, sampling-cache bypass, and chunked long-prompt deferral.
+
+### Docs
+
+- [v0.0.7rc4 release report](docs/releases/v0.0.7rc4.md)
+
 ## [0.0.7rc3] - 2026-06-17
 
 Complete the safe runtime pieces of the v0.0.7 scheduler/KV-engine refactor.

@@ -39,6 +39,7 @@ class FakeBackend:
         self.decode_calls = []
         self.released = []
         self.prefill_errors = []
+        self.reserved_lengths = []
 
     def prefill(self, requests):
         self.prefill_calls.append([request.request_id for request in requests])
@@ -193,6 +194,30 @@ class ContinuousBatchSchedulerTest(unittest.TestCase):
         self.assertEqual(backend.prefill_calls, [["long"]])
         self.assertEqual(scheduler.pending_count, 1)
 
+    def test_chunked_prefill_defers_long_prompt_and_admits_short_prompt(self):
+        module = load_batching_module()
+        backend = FakeBackend()
+        scheduler = module.ContinuousBatchScheduler(
+            backend=backend,
+            max_batch_size=2,
+            eos_token_id=99,
+            decode_tokens=lambda token_ids: "".join(
+                f"<{token_id}>" for token_id in token_ids
+            ),
+            max_prefill_tokens=4,
+            chunked_prefill=True,
+            prefill_chunk_size=4,
+        )
+        backend.prefill_tokens = {"long": [10], "short": [20]}
+
+        scheduler.submit("long", [1, 2, 3, 4, 5, 6, 7, 8], 4, 0.0, 1.0)
+        scheduler.submit("short", [9, 10], 4, 0.0, 1.0)
+
+        scheduler.step()
+
+        self.assertEqual(backend.prefill_calls, [["short"]])
+        self.assertEqual(scheduler.pending_count, 1)
+
     def test_decode_token_budget_limits_active_decode_rows(self):
         scheduler, backend = self._make_scheduler(max_batch_size=4)
         scheduler.max_decode_tokens = 1
@@ -298,8 +323,10 @@ class FakeExecutor:
         self.active_request_ids = ()
         self.forward_inputs = []
         self.logits_are_sharded = False
+        self.reserved_lengths = []
 
     def reserve_paged_requests(self, prompt_lengths):
+        self.reserved_lengths.append(tuple(prompt_lengths))
         result = []
         for length in prompt_lengths:
             req_idx = self.next_request_id
@@ -324,6 +351,12 @@ class FakeExecutor:
         self.released.extend(request_ids)
         for req_idx in request_ids:
             self.lengths.pop(req_idx, None)
+
+    def share_paged_request_from_cache(self, prompt_tokens):
+        return None
+
+    def store_paged_request_prefix(self, prompt_tokens, req_idx, first_token_id):
+        pass
 
     def forward(self, input_ids, position_ids):
         self.forward_inputs.append(
@@ -424,6 +457,78 @@ class ContinuousBatchModelBackendTest(unittest.TestCase):
         self.assertEqual(
             backend._device_tokens[request.model_request_id].tolist(), 40
         )
+
+    def test_exact_prefix_cache_hit_skips_prefill_forward(self):
+        module = load_batching_module()
+
+        class PrefixCacheExecutor(FakeExecutor):
+            def __init__(self):
+                super().__init__()
+                self.cache = {}
+                self.shared = []
+
+            def share_paged_request_from_cache(self, prompt_tokens):
+                key = tuple(prompt_tokens)
+                if key not in self.cache:
+                    return None
+                req_idx = self.next_request_id
+                self.next_request_id += 1
+                length, token_id = self.cache[key]
+                self.lengths[req_idx] = length
+                self.shared.append((req_idx, key))
+                return req_idx, token_id
+
+            def store_paged_request_prefix(self, prompt_tokens, req_idx, first_token_id):
+                self.cache[tuple(prompt_tokens)] = (self.lengths[req_idx], first_token_id)
+
+        executor = PrefixCacheExecutor()
+        generator = SimpleNamespace(
+            model_executor=executor,
+            tokenizer=SimpleNamespace(eos_token_id=99),
+        )
+        backend = module.ContinuousBatchModelBackend(generator)
+        first = module.BatchRequest("first", [1, 2, 3], 4, 0.0, 1.0)
+        second = module.BatchRequest("second", [1, 2, 3], 4, 0.0, 1.0)
+
+        self.assertEqual(backend.prefill([first]), [40])
+        self.assertEqual(backend.prefill([second]), [40])
+
+        self.assertEqual(len(executor.forward_inputs), 1)
+        self.assertEqual(executor.reserved_lengths, [(3,)])
+        self.assertEqual(executor.shared, [(1, (1, 2, 3))])
+        self.assertEqual(second.model_request_id, 1)
+        self.assertEqual(backend._device_positions[1].tolist(), 3)
+
+    def test_exact_prefix_cache_is_disabled_for_sampling_requests(self):
+        module = load_batching_module()
+
+        class PrefixCacheExecutor(FakeExecutor):
+            def __init__(self):
+                super().__init__()
+                self.cache = {}
+
+            def share_paged_request_from_cache(self, prompt_tokens):
+                if tuple(prompt_tokens) in self.cache:
+                    return self.next_request_id, self.cache[tuple(prompt_tokens)]
+                return None
+
+            def store_paged_request_prefix(self, prompt_tokens, req_idx, first_token_id):
+                self.cache[tuple(prompt_tokens)] = first_token_id
+
+        executor = PrefixCacheExecutor()
+        generator = SimpleNamespace(
+            model_executor=executor,
+            tokenizer=SimpleNamespace(eos_token_id=99),
+        )
+        backend = module.ContinuousBatchModelBackend(generator)
+        first = module.BatchRequest("first", [1, 2, 3], 4, 0.6, 0.9)
+        second = module.BatchRequest("second", [1, 2, 3], 4, 0.6, 0.9)
+
+        self.assertEqual(backend.prefill([first]), [40])
+        self.assertEqual(backend.prefill([second]), [41])
+
+        self.assertEqual(len(executor.forward_inputs), 2)
+        self.assertEqual(executor.cache, {})
 
 
 if __name__ == "__main__":

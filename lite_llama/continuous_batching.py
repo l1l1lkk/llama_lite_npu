@@ -86,6 +86,7 @@ class BatchRequest:
         self.top_p = top_p
         self.generated_token_ids: list[int] = []
         self.preemptions = 0
+        self.prefill_credit_tokens = 0
         self.decoded_text = ""
         self.model_request_id: int | None = None
         self.finished = False
@@ -266,6 +267,9 @@ class ContinuousBatchScheduler:
         return request
 
     def _admit(self, capacity: int) -> list[BatchRequest]:
+        if self.chunked_prefill and self.prefill_chunk_size:
+            return self._admit_chunked(capacity)
+
         admitted: list[BatchRequest] = []
         remaining_prefill_tokens = self.max_prefill_tokens
         with self._lock:
@@ -290,6 +294,46 @@ class ContinuousBatchScheduler:
 
                 admitted.append(self._pending.popleft())
                 capacity -= 1
+                if remaining_prefill_tokens == 0:
+                    break
+        return admitted
+
+    def _admit_chunked(self, capacity: int) -> list[BatchRequest]:
+        admitted: list[BatchRequest] = []
+        remaining_prefill_tokens = self.max_prefill_tokens
+        with self._lock:
+            scan_budget = len(self._pending)
+            while capacity > 0 and self._pending and scan_budget > 0:
+                scan_budget -= 1
+                request = self._pending[0]
+                if request.cancelled:
+                    self._pending.popleft()
+                    request.finish("cancelled")
+                    continue
+
+                total_tokens = len(request.model_context_tokens)
+                if (
+                    total_tokens > self.prefill_chunk_size
+                    and request.prefill_credit_tokens + self.prefill_chunk_size < total_tokens
+                ):
+                    request.prefill_credit_tokens += self.prefill_chunk_size
+                    self._pending.rotate(-1)
+                    continue
+
+                token_cost = total_tokens
+                if remaining_prefill_tokens is not None:
+                    if token_cost > remaining_prefill_tokens:
+                        if admitted:
+                            break
+                        # Ready long requests are allowed to run alone after
+                        # accumulating chunk credit, preserving progress.
+                        remaining_prefill_tokens = 0
+                    else:
+                        remaining_prefill_tokens -= token_cost
+
+                admitted.append(self._pending.popleft())
+                capacity -= 1
+                request.prefill_credit_tokens = 0
                 if remaining_prefill_tokens == 0:
                     break
         return admitted
@@ -512,16 +556,46 @@ class ContinuousBatchModelBackend:
 
         if not requests:
             return []
-        context_lengths = [len(request.model_context_tokens) for request in requests]
+        results: list[int | None] = [None] * len(requests)
+        cache_misses: list[tuple[int, BatchRequest]] = []
+        for index, request in enumerate(requests):
+            context_tokens = request.model_context_tokens
+            cached = None
+            if (
+                request.temperature == 0
+                and hasattr(self.executor, "share_paged_request_from_cache")
+            ):
+                cached = self.executor.share_paged_request_from_cache(context_tokens)
+            if cached is None:
+                cache_misses.append((index, request))
+                continue
+            req_idx, token_id = cached
+            request.model_request_id = int(req_idx)
+            sampled = torch.tensor(
+                [int(token_id)], dtype=torch.long, device=self.executor.device
+            )
+            self._remember_sampled_tokens(
+                [request],
+                sampled,
+                initial_positions=[len(context_tokens)],
+            )
+            results[index] = int(token_id)
+
+        if not cache_misses:
+            if not self.return_host_tokens:
+                return []
+            return [int(token_id) for token_id in results]
+
+        miss_requests = [request for _, request in cache_misses]
+        context_lengths = [len(request.model_context_tokens) for request in miss_requests]
         request_ids = self.executor.reserve_paged_requests(
             context_lengths
         )
-        for request, req_idx in zip(requests, request_ids):
+        for request, req_idx in zip(miss_requests, request_ids):
             request.model_request_id = req_idx
 
-        results: list[int | None] = [None] * len(requests)
         groups: dict[int, list[tuple[int, BatchRequest]]] = {}
-        for index, request in enumerate(requests):
+        for index, request in cache_misses:
             groups.setdefault(len(request.model_context_tokens), []).append(
                 (index, request)
             )
@@ -562,9 +636,22 @@ class ContinuousBatchModelBackend:
                         indexed_requests, group_tokens
                     ):
                         results[original_index] = token_id
+                if hasattr(self.executor, "store_paged_request_prefix"):
+                    host_tokens = (
+                        group_tokens
+                        if self.return_host_tokens
+                        else sampled.detach().cpu().tolist()
+                    )
+                    for request, token_id in zip(group_requests, host_tokens):
+                        if request.temperature == 0:
+                            self.executor.store_paged_request_prefix(
+                                request.model_context_tokens,
+                                int(request.model_request_id),
+                                int(token_id),
+                            )
         except BaseException:
             self.executor.release_paged_request_ids(request_ids)
-            for request in requests:
+            for request in miss_requests:
                 request.model_request_id = None
             raise
 

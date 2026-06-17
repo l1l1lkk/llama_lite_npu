@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 
 import json, time
+from collections import OrderedDict
 from pathlib import Path
 
 from transformers import LlavaConfig
@@ -276,6 +277,10 @@ class ModelExecutor:
         # prefill so decode does not synchronize an NPU tensor via .tolist()
         # for every generated token.
         self._paged_request_ids: tuple[int, ...] = ()
+        self._paged_prefix_cache: OrderedDict[
+            tuple[int, ...], tuple[object, int, int]
+        ] = OrderedDict()
+        self._paged_prefix_cache_max_entries = 128
 
         # --- NPU Graph (decode kernel launch batching) ---
         self.graph_runner = None
@@ -475,6 +480,55 @@ class ModelExecutor:
                 self.req_tokens_manager.free_req(req_idx)
             raise
         return tuple(request_ids)
+
+    def share_paged_request_from_cache(
+        self, prompt_tokens: list[int] | tuple[int, ...]
+    ) -> tuple[int, int] | None:
+        """Share a full-prompt cached KV prefix and return (request_id, token).
+
+        The cache intentionally starts with exact full-prompt matches only. It
+        avoids unsafe suffix-prefill semantics while still making repeated
+        prompts skip prefill forward entirely.
+        """
+        if not self.use_paged_attn:
+            return None
+        cached = self._paged_prefix_cache.get(tuple(int(t) for t in prompt_tokens))
+        if cached is None:
+            return None
+        self._paged_prefix_cache.move_to_end(tuple(int(t) for t in prompt_tokens))
+        page_indices, num_tokens, first_token_id = cached
+        req_idx = self.req_tokens_manager.reserve_shared_req(
+            page_indices, num_tokens
+        )
+        if req_idx is None:
+            return None
+        return int(req_idx), int(first_token_id)
+
+    def store_paged_request_prefix(
+        self,
+        prompt_tokens: list[int] | tuple[int, ...],
+        req_idx: int,
+        first_token_id: int,
+    ) -> None:
+        """Retain one KV page reference for an exact prompt cache entry."""
+        if not self.use_paged_attn:
+            return
+        if req_idx not in self.req_tokens_manager.req_page_table:
+            return
+        key = tuple(int(t) for t in prompt_tokens)
+        if key in self._paged_prefix_cache:
+            return
+        page_indices = self.req_tokens_manager.req_page_table[int(req_idx)]
+        self.req_tokens_manager.page_mgr.add_ref(page_indices)
+        self._paged_prefix_cache[key] = (
+            page_indices.clone(),
+            int(self.req_tokens_manager.req_token_count[int(req_idx)]),
+            int(first_token_id),
+        )
+        self._paged_prefix_cache.move_to_end(key)
+        while len(self._paged_prefix_cache) > self._paged_prefix_cache_max_entries:
+            _, (old_pages, _, _) = self._paged_prefix_cache.popitem(last=False)
+            self.req_tokens_manager.page_mgr.free(old_pages)
 
     def activate_paged_prefill_batch(
         self, request_ids: tuple[int, ...], prompt_length: int
