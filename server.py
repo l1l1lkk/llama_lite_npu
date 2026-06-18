@@ -1026,8 +1026,9 @@ def main():
         "--chunked_prefill",
         action="store_true",
         help=(
-            "Enable the v0.0.7 chunked-prefill planning path. "
-            "Execution remains conservative and should be treated as experimental."
+            "Enable chunked prefill execution across scheduler ticks. "
+            "v0.0.8 batches chunk replay across active prefill requests; "
+            "full prompt-cache attention kernels remain future work."
         ),
     )
     parser.add_argument(

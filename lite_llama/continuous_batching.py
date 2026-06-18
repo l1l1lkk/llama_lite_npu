@@ -630,6 +630,17 @@ class ContinuousBatchModelBackend:
             return []
         return sampled.detach().cpu().tolist()
 
+    def _sample_prefill_logits(
+        self,
+        logits,
+        requests: Sequence[BatchRequest],
+        sample_indices=None,
+    ):
+        if sample_indices is None:
+            return self._sample_device(logits, requests)
+        gathered_logits = logits[0, sample_indices, :]
+        return self._sample_device(gathered_logits, requests)
+
     def _cache_lookup(
         self, request: BatchRequest
     ) -> tuple[int, int, int | None] | None:
@@ -717,6 +728,113 @@ class ContinuousBatchModelBackend:
             )
         return None if not self.return_host_tokens else token_id
 
+    def _run_prefill_chunk_incremental_batch(
+        self,
+        requests: Sequence[BatchRequest],
+        chunk_size: int,
+    ) -> list[int | None]:
+        import torch
+
+        results: list[int | None] = [None] * len(requests)
+        if not requests:
+            return results
+
+        target_ends: list[int] = []
+        for request in requests:
+            context_tokens = request.model_context_tokens
+            if not context_tokens:
+                raise RuntimeError("empty prompts are not supported by chunked prefill")
+            self._ensure_incremental_request(request)
+            target_ends.append(
+                min(len(context_tokens), request.prefill_cursor + int(chunk_size))
+            )
+
+        while True:
+            step_items = [
+                (index, request, target_end)
+                for index, (request, target_end) in enumerate(zip(requests, target_ends))
+                if request.prefill_cursor < target_end
+            ]
+            if not step_items:
+                break
+
+            step_ids: list[int] = []
+            input_rows: list[list[int]] = []
+            position_rows: list[list[int]] = []
+            for _, request, _ in step_items:
+                req_idx = int(request.model_request_id)
+                position = int(request.prefill_cursor)
+                while self.executor.req_tokens_manager.req_token_count[req_idx] <= position:
+                    self.executor.extend_paged_requests((req_idx,))
+                step_ids.append(req_idx)
+                input_rows.append([int(request.model_context_tokens[position])])
+                position_rows.append([position])
+
+            self.executor.activate_paged_decode_batch(tuple(step_ids))
+            input_ids = torch.tensor(
+                input_rows, dtype=torch.long, device=self.executor.device
+            )
+            position_ids = torch.tensor(
+                position_rows, dtype=torch.long, device=self.executor.device
+            )
+            logits = self.executor.forward(input_ids, position_ids)
+
+            completed_rows: list[int] = []
+            completed_requests: list[BatchRequest] = []
+            completed_indices: list[int] = []
+            for row, (original_index, request, _) in enumerate(step_items):
+                request.prefill_cursor += 1
+                if request.prefill_cursor >= len(request.model_context_tokens):
+                    completed_rows.append(row)
+                    completed_requests.append(request)
+                    completed_indices.append(original_index)
+
+            if completed_requests:
+                completed_logits = logits[
+                    torch.tensor(
+                        completed_rows, dtype=torch.long, device=logits.device
+                    ),
+                    -1,
+                    :,
+                ]
+                sampled = self._sample_prefill_logits(
+                    completed_logits, completed_requests
+                )
+                self._remember_sampled_tokens(
+                    completed_requests,
+                    sampled,
+                    initial_positions=[
+                        len(request.model_context_tokens)
+                        for request in completed_requests
+                    ],
+                )
+                completed_ids = tuple(
+                    int(request.model_request_id)
+                    for request in completed_requests
+                )
+                self.executor.extend_paged_requests(completed_ids)
+                host_tokens = self._tokens_to_host(sampled)
+                if not self.return_host_tokens and hasattr(
+                    self.executor, "store_paged_request_prefix"
+                ):
+                    host_tokens = sampled.detach().cpu().tolist()
+                for list_index, request, token_id in zip(
+                    completed_indices, completed_requests, host_tokens
+                ):
+                    if self.return_host_tokens:
+                        results[list_index] = int(token_id)
+                    if (
+                        hasattr(self.executor, "store_paged_request_prefix")
+                        and request.temperature == 0
+                    ):
+                        self.executor.store_paged_request_prefix(
+                            request.model_context_tokens,
+                            int(request.model_request_id),
+                            int(token_id),
+                        )
+
+        return results
+
     def prefill(self, requests: Sequence[BatchRequest]) -> Sequence[int]:
         import torch
 
@@ -769,33 +887,43 @@ class ContinuousBatchModelBackend:
             )
 
         try:
-            for prompt_length, indexed_requests in groups.items():
-                group_requests = [
-                    request for _, request in indexed_requests
-                ]
+            if len(groups) > 1 and hasattr(
+                self.executor, "activate_paged_packed_prefill_batch"
+            ):
+                indexed_requests = list(cache_misses)
+                group_requests = [request for _, request in indexed_requests]
                 group_ids = tuple(
                     int(request.model_request_id)
                     for request in group_requests
                 )
-                self.executor.activate_paged_prefill_batch(
-                    group_ids, prompt_length
+                prompt_lengths = [
+                    len(request.model_context_tokens)
+                    for request in group_requests
+                ]
+                flat_tokens = [
+                    int(token_id)
+                    for request in group_requests
+                    for token_id in request.model_context_tokens
+                ]
+                flat_position_ids, sample_indices = (
+                    self.executor.activate_paged_packed_prefill_batch(
+                        group_ids, prompt_lengths
+                    )
                 )
                 input_ids = torch.tensor(
-                    [request.model_context_tokens for request in group_requests],
+                    [flat_tokens],
                     dtype=torch.long,
                     device=self.executor.device,
                 )
-                position_ids = torch.arange(
-                    prompt_length,
-                    dtype=torch.long,
-                    device=self.executor.device,
-                ).unsqueeze(0).expand(len(group_requests), -1)
+                position_ids = flat_position_ids.reshape(1, -1)
                 logits = self.executor.forward(input_ids, position_ids)
-                sampled = self._sample_device(logits, group_requests)
+                sampled = self._sample_prefill_logits(
+                    logits, group_requests, sample_indices
+                )
                 self._remember_sampled_tokens(
                     group_requests,
                     sampled,
-                    initial_positions=[prompt_length] * len(group_requests),
+                    initial_positions=prompt_lengths,
                 )
                 group_tokens = self._tokens_to_host(sampled)
                 self.executor.extend_paged_requests(group_ids)
@@ -817,6 +945,55 @@ class ContinuousBatchModelBackend:
                                 int(request.model_request_id),
                                 int(token_id),
                             )
+            else:
+                for prompt_length, indexed_requests in groups.items():
+                    group_requests = [
+                        request for _, request in indexed_requests
+                    ]
+                    group_ids = tuple(
+                        int(request.model_request_id)
+                        for request in group_requests
+                    )
+                    self.executor.activate_paged_prefill_batch(
+                        group_ids, prompt_length
+                    )
+                    input_ids = torch.tensor(
+                        [request.model_context_tokens for request in group_requests],
+                        dtype=torch.long,
+                        device=self.executor.device,
+                    )
+                    position_ids = torch.arange(
+                        prompt_length,
+                        dtype=torch.long,
+                        device=self.executor.device,
+                    ).unsqueeze(0).expand(len(group_requests), -1)
+                    logits = self.executor.forward(input_ids, position_ids)
+                    sampled = self._sample_prefill_logits(logits, group_requests)
+                    self._remember_sampled_tokens(
+                        group_requests,
+                        sampled,
+                        initial_positions=[prompt_length] * len(group_requests),
+                    )
+                    group_tokens = self._tokens_to_host(sampled)
+                    self.executor.extend_paged_requests(group_ids)
+                    if self.return_host_tokens:
+                        for (original_index, _), token_id in zip(
+                            indexed_requests, group_tokens
+                        ):
+                            results[original_index] = token_id
+                    if hasattr(self.executor, "store_paged_request_prefix"):
+                        host_tokens = (
+                            group_tokens
+                            if self.return_host_tokens
+                            else sampled.detach().cpu().tolist()
+                        )
+                        for request, token_id in zip(group_requests, host_tokens):
+                            if request.temperature == 0:
+                                self.executor.store_paged_request_prefix(
+                                    request.model_context_tokens,
+                                    int(request.model_request_id),
+                                    int(token_id),
+                                )
         except BaseException:
             self.executor.release_paged_request_ids(request_ids)
             for request in miss_requests:
@@ -832,8 +1009,10 @@ class ContinuousBatchModelBackend:
         requests: Sequence[BatchRequest],
         chunk_size: int,
     ) -> Sequence[int | None]:
-        results: list[int | None] = []
-        for request in requests:
+        results: list[int | None] = [None] * len(requests)
+        replay_requests: list[BatchRequest] = []
+        replay_indices: list[int] = []
+        for index, request in enumerate(requests):
             cached = None
             if request.model_request_id is None:
                 cached = self._cache_lookup(request)
@@ -852,11 +1031,15 @@ class ContinuousBatchModelBackend:
                         sampled,
                         initial_positions=[len(request.model_context_tokens)],
                     )
-                    results.append(int(token_id) if self.return_host_tokens else None)
+                    results[index] = int(token_id) if self.return_host_tokens else None
                     continue
-            results.append(
-                self._run_prefill_chunk_incremental(request, int(chunk_size))
-            )
+            replay_requests.append(request)
+            replay_indices.append(index)
+        replay_results = self._run_prefill_chunk_incremental_batch(
+            replay_requests, int(chunk_size)
+        )
+        for index, token_id in zip(replay_indices, replay_results):
+            results[index] = token_id
         return results
 
     def decode(self, requests: Sequence[BatchRequest]) -> Sequence[int]:

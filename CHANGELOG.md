@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.0.8rc1] - 2026-06-18
+
+Packed-prefill release for the scheduler/KV-engine line.
+
+### Core changes
+
+- Added live mixed-length packed prefill for continuous batching cache misses. Requests with different prompt lengths can now share one flattened prefill forward instead of being split into equal-length groups.
+- Added `ModelExecutor.activate_paged_packed_prefill_batch(...)` to build no-padding PagedAttention metadata: `b_start_loc`, `b_seq_len`, flattened `cur_select_index`, flat position ids, and per-request sample indices.
+- Updated chunked prefill replay to process active prefill requests as decode micro-batches instead of looping request-by-request.
+- Preserved exact Prefix Cache default behavior and kept page-aligned partial Prefix Cache opt-in via `--partial_prefix_cache`.
+
+### Expected test-visible benefit
+
+- Mixed prompt-length concurrency should reduce TTFT versus equal-length grouping because the scheduler can run heterogeneous prefill work in fewer model forwards.
+- `--chunked_prefill` should show lower Python overhead when multiple long prompts are prefilling concurrently.
+- Single-request decode speed is not expected to change materially.
+
+### Compatibility and limitations
+
+- This release does not add a dedicated suffix-prefill attention kernel. Chunk replay still uses decode-style KV replay for correctness.
+- New Atlas performance numbers are not recorded yet; use EvalScope and profiler runs before updating the performance table.
+
+### Tests
+
+- Added packed prefill backend and executor contract tests.
+- Added chunked prefill micro-batch replay regression coverage.
+
+### Docs
+
+- [v0.0.8rc1 release report](docs/releases/v0.0.8rc1.md)
+
+
 所有触发版本升级的变更按发布时间倒序记录。详细规则见[版本管理与发布规范](docs/versioning.md)。
 
 ## [0.0.7rc6] - 2026-06-18

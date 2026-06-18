@@ -668,6 +668,67 @@ class ModelExecutor:
         )
         self.atten_info.max_actual_seq_len = prompt_length
 
+    def activate_paged_packed_prefill_batch(
+        self, request_ids: tuple[int, ...], prompt_lengths: list[int] | tuple[int, ...]
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Select a mixed-length request group for one no-padding prefill.
+
+        The model receives flattened tensors with shape ``[1, total_tokens]``.
+        Attention kernels still see the logical request batch through
+        ``b_start_loc`` and ``b_seq_len``.  The returned tensors are the flat
+        position ids and the flat logits indices that correspond to the last
+        prompt token of each logical request.
+        """
+        if not request_ids:
+            raise ValueError("request_ids must not be empty")
+        if len(request_ids) != len(prompt_lengths):
+            raise ValueError("request_ids and prompt_lengths must have same length")
+
+        lengths = tuple(int(length) for length in prompt_lengths)
+        if any(length <= 0 for length in lengths):
+            raise ValueError("prompt_lengths must be positive")
+        for req_idx, prompt_length in zip(request_ids, lengths):
+            actual_length = self.req_tokens_manager.req_token_count[int(req_idx)]
+            if actual_length != prompt_length:
+                raise ValueError(
+                    "packed prefill request length mismatch: "
+                    f"request={req_idx}, expected={prompt_length}, "
+                    f"actual={actual_length}"
+                )
+
+        starts: list[int] = []
+        sample_indices: list[int] = []
+        position_ids: list[int] = []
+        cursor = 0
+        for prompt_length in lengths:
+            starts.append(cursor)
+            sample_indices.append(cursor + prompt_length - 1)
+            position_ids.extend(range(prompt_length))
+            cursor += prompt_length
+
+        self._paged_request_ids = tuple(int(req_idx) for req_idx in request_ids)
+        self.atten_info.b_req_idx = torch.tensor(
+            self._paged_request_ids, dtype=torch.int32, device=self.device
+        )
+        self.atten_info.b_seq_len = torch.tensor(
+            lengths, dtype=torch.long, device=self.device
+        )
+        self.atten_info.cur_select_index = torch.cat(
+            [
+                self.req_tokens_manager.get_token_indices(req_idx, prompt_length)
+                for req_idx, prompt_length in zip(self._paged_request_ids, lengths)
+            ]
+        ).to(torch.int32)
+        self.atten_info.b_start_loc = torch.tensor(
+            starts, dtype=torch.int32, device=self.device
+        )
+        self.atten_info.max_actual_seq_len = max(lengths)
+
+        return (
+            torch.tensor(position_ids, dtype=torch.long, device=self.device),
+            torch.tensor(sample_indices, dtype=torch.long, device=self.device),
+        )
+
     def activate_paged_decode_batch(
         self, request_ids: tuple[int, ...]
     ) -> None:

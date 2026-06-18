@@ -377,6 +377,8 @@ class FakeExecutor:
         self.forward_inputs = []
         self.logits_are_sharded = False
         self.reserved_lengths = []
+        self.packed_prefill_batches = []
+        self.sample_indices = None
 
     def reserve_paged_requests(self, prompt_lengths):
         self.reserved_lengths.append(tuple(prompt_lengths))
@@ -391,6 +393,29 @@ class FakeExecutor:
     def activate_paged_prefill_batch(self, request_ids, prompt_length):
         self.active_request_ids = tuple(request_ids)
         self.prefill_batches.append((tuple(request_ids), prompt_length))
+
+    def activate_paged_packed_prefill_batch(self, request_ids, prompt_lengths):
+        self.active_request_ids = tuple(request_ids)
+        start = 0
+        starts = []
+        sample_indices = []
+        for length in prompt_lengths:
+            starts.append(start)
+            sample_indices.append(start + int(length) - 1)
+            start += int(length)
+        self.sample_indices = tuple(sample_indices)
+        self.packed_prefill_batches.append(
+            (tuple(request_ids), tuple(prompt_lengths), tuple(starts))
+        )
+        position_ids = [
+            position
+            for length in prompt_lengths
+            for position in range(int(length))
+        ]
+        return (
+            torch.tensor(position_ids, dtype=torch.long),
+            torch.tensor(sample_indices, dtype=torch.long),
+        )
 
     def activate_paged_decode_batch(self, request_ids):
         self.active_request_ids = tuple(request_ids)
@@ -417,13 +442,18 @@ class FakeExecutor:
         )
         batch_size, seq_len = input_ids.shape
         logits = torch.zeros((batch_size, seq_len, 128))
-        for row, req_idx in enumerate(self.active_request_ids):
-            logits[row, -1, 40 + req_idx] = 10
+        if batch_size == 1 and self.sample_indices is not None:
+            for req_idx, token_index in zip(self.active_request_ids, self.sample_indices):
+                logits[0, token_index, 40 + req_idx] = 10
+            self.sample_indices = None
+        else:
+            for row, req_idx in enumerate(self.active_request_ids):
+                logits[row, -1, 40 + req_idx] = 10
         return logits
 
 
 class ContinuousBatchModelBackendTest(unittest.TestCase):
-    def test_prefill_groups_requests_by_prompt_length(self):
+    def test_prefill_packs_mixed_length_requests_into_one_forward(self):
         module = load_batching_module()
         executor = FakeExecutor()
         tokenizer = SimpleNamespace(
@@ -444,10 +474,14 @@ class ContinuousBatchModelBackendTest(unittest.TestCase):
         tokens = backend.prefill(requests)
 
         self.assertEqual(tokens, [40, 41, 42])
+        self.assertEqual(executor.prefill_batches, [])
         self.assertEqual(
-            executor.prefill_batches,
-            [((0, 2), 2), ((1,), 1)],
+            executor.packed_prefill_batches,
+            [((0, 1, 2), (2, 1, 2), (0, 2, 3))],
         )
+        input_ids, position_ids = executor.forward_inputs[0]
+        self.assertEqual(input_ids.tolist(), [[1, 2, 3, 4, 5]])
+        self.assertEqual(position_ids.tolist(), [[0, 1, 0, 0, 1]])
         self.assertEqual([r.model_request_id for r in requests], [0, 1, 2])
 
     def test_decode_rebuilds_dynamic_batch_metadata(self):
@@ -627,6 +661,34 @@ class ContinuousBatchModelBackendTest(unittest.TestCase):
         ]
         self.assertEqual(forwarded_token_ids, [5, 6])
         self.assertEqual(forwarded_positions, [4, 5])
+
+    def test_prefill_chunk_replays_multiple_requests_as_decode_micro_batches(self):
+        module = load_batching_module()
+        executor = FakeExecutor()
+        generator = SimpleNamespace(
+            model_executor=executor,
+            tokenizer=SimpleNamespace(eos_token_id=99),
+        )
+        backend = module.ContinuousBatchModelBackend(generator)
+        request_a = module.BatchRequest("a", [1, 2, 3], 4, 0.0, 1.0)
+        request_b = module.BatchRequest("b", [4, 5], 4, 0.0, 1.0)
+
+        first = backend.prefill_chunk([request_a, request_b], chunk_size=2)
+
+        self.assertEqual(first, [None, 41])
+        self.assertEqual(request_a.prefill_cursor, 2)
+        self.assertEqual(request_b.prefill_cursor, 2)
+        self.assertEqual(executor.forward_inputs[0][0].tolist(), [[1], [4]])
+        self.assertEqual(executor.forward_inputs[0][1].tolist(), [[0], [0]])
+        self.assertEqual(executor.forward_inputs[1][0].tolist(), [[2], [5]])
+        self.assertEqual(executor.forward_inputs[1][1].tolist(), [[1], [1]])
+
+        second = backend.prefill_chunk([request_a], chunk_size=2)
+
+        self.assertEqual(second, [40])
+        self.assertEqual(request_a.prefill_cursor, 3)
+        self.assertEqual(executor.forward_inputs[-1][0].tolist(), [[3]])
+        self.assertEqual(executor.forward_inputs[-1][1].tolist(), [[2]])
 
     def test_exact_prefix_cache_is_disabled_for_sampling_requests(self):
         module = load_batching_module()
