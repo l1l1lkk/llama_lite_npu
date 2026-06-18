@@ -223,6 +223,12 @@ class _TpCoordinatedContinuousBackend:
         self.channel.send(encode_prefill(requests))
         return self.local_backend.prefill(requests)
 
+    def prefill_chunk(self, requests, chunk_size):
+        from lite_llama.executor.tp_control import encode_prefill_chunk
+
+        self.channel.send(encode_prefill_chunk(requests, chunk_size))
+        return self.local_backend.prefill_chunk(requests, chunk_size)
+
     def decode(self, requests):
         from lite_llama.executor.tp_control import encode_decode
 
@@ -268,17 +274,21 @@ def _tp_continuous_worker_loop():
             break
 
         worker_requests = []
-        if command.operation == "prefill":
+        if command.operation in ("prefill", "prefill_chunk"):
             for index, control_id in enumerate(command.control_ids):
-                request = BatchRequest(
-                    request_id=f"tp-worker-{control_id}",
-                    control_id=control_id,
-                    prompt_tokens=command.prompt_tokens[index],
-                    max_new_tokens=command.max_new_tokens[index],
-                    temperature=command.temperatures[index],
-                    top_p=command.top_ps[index],
-                )
-                requests_by_id[control_id] = request
+                request = requests_by_id.get(control_id)
+                if request is None:
+                    request = BatchRequest(
+                        request_id=f"tp-worker-{control_id}",
+                        control_id=control_id,
+                        prompt_tokens=command.prompt_tokens[index],
+                        max_new_tokens=command.max_new_tokens[index],
+                        temperature=command.temperatures[index],
+                        top_p=command.top_ps[index],
+                    )
+                    requests_by_id[control_id] = request
+                if command.operation == "prefill_chunk":
+                    request.prefill_cursor = command.prefill_cursors[index]
                 worker_requests.append(request)
         else:
             for control_id in command.control_ids:
@@ -292,6 +302,8 @@ def _tp_continuous_worker_loop():
 
         if command.operation == "prefill":
             backend.prefill(worker_requests)
+        elif command.operation == "prefill_chunk":
+            backend.prefill_chunk(worker_requests, command.chunk_size)
         elif command.operation == "decode":
             backend.decode(worker_requests)
         elif command.operation == "release":

@@ -34,8 +34,10 @@ def load_batching_module():
 class FakeBackend:
     def __init__(self):
         self.prefill_tokens = {}
+        self.prefill_chunk_tokens = {}
         self.decode_tokens = {}
         self.prefill_calls = []
+        self.prefill_chunk_calls = []
         self.decode_calls = []
         self.released = []
         self.prefill_errors = []
@@ -49,6 +51,22 @@ class FakeBackend:
             self.prefill_tokens[request.request_id].pop(0)
             for request in requests
         ]
+
+    def prefill_chunk(self, requests, chunk_size):
+        self.prefill_chunk_calls.append(
+            [(request.request_id, request.prefill_cursor, chunk_size) for request in requests]
+        )
+        results = []
+        for request in requests:
+            request.prefill_cursor = min(
+                len(request.model_context_tokens),
+                request.prefill_cursor + int(chunk_size),
+            )
+            if request.prefill_cursor >= len(request.model_context_tokens):
+                results.append(self.prefill_chunk_tokens[request.request_id].pop(0))
+            else:
+                results.append(None)
+        return results
 
     def decode(self, requests):
         self.decode_calls.append([request.request_id for request in requests])
@@ -194,7 +212,7 @@ class ContinuousBatchSchedulerTest(unittest.TestCase):
         self.assertEqual(backend.prefill_calls, [["long"]])
         self.assertEqual(scheduler.pending_count, 1)
 
-    def test_chunked_prefill_defers_long_prompt_and_admits_short_prompt(self):
+    def test_chunked_prefill_starts_long_prompt_without_waiting_for_full_budget(self):
         module = load_batching_module()
         backend = FakeBackend()
         scheduler = module.ContinuousBatchScheduler(
@@ -208,15 +226,50 @@ class ContinuousBatchSchedulerTest(unittest.TestCase):
             chunked_prefill=True,
             prefill_chunk_size=4,
         )
-        backend.prefill_tokens = {"long": [10], "short": [20]}
+        backend.prefill_chunk_tokens = {"long": [10], "short": [20]}
 
         scheduler.submit("long", [1, 2, 3, 4, 5, 6, 7, 8], 4, 0.0, 1.0)
         scheduler.submit("short", [9, 10], 4, 0.0, 1.0)
 
         scheduler.step()
 
-        self.assertEqual(backend.prefill_calls, [["short"]])
+        self.assertEqual(backend.prefill_chunk_calls, [[("long", 0, 4)]])
         self.assertEqual(scheduler.pending_count, 1)
+        self.assertEqual(scheduler.prefilling_count, 1)
+
+    def test_chunked_prefill_executes_long_prompt_across_scheduler_ticks(self):
+        module = load_batching_module()
+        backend = FakeBackend()
+        scheduler = module.ContinuousBatchScheduler(
+            backend=backend,
+            max_batch_size=2,
+            eos_token_id=99,
+            decode_tokens=lambda token_ids: "".join(
+                f"<{token_id}>" for token_id in token_ids
+            ),
+            max_prefill_tokens=2,
+            chunked_prefill=True,
+            prefill_chunk_size=2,
+        )
+        backend.prefill_chunk_tokens = {"long": [10]}
+
+        request = scheduler.submit("long", [1, 2, 3, 4, 5], 4, 0.0, 1.0)
+
+        scheduler.step()
+        self.assertEqual(request.generated_token_ids, [])
+        self.assertEqual(scheduler.prefilling_count, 1)
+
+        scheduler.step()
+        self.assertEqual(request.generated_token_ids, [])
+        self.assertEqual(scheduler.prefilling_count, 1)
+
+        scheduler.step()
+        self.assertEqual(request.generated_token_ids, [10])
+        self.assertEqual(scheduler.prefilling_count, 0)
+        self.assertEqual(
+            backend.prefill_chunk_calls,
+            [[("long", 0, 2)], [("long", 2, 2)], [("long", 4, 2)]],
+        )
 
     def test_decode_token_budget_limits_active_decode_rows(self):
         scheduler, backend = self._make_scheduler(max_batch_size=4)
@@ -498,6 +551,50 @@ class ContinuousBatchModelBackendTest(unittest.TestCase):
         self.assertEqual(executor.shared, [(1, (1, 2, 3))])
         self.assertEqual(second.model_request_id, 1)
         self.assertEqual(backend._device_positions[1].tolist(), 3)
+
+    def test_partial_prefix_cache_hit_replays_only_suffix_tokens(self):
+        module = load_batching_module()
+
+        class PartialPrefixExecutor(FakeExecutor):
+            def __init__(self):
+                super().__init__()
+                self.next_request_id = 3
+                self.lengths[0] = 4
+                self.lengths[1] = 4
+                self.partial_hits = {
+                    (1, 2, 3, 4, 5, 6): (1, 4, None),
+                }
+                self.extended = []
+
+            def share_paged_prefix_from_cache(self, prompt_tokens):
+                return self.partial_hits.get(tuple(prompt_tokens))
+
+            def extend_paged_requests(self, request_ids):
+                self.extended.append(tuple(request_ids))
+                super().extend_paged_requests(request_ids)
+
+        executor = PartialPrefixExecutor()
+        generator = SimpleNamespace(
+            model_executor=executor,
+            tokenizer=SimpleNamespace(eos_token_id=99),
+        )
+        backend = module.ContinuousBatchModelBackend(generator)
+        request = module.BatchRequest("partial", [1, 2, 3, 4, 5, 6], 4, 0.0, 1.0)
+
+        tokens = backend.prefill([request])
+
+        self.assertEqual(tokens, [41])
+        self.assertEqual(request.model_request_id, 1)
+        forwarded_token_ids = [
+            input_ids.tolist()[0][0]
+            for input_ids, _ in executor.forward_inputs
+        ]
+        forwarded_positions = [
+            position_ids.tolist()[0][0]
+            for _, position_ids in executor.forward_inputs
+        ]
+        self.assertEqual(forwarded_token_ids, [5, 6])
+        self.assertEqual(forwarded_positions, [4, 5])
 
     def test_exact_prefix_cache_is_disabled_for_sampling_requests(self):
         module = load_batching_module()

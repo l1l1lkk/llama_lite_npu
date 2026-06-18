@@ -9,7 +9,7 @@
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.7-orange)
 ![Ascend](https://img.shields.io/badge/Ascend-910B3-red)
-![Version](https://img.shields.io/badge/version-0.0.7rc4-blue)
+![Version](https://img.shields.io/badge/version-0.0.7rc5-blue)
 ![Status](https://img.shields.io/badge/status-active_development-yellow)
 
 </div>
@@ -29,15 +29,15 @@ Lite Llama NPU 的目标不是封装 Transformers，而是实现一条可以观�
 
 ## 最新版本
 
-Current version: **0.0.7rc4** (2026-06-17)
+Current version: **0.0.7rc5** (2026-06-18)
 
-- [v0.0.7rc4 release report](docs/releases/v0.0.7rc4.md)
+- [v0.0.7rc5 release report](docs/releases/v0.0.7rc5.md)
 - [完整CHANGELOG](CHANGELOG.md)
 - [版本管理与发布规范](docs/versioning.md)
 - [推理性能历史记录](docs/inference_performance_history.md)
 - [文档索引](docs/README.md)
 
-`v0.0.7rc4` adds exact-prompt live Prefix Cache for greedy repeated prompts and chunked-prefill scheduling interleaving for mixed long/short prompt workloads. Random prompts should not show Prefix Cache gains.
+`v0.0.7rc5` adds page-aligned partial Prefix Cache reuse for greedy prefix-extension prompts and real multi-tick chunked-prefill execution. Random prompts without shared prefixes should not show Prefix Cache gains.
 
 ## 主要能力
 
@@ -109,7 +109,9 @@ Current version: **0.0.7rc4** (2026-06-17)
   - Paged KV pages now carry live refcounts for safe shared-page ownership;
   - KV-pressure preemption can release/requeue active requests and rebuild context from prompt plus generated tokens;
   - Exact-prompt Prefix Cache is wired into greedy continuous batching and can skip repeated-prompt prefill;
-  - Chunked Prefill currently improves admission/interleaving for long prompts, while true suffix-prefill execution remains future work.
+  - Page-aligned partial Prefix Cache reuse can share cached KV pages and replay only the uncached suffix;
+  - Chunked Prefill can process long prompts across scheduler ticks for decode/prefill interleaving;
+  - Mixed-length packed prefill metadata exists, while no-padding packed prefill kernels remain future work.
   - Ascend PyTorch Profiler；
   - CPU、CANN、NPU 算子、HBM 和 HCCL 通信数据；
   - MindStudio Insight Timeline、算子、内存和集群分析。
@@ -547,7 +549,7 @@ Profiler 数据通常包含：
 - TP 通信为同步 AllReduce/AllGather，尚未实现计算通信重叠；
 - 当前只支持单机多卡；设备映射、进程组和权重加载尚未完成多机适配；
 - Q+KV、Gate+Up 尚未融合；
-- v0.0.7rc4 Exact Prefix Cache only benefits repeated greedy prompts; random datasets should not show cache gains;
+- v0.0.7rc5 Prefix Cache benefits exact repeated greedy prompts and page-aligned greedy prefix-extension prompts; random datasets without shared prefixes should not show cache gains;
 - Top-P Vocab Parallel Sampling在候选集无法覆盖精确nucleus时会回退完整Logits Gather；
 - Continuous Batching的Rank 0仍需每Step执行一次批量Token D2H以服务HTTP流式输出；
 - Qwen3 MoE TP Graph兼容性取决于CANN、torch_npu、GMM、Triton和HCCL版本；不兼容时按Bucket回退Eager；

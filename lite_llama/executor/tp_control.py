@@ -18,12 +18,14 @@ _OP_PREFILL = 1
 _OP_DECODE = 2
 _OP_RELEASE = 3
 _OP_SHUTDOWN = 4
+_OP_PREFILL_CHUNK = 5
 
 _OPERATION_NAMES = {
     _OP_PREFILL: "prefill",
     _OP_DECODE: "decode",
     _OP_RELEASE: "release",
     _OP_SHUTDOWN: "shutdown",
+    _OP_PREFILL_CHUNK: "prefill_chunk",
 }
 
 
@@ -34,6 +36,8 @@ class DecodedCommand(NamedTuple):
     max_new_tokens: list[int]
     temperatures: list[float]
     top_ps: list[float]
+    prefill_cursors: list[int] = []
+    chunk_size: int = 0
 
 
 def _header(operation: int, batch_size: int, ints, floats):
@@ -57,6 +61,26 @@ def encode_prefill(requests):
         )
         floats.extend([float(request.temperature), float(request.top_p)])
     return _header(_OP_PREFILL, len(requests), integers, floats), integers, floats
+
+
+def encode_prefill_chunk(requests, chunk_size: int):
+    integers: list[int] = [int(chunk_size)]
+    floats: list[float] = []
+    for request in requests:
+        if request.control_id is None:
+            raise RuntimeError("continuous batching request has no control_id")
+        prompt_tokens = [int(token) for token in request.prompt_tokens]
+        integers.extend(
+            [
+                int(request.control_id),
+                int(request.max_new_tokens),
+                int(getattr(request, "prefill_cursor", 0)),
+                len(prompt_tokens),
+                *prompt_tokens,
+            ]
+        )
+        floats.extend([float(request.temperature), float(request.top_p)])
+    return _header(_OP_PREFILL_CHUNK, len(requests), integers, floats), integers, floats
 
 
 def _encode_ids(operation: int, control_ids: Sequence[int]):
@@ -96,6 +120,8 @@ def decode_command(header, integers, floats) -> DecodedCommand:
     if integer_count != len(integers) or float_count != len(floats):
         raise RuntimeError("TP command payload length does not match header")
 
+    prefill_cursors: list[int] = []
+    chunk_size = 0
     if operation == "prefill":
         control_ids: list[int] = []
         prompt_tokens: list[list[int]] = []
@@ -117,6 +143,34 @@ def decode_command(header, integers, floats) -> DecodedCommand:
             raise RuntimeError("invalid TP prefill payload")
         temperatures = floats[0::2]
         top_ps = floats[1::2]
+    elif operation == "prefill_chunk":
+        control_ids = []
+        prompt_tokens = []
+        max_new_tokens = []
+        prefill_cursors = []
+        if not integers:
+            raise RuntimeError("missing TP prefill_chunk chunk size")
+        chunk_size = int(integers[0])
+        cursor = 1
+        for _ in range(batch_size):
+            if cursor + 4 > len(integers):
+                raise RuntimeError("truncated TP prefill_chunk metadata")
+            control_id, max_new, prefill_cursor, prompt_length = integers[
+                cursor : cursor + 4
+            ]
+            cursor += 4
+            end = cursor + prompt_length
+            if end > len(integers):
+                raise RuntimeError("truncated TP prefill_chunk prompt")
+            control_ids.append(control_id)
+            max_new_tokens.append(max_new)
+            prefill_cursors.append(prefill_cursor)
+            prompt_tokens.append(integers[cursor:end])
+            cursor = end
+        if cursor != len(integers) or len(floats) != batch_size * 2:
+            raise RuntimeError("invalid TP prefill_chunk payload")
+        temperatures = floats[0::2]
+        top_ps = floats[1::2]
     else:
         if len(integers) != batch_size or floats:
             raise RuntimeError(f"invalid TP {operation} payload")
@@ -133,6 +187,8 @@ def decode_command(header, integers, floats) -> DecodedCommand:
         max_new_tokens=max_new_tokens,
         temperatures=temperatures,
         top_ps=top_ps,
+        prefill_cursors=prefill_cursors,
+        chunk_size=chunk_size,
     )
 
 

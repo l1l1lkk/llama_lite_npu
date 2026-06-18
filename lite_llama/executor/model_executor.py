@@ -504,6 +504,57 @@ class ModelExecutor:
             return None
         return int(req_idx), int(first_token_id)
 
+    def share_paged_prefix_from_cache(
+        self, prompt_tokens: list[int] | tuple[int, ...]
+    ) -> tuple[int, int, int | None] | None:
+        """Share the longest cached page-aligned prefix for a prompt.
+
+        Returns ``(request_id, matched_tokens, first_token_id)``.  For exact
+        prompt hits, ``first_token_id`` is the cached first generated token and
+        the caller can skip prefill entirely.  For partial prefix hits,
+        ``first_token_id`` is ``None`` and the caller must replay only the
+        suffix tokens.
+        """
+        if not self.use_paged_attn:
+            return None
+        prompt_key = tuple(int(t) for t in prompt_tokens)
+        if not prompt_key:
+            return None
+
+        exact = self._paged_prefix_cache.get(prompt_key)
+        if exact is not None:
+            self._paged_prefix_cache.move_to_end(prompt_key)
+            page_indices, num_tokens, first_token_id = exact
+            req_idx = self.req_tokens_manager.reserve_shared_req(
+                page_indices, num_tokens
+            )
+            if req_idx is None:
+                return None
+            return int(req_idx), len(prompt_key), int(first_token_id)
+
+        best_key: tuple[int, ...] | None = None
+        best_pages = None
+        best_tokens = 0
+        page_size = int(self.page_size)
+        for cached_key, (page_indices, _, _) in self._paged_prefix_cache.items():
+            common = 0
+            max_common = min(len(prompt_key), len(cached_key))
+            while common < max_common and prompt_key[common] == cached_key[common]:
+                common += 1
+            matched_tokens = (common // page_size) * page_size
+            if matched_tokens > best_tokens:
+                best_key = cached_key
+                best_pages = page_indices
+                best_tokens = matched_tokens
+
+        if best_key is None or best_pages is None or best_tokens <= 0:
+            return None
+        req_idx = self.req_tokens_manager.reserve_shared_req(best_pages, best_tokens)
+        if req_idx is None:
+            return None
+        self._paged_prefix_cache.move_to_end(best_key)
+        return int(req_idx), int(best_tokens), None
+
     def store_paged_request_prefix(
         self,
         prompt_tokens: list[int] | tuple[int, ...],

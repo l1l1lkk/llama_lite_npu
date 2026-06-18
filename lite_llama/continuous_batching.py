@@ -86,6 +86,7 @@ class BatchRequest:
         self.top_p = top_p
         self.generated_token_ids: list[int] = []
         self.preemptions = 0
+        self.prefill_cursor = 0
         self.prefill_credit_tokens = 0
         self.decoded_text = ""
         self.model_request_id: int | None = None
@@ -219,6 +220,7 @@ class ContinuousBatchScheduler:
         if self.max_preemptions < 0:
             raise ValueError("max_preemptions must be non-negative")
         self._pending: deque[BatchRequest] = deque()
+        self._prefilling: list[BatchRequest] = []
         self._active: list[BatchRequest] = []
         self._lock = Lock()
         self._next_control_id = 0
@@ -242,6 +244,10 @@ class ContinuousBatchScheduler:
     @property
     def active_count(self) -> int:
         return len(self._active)
+
+    @property
+    def prefilling_count(self) -> int:
+        return len(self._prefilling)
 
     def submit(
         self,
@@ -311,32 +317,53 @@ class ContinuousBatchScheduler:
                     request.finish("cancelled")
                     continue
 
-                total_tokens = len(request.model_context_tokens)
-                if (
-                    total_tokens > self.prefill_chunk_size
-                    and request.prefill_credit_tokens + self.prefill_chunk_size < total_tokens
-                ):
-                    request.prefill_credit_tokens += self.prefill_chunk_size
-                    self._pending.rotate(-1)
-                    continue
-
-                token_cost = total_tokens
+                remaining_tokens = max(
+                    0, len(request.model_context_tokens) - request.prefill_cursor
+                )
+                token_cost = min(remaining_tokens, self.prefill_chunk_size)
                 if remaining_prefill_tokens is not None:
                     if token_cost > remaining_prefill_tokens:
                         if admitted:
                             break
-                        # Ready long requests are allowed to run alone after
-                        # accumulating chunk credit, preserving progress.
+                        # Avoid starvation: one oversized chunk may run alone.
                         remaining_prefill_tokens = 0
                     else:
                         remaining_prefill_tokens -= token_cost
 
                 admitted.append(self._pending.popleft())
                 capacity -= 1
-                request.prefill_credit_tokens = 0
                 if remaining_prefill_tokens == 0:
                     break
         return admitted
+
+    def _select_prefill_chunk_requests(
+        self, requests: Sequence[BatchRequest]
+    ) -> tuple[list[BatchRequest], list[BatchRequest]]:
+        if not self.chunked_prefill or self.prefill_chunk_size is None:
+            return list(requests), []
+        if self.max_prefill_tokens is None:
+            return list(requests), []
+        selected: list[BatchRequest] = []
+        deferred: list[BatchRequest] = []
+        remaining_budget = self.max_prefill_tokens
+        for index, request in enumerate(requests):
+            token_cost = min(
+                max(0, len(request.model_context_tokens) - request.prefill_cursor),
+                self.prefill_chunk_size,
+            )
+            if token_cost > remaining_budget and selected:
+                deferred.extend(requests[index:])
+                break
+            if token_cost > remaining_budget:
+                selected.append(request)
+                deferred.extend(requests[index + 1:])
+                break
+            selected.append(request)
+            remaining_budget = max(0, remaining_budget - token_cost)
+            if remaining_budget == 0:
+                deferred.extend(requests[index + 1:])
+                break
+        return selected, deferred
 
     def _select_decode_requests(
         self, requests: Sequence[BatchRequest]
@@ -433,11 +460,52 @@ class ContinuousBatchScheduler:
         decode_active, deferred_active = self._select_decode_requests(
             prior_active
         )
-        admitted = self._admit(self.max_batch_size - len(prior_active))
-        did_work = bool(decode_active or admitted or deferred_active)
+        admitted = self._admit(
+            self.max_batch_size - len(prior_active) - len(self._prefilling)
+        )
+        prefilling_candidates = self._prefilling + admitted
+        prefill_work: list[BatchRequest] = []
+        deferred_prefilling: list[BatchRequest] = []
+        if self.chunked_prefill and self.prefill_chunk_size is not None:
+            prefill_work, deferred_prefilling = self._select_prefill_chunk_requests(
+                prefilling_candidates
+            )
+        did_work = bool(
+            decode_active or admitted or deferred_active or self._prefilling
+        )
         uncommitted_admitted = list(admitted)
 
         try:
+            if self.chunked_prefill and self.prefill_chunk_size is not None:
+                if decode_active:
+                    decode_tokens = self.backend.decode(decode_active)
+                    self._apply_tokens(decode_active, decode_tokens)
+                    decode_active = self._release_finished(decode_active)
+
+                completed_prefill: list[BatchRequest] = []
+                if prefill_work:
+                    prefill_tokens = self.backend.prefill_chunk(
+                        prefill_work, self.prefill_chunk_size
+                    )
+                    for request, token_id in zip(prefill_work, prefill_tokens):
+                        if token_id is None:
+                            continue
+                        self._apply_tokens([request], [int(token_id)])
+                        completed_prefill.append(request)
+                    completed_prefill = self._release_finished(completed_prefill)
+                    uncommitted_admitted = []
+
+                incomplete_prefill = [
+                    request
+                    for request in prefill_work
+                    if request not in completed_prefill
+                    and not request.finished
+                    and not request.cancelled
+                ]
+                self._prefilling = deferred_prefilling + incomplete_prefill
+                self._active = deferred_active + decode_active + completed_prefill
+                return did_work
+
             if admitted:
                 prefill_tokens = self.backend.prefill(admitted)
                 self._apply_tokens(admitted, prefill_tokens)
@@ -485,6 +553,11 @@ class ContinuousBatchScheduler:
             for request in self._active:
                 request.finish("cancelled")
             self._active = []
+        if self._prefilling:
+            self.backend.release(self._prefilling)
+            for request in self._prefilling:
+                request.finish("cancelled")
+            self._prefilling = []
 
 
 class ContinuousBatchModelBackend:
@@ -551,6 +624,91 @@ class ContinuousBatchModelBackend:
             return []
         return sampled.detach().cpu().tolist()
 
+    def _cache_lookup(
+        self, request: BatchRequest
+    ) -> tuple[int, int, int | None] | None:
+        context_tokens = request.model_context_tokens
+        if request.temperature != 0:
+            return None
+        if hasattr(self.executor, "share_paged_prefix_from_cache"):
+            cached = self.executor.share_paged_prefix_from_cache(context_tokens)
+            if cached is not None:
+                req_idx, matched_tokens, token_id = cached
+                return int(req_idx), int(matched_tokens), (
+                    None if token_id is None else int(token_id)
+                )
+        if hasattr(self.executor, "share_paged_request_from_cache"):
+            cached = self.executor.share_paged_request_from_cache(context_tokens)
+            if cached is not None:
+                req_idx, token_id = cached
+                return int(req_idx), len(context_tokens), int(token_id)
+        return None
+
+    def _ensure_incremental_request(self, request: BatchRequest) -> None:
+        if request.model_request_id is not None:
+            return
+        request_ids = self.executor.reserve_paged_requests((1,))
+        request.model_request_id = int(request_ids[0])
+        request.prefill_cursor = 0
+
+    def _run_prefill_chunk_incremental(
+        self,
+        request: BatchRequest,
+        chunk_size: int | None,
+    ) -> int | None:
+        import torch
+
+        context_tokens = request.model_context_tokens
+        if not context_tokens:
+            raise RuntimeError("empty prompts are not supported by chunked prefill")
+        self._ensure_incremental_request(request)
+        req_idx = int(request.model_request_id)
+        end = len(context_tokens)
+        if chunk_size is not None:
+            end = min(end, request.prefill_cursor + int(chunk_size))
+        logits = None
+        while request.prefill_cursor < end:
+            position = request.prefill_cursor
+            while self.executor.req_tokens_manager.req_token_count[req_idx] <= position:
+                self.executor.extend_paged_requests((req_idx,))
+            self.executor.activate_paged_decode_batch((req_idx,))
+            input_ids = torch.tensor(
+                [[int(context_tokens[position])]],
+                dtype=torch.long,
+                device=self.executor.device,
+            )
+            position_ids = torch.tensor(
+                [[int(position)]],
+                dtype=torch.long,
+                device=self.executor.device,
+            )
+            logits = self.executor.forward(input_ids, position_ids)
+            request.prefill_cursor += 1
+        if request.prefill_cursor < len(context_tokens):
+            return None
+        if logits is None:
+            raise RuntimeError("prefill produced no logits")
+        sampled = self._sample_device(logits, [request])
+        self._remember_sampled_tokens(
+            [request],
+            sampled,
+            initial_positions=[len(context_tokens)],
+        )
+        self.executor.extend_paged_requests((req_idx,))
+        host_tokens = self._tokens_to_host(sampled)
+        token_id = (
+            int(sampled.detach().cpu().tolist()[0])
+            if not self.return_host_tokens
+            else int(host_tokens[0])
+        )
+        if hasattr(self.executor, "store_paged_request_prefix") and request.temperature == 0:
+            self.executor.store_paged_request_prefix(
+                context_tokens,
+                req_idx,
+                token_id,
+            )
+        return None if not self.return_host_tokens else token_id
+
     def prefill(self, requests: Sequence[BatchRequest]) -> Sequence[int]:
         import torch
 
@@ -560,17 +718,19 @@ class ContinuousBatchModelBackend:
         cache_misses: list[tuple[int, BatchRequest]] = []
         for index, request in enumerate(requests):
             context_tokens = request.model_context_tokens
-            cached = None
-            if (
-                request.temperature == 0
-                and hasattr(self.executor, "share_paged_request_from_cache")
-            ):
-                cached = self.executor.share_paged_request_from_cache(context_tokens)
+            cached = self._cache_lookup(request)
             if cached is None:
                 cache_misses.append((index, request))
                 continue
-            req_idx, token_id = cached
+            req_idx, matched_tokens, token_id = cached
             request.model_request_id = int(req_idx)
+            request.prefill_cursor = int(matched_tokens)
+            if token_id is None:
+                token_id = self._run_prefill_chunk_incremental(request, None)
+                if token_id is None and self.return_host_tokens:
+                    raise RuntimeError("partial prefix replay did not produce a token")
+                results[index] = token_id
+                continue
             sampled = torch.tensor(
                 [int(token_id)], dtype=torch.long, device=self.executor.device
             )
@@ -658,6 +818,38 @@ class ContinuousBatchModelBackend:
         if not self.return_host_tokens:
             return []
         return [int(token_id) for token_id in results]
+
+    def prefill_chunk(
+        self,
+        requests: Sequence[BatchRequest],
+        chunk_size: int,
+    ) -> Sequence[int | None]:
+        results: list[int | None] = []
+        for request in requests:
+            cached = None
+            if request.model_request_id is None:
+                cached = self._cache_lookup(request)
+            if cached is not None:
+                req_idx, matched_tokens, token_id = cached
+                request.model_request_id = int(req_idx)
+                request.prefill_cursor = int(matched_tokens)
+                if token_id is not None:
+                    import torch
+
+                    sampled = torch.tensor(
+                        [int(token_id)], dtype=torch.long, device=self.executor.device
+                    )
+                    self._remember_sampled_tokens(
+                        [request],
+                        sampled,
+                        initial_positions=[len(request.model_context_tokens)],
+                    )
+                    results.append(int(token_id) if self.return_host_tokens else None)
+                    continue
+            results.append(
+                self._run_prefill_chunk_incremental(request, int(chunk_size))
+            )
+        return results
 
     def decode(self, requests: Sequence[BatchRequest]) -> Sequence[int]:
         import torch

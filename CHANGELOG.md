@@ -2,6 +2,27 @@
 
 所有触发版本升级的变更按发布时间倒序记录。详细规则见[版本管理与发布规范](docs/versioning.md)。
 
+## [0.0.7rc5] - 2026-06-18
+
+KV-cache optimization closeout for the v0.0.7 line.
+
+### Core changes
+
+- Added live page-aligned partial prefix reuse for greedy requests. Exact prompt hits still skip prefill entirely; prefix-extension prompts now share cached pages and replay only the uncached suffix.
+- Changed chunked prefill from admission-only scheduling into a real multi-tick execution path using safe incremental prompt replay.
+- Added TP continuous-batching `prefill_chunk` control messages so worker ranks mirror chunked prefill state correctly.
+- Kept mixed-length packed prefill as a tested metadata contract; no-padding packed prefill kernels remain future work.
+
+### Compatibility and limitations
+
+- Prefix reuse remains disabled for sampling requests (`temperature>0`).
+- Partial suffix replay is correctness-first and token-by-token; expected benefit is TTFT reduction on repeated prefixes, not maximum raw prefill throughput.
+- No Atlas performance number is recorded yet.
+
+### Docs
+
+- [v0.0.7rc5 release report](docs/releases/v0.0.7rc5.md)
+
 ## [0.0.7rc4] - 2026-06-17
 
 Runtime-benefit release for the v0.0.7 scheduler/KV-engine line.

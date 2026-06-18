@@ -124,6 +124,30 @@ class TensorCommandCodecTest(unittest.TestCase):
         self.assertEqual(shutdown.operation, "shutdown")
         self.assertEqual(shutdown.control_ids, [])
 
+    def test_prefill_chunk_round_trip(self):
+        module = load_module()
+        requests = [
+            SimpleNamespace(
+                control_id=4,
+                prompt_tokens=[10, 11, 12],
+                max_new_tokens=32,
+                temperature=0.0,
+                top_p=1.0,
+                prefill_cursor=2,
+            )
+        ]
+
+        decoded = module.decode_command(*module.encode_prefill_chunk(requests, 64))
+
+        self.assertEqual(decoded.operation, "prefill_chunk")
+        self.assertEqual(decoded.control_ids, [4])
+        self.assertEqual(decoded.prompt_tokens, [[10, 11, 12]])
+        self.assertEqual(decoded.max_new_tokens, [32])
+        self.assertEqual(decoded.temperatures, [0.0])
+        self.assertEqual(decoded.top_ps, [1.0])
+        self.assertEqual(decoded.prefill_cursors, [2])
+        self.assertEqual(decoded.chunk_size, 64)
+
 
 if __name__ == "__main__":
     unittest.main()
