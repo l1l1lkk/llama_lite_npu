@@ -15,6 +15,9 @@
 
 | 日期 | 项目版本 | 模型 | 测试工具 | TP / Batch或并发 | 输入 / 输出 | NPU Graph | 执行路径 | 核心吞吐 | 单Token指标 | 备注 |
 |---|---|---|---|---|---|---|---|---:|---:|---|
+| 2026-06-18 | 0.0.7rc6 | Qwen3-32B | EvalScope | TP=2 / concurrency=1 | avg 184.0 / 255.95 | enabled | Continuous Batching; Greedy; exact Prefix Cache on by default; partial Prefix Cache off | Output 24.3149 tok/s; Total 41.7947 tok/s | TTFT 706.3ms; TPOT 38.5ms; ITL 38.4ms | 20 requests; random dataset; rc5 default-partial regression fixed |
+| 2026-06-18 | 0.0.7rc6 | Qwen3-32B | EvalScope | TP=2 / concurrency=4 | avg 184.0 / 215.775 | enabled | Continuous Batching; Greedy; exact Prefix Cache on by default; partial Prefix Cache off | Output 62.4598 tok/s; Total 115.7218 tok/s | TTFT 1502.2ms; TPOT 65.0ms; ITL 56.8ms | 40 requests; random dataset; average output shorter than 256, compare with caution |
+| 2026-06-18 | 0.0.7rc6 | Qwen3-32B | `benchmark_prefix_cache.py` | TP=2 / concurrency=1 | approx 62 / 256 | enabled | same prompt; Exact Prefix Cache | Output 26.56 tok/s/request-time; Wall 388.45 tok/s/wall | Avg TTFT 22.9ms; P50 TTFT 6.0ms | 20 requests; first request TTFT 344ms, later requests about 5-6ms |
 | 2026-06-17 | 0.0.6rc2 | Qwen3-32B | `benchmark_tp.py` | TP=2 / Batch=4 | 约128 / 256 | 开启 | Batch级Vocab Parallel Greedy；temperature=0；Top-P inactive | 22.1 tok/s；Batch 88.6 tok/s | 45.16 ms/token | 5次平均11.560s；模型与KV约54.3GB；Graph attempts=3、captured=3、replays=1785、fallbacks=0 |
 | 2026-06-17 | 0.0.6rc2 | Qwen3-32B | `benchmark_tp.py` | TP=2 / Batch=4 | 约128 / 256 | 开启 | 精确Vocab Parallel Top-P；temperature=0.6、top_p=0.9 | 17.9 tok/s；Batch 71.7 tok/s | 55.83 ms/token | 5次平均14.293s；模型与KV约54.3GB；Graph attempts=3、captured=3、replays=1785、fallbacks=0 |
 | 2026-06-12 | 0.0.5rc2 | Qwen3-32B | `benchmark_tp.py` | TP=2 / Batch=4 | 约128 / 256 | 开启 | 完整词表Logits AllGather + Greedy；temperature=0 | 21.3 tok/s；Batch 85.0 tok/s | 47.04 ms/token | 5次平均12.043s；模型与KV约54.2GB；Graph attempts=3、captured=3、replays=1785、fallbacks=0 |
@@ -233,3 +236,57 @@ Compared with the random-prompt baseline:
 - Output throughput by request-time improves from 23.04 tok/s to 26.68 tok/s, about +15.8%.
 
 Caveat: the repeated prompt and random prompt runs do not have identical input-token counts (`Avg total tokens` differs), so total latency is not a pure cache-only comparison. The TTFT collapse after the first repeated request is the strongest evidence that Prefix Cache reuse is working.
+
+## 2026-06-18 v0.0.7rc6 EvalScope and Prefix Cache Measurements
+
+Environment and command shape:
+
+- Model: Qwen3-32B
+- Hardware: 2 x Atlas 910B3
+- Runtime: OpenAI-compatible `server.py` with Continuous Batching enabled
+- Branch/version: `release/0.0.7rc6`
+- TP: 2
+- PagedAttention: `page_size=16`
+- Decode NPU Graph: enabled by server startup option
+- Partial Prefix Cache: disabled for EvalScope random tests; exact Prefix Cache remains enabled by default
+- Dataset: EvalScope random for throughput tests; `examples/benchmark_prefix_cache.py` for cache tests
+- Stream: enabled
+
+### Raw results
+
+| Test | Tool | Concurrency | Requests | Temperature / Top-p | Avg input tokens | Avg output tokens | Output throughput | Total throughput | Req throughput | Avg latency | TTFT | TPOT | ITL |
+|---|---|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `v007rc6_greedy_p1` | EvalScope random | 1 | 20 | temperature=0 | 184.0 | 255.95 | 24.3149 tok/s | 41.7947 tok/s | 0.0950 req/s | 10.5259 s | 0.7063 s | 0.0385 s | 0.0384 s |
+| `v007rc6_greedy_p4` | EvalScope random | 4 | 40 | temperature=0 | 184.0 | 215.775 | 62.4598 tok/s | 115.7218 tok/s | 0.2895 req/s | 13.7312 s | 1.5022 s | 0.0650 s | 0.0568 s |
+| `same` | Prefix cache script | 1 | 20 | temperature=0 | ~62.0 | 256.0 | 26.56 tok/s/request-time | 388.45 tok/s/wall | n/a | 9.6386 s | 0.0229 s | n/a | n/a |
+| `random` | Prefix cache script | 1 | 20 | temperature=0 | ~312.5 | 256.0 | 12.37 tok/s/request-time | 231.10 tok/s/wall | n/a | 20.6874 s | 10.7590 s | n/a | n/a |
+
+### Interpretation
+
+The `v0.0.7rc6` EvalScope random result confirms the `v0.0.7rc5` TTFT regression was fixed:
+
+- `v0.0.7rc5` greedy p1 random had Output 16.4127 tok/s and TTFT 5.8119 s.
+- `v0.0.7rc6` greedy p1 random has Output 24.3149 tok/s and TTFT 0.7063 s.
+- Output throughput recovered by about 48.1% relative to the rc5 regression run.
+- TTFT dropped by about 87.8%.
+- ITL is 38.4ms, essentially the same decode speed as the healthy v0.0.7 line.
+
+Compared with `v0.0.7rc1` greedy p1 random:
+
+- Output throughput is 24.3149 vs 24.2603 tok/s, effectively unchanged (+0.2%).
+- TTFT is 0.7063 vs 0.6670 s. The new run also has a longer measured input length: 184 vs 156 tokens, so the small TTFT increase is expected.
+- Decode ITL is 38.4ms vs 38.6ms, effectively unchanged.
+
+For concurrency 4:
+
+- Output throughput is 62.4598 tok/s, close to the previous v0.0.7rc1 value of 63.3523 tok/s.
+- Total throughput is higher, 115.7218 vs 102.2360 tok/s, but this run has longer inputs and shorter average outputs, so total throughput is not a clean improvement signal.
+- TTFT improved from 2.2958s in rc1 to 1.5022s in this run, but TPOT worsened from 53.0ms to 65.0ms. Because average output tokens dropped from 254.125 to 215.775, this run should be treated as broadly comparable rather than strictly faster.
+
+The prefix cache script shows exact Prefix Cache is still working:
+
+- First repeated prompt TTFT: 0.344s.
+- Requests 2-20 TTFT: about 5-6ms.
+- Avg TTFT: 22.9ms.
+
+The `benchmark_prefix_cache.py random` result is not directly comparable to EvalScope random. It produced about 312.5 input tokens per request (`568.5 total - 256 output`), while EvalScope random used 184 input tokens. Its high TTFT around 10.76s is therefore a long-prefill/no-cache control case, not evidence that rc6 random serving is slow.
