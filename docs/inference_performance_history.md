@@ -194,3 +194,42 @@ v0.0.7rc1 introduced token-budget scheduling and KV metadata foundations. In thi
 - Aggregate output throughput gain from concurrency batching: +39.092 tok/s, +161.1%.
 
 This should be treated as a server-scheduling gain, not a MatMul/kernel-level gain.
+
+## 2026-06-18 v0.0.7rc4 Prefix Cache Server Measurements
+
+Environment and command shape:
+
+- Model: Qwen3-32B
+- Runtime: OpenAI-compatible `server.py`
+- Benchmark script: `examples/benchmark_prefix_cache.py`
+- Requests: 20
+- Concurrency: 1
+- Max output tokens: 256
+- Temperature: 0
+- Stream: enabled
+- Thinking: off
+
+### Raw results
+
+| Dataset | Requests | Success | Avg latency | P50 / P90 / P99 latency | Avg TTFT | P50 / P90 / P99 TTFT | Avg output tokens | Output throughput | Avg total tokens |
+|---|---:|---:|---:|---|---:|---|---:|---:|---:|
+| `same` | 20 | 20 | 9.5967 s | 9.4165 / 9.4432 / 12.9406 s | 0.0232 s | 0.0057 / 0.0067 / 0.3509 s | 256.0 | 26.68 tok/s/request-time | 318.0 |
+| `random` | 20 | 20 | 11.1117 s | 11.1857 / 11.2068 / 12.4304 s | 1.2658 s | 1.1005 / 1.4423 / 1.4451 s | 256.0 | 23.04 tok/s/request-time | 517.5 |
+
+### Prefix Cache effect
+
+The repeated-prompt run shows a clear Prefix Cache hit pattern:
+
+- Request 1 TTFT: 0.351 s.
+- Requests 2-20 TTFT: stable around 0.005-0.008 s.
+- Cached-request average TTFT after excluding the first request: about 0.006 s.
+- Random prompts stay around 1.09-1.44 s TTFT and do not show cache reuse.
+
+Compared with the random-prompt baseline:
+
+- Average TTFT drops from 1.2658 s to 0.0232 s, about 54.6x lower.
+- P50 TTFT drops from 1.1005 s to 0.0057 s, about 193x lower.
+- Average latency drops from 11.1117 s to 9.5967 s, about 13.6% lower.
+- Output throughput by request-time improves from 23.04 tok/s to 26.68 tok/s, about +15.8%.
+
+Caveat: the repeated prompt and random prompt runs do not have identical input-token counts (`Avg total tokens` differs), so total latency is not a pure cache-only comparison. The TTFT collapse after the first repeated request is the strongest evidence that Prefix Cache reuse is working.
