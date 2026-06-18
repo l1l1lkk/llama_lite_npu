@@ -563,11 +563,17 @@ class ContinuousBatchScheduler:
 class ContinuousBatchModelBackend:
     """Paged-KV model adapter used by :class:`ContinuousBatchScheduler`."""
 
-    def __init__(self, generator, return_host_tokens: bool = True) -> None:
+    def __init__(
+        self,
+        generator,
+        return_host_tokens: bool = True,
+        enable_partial_prefix_cache: bool = False,
+    ) -> None:
         self.generator = generator
         self.executor = generator.model_executor
         self.tokenizer = generator.tokenizer
         self.return_host_tokens = bool(return_host_tokens)
+        self.enable_partial_prefix_cache = bool(enable_partial_prefix_cache)
         self._device_tokens: dict[int, object] = {}
         self._device_positions: dict[int, object] = {}
         if not self.executor.use_paged_attn:
@@ -630,7 +636,9 @@ class ContinuousBatchModelBackend:
         context_tokens = request.model_context_tokens
         if request.temperature != 0:
             return None
-        if hasattr(self.executor, "share_paged_prefix_from_cache"):
+        if self.enable_partial_prefix_cache and hasattr(
+            self.executor, "share_paged_prefix_from_cache"
+        ):
             cached = self.executor.share_paged_prefix_from_cache(context_tokens)
             if cached is not None:
                 req_idx, matched_tokens, token_id = cached

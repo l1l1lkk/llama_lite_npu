@@ -93,6 +93,7 @@ _tp_lock = None  # threading.Lock for single-request-at-a-time in TP mode
 _continuous_batching = False
 _continuous_backend = None
 _continuous_scheduler = None
+_partial_prefix_cache = False
 _scheduler_thread = None
 _scheduler_stop = None
 _scheduler_poll_seconds = 0.001
@@ -265,6 +266,7 @@ def _tp_continuous_worker_loop():
     backend = ContinuousBatchModelBackend(
         _generator,
         return_host_tokens=False,
+        enable_partial_prefix_cache=_partial_prefix_cache,
     )
     channel = StoreCommandChannel()
     requests_by_id = {}
@@ -329,6 +331,7 @@ def _start_continuous_scheduler(
     chunked_prefill: bool = False,
     prefill_chunk_size: int | None = None,
     max_preemptions: int = 1,
+    partial_prefix_cache: bool = False,
 ) -> None:
     global _continuous_backend, _continuous_scheduler
     global _scheduler_thread, _scheduler_stop, _scheduler_poll_seconds
@@ -338,7 +341,10 @@ def _start_continuous_scheduler(
         ContinuousBatchScheduler,
     )
 
-    local_backend = ContinuousBatchModelBackend(_generator)
+    local_backend = ContinuousBatchModelBackend(
+        _generator,
+        enable_partial_prefix_cache=partial_prefix_cache,
+    )
     _continuous_backend = (
         _TpCoordinatedContinuousBackend(local_backend)
         if _is_tp
@@ -1008,6 +1014,15 @@ def main():
         ),
     )
     parser.add_argument(
+        "--partial_prefix_cache",
+        action="store_true",
+        help=(
+            "Enable page-aligned partial Prefix Cache reuse. Disabled by "
+            "default because suffix replay is correctness-first and can slow "
+            "random prompt benchmarks."
+        ),
+    )
+    parser.add_argument(
         "--chunked_prefill",
         action="store_true",
         help=(
@@ -1044,11 +1059,12 @@ def main():
 
     # Detect TP
     from lite_llama.executor.tp_utils import detect_tp_env
-    global _rank, _is_tp, _continuous_batching
+    global _rank, _is_tp, _continuous_batching, _partial_prefix_cache
     tp = detect_tp_env()
     _rank = tp.rank if tp else 0
     _is_tp = tp is not None and tp.enabled
     _continuous_batching = args.continuous_batching
+    _partial_prefix_cache = bool(args.partial_prefix_cache)
 
     device = f"npu:{_rank}" if _is_tp else get_device(args.device)
     if _rank == 0:
@@ -1057,6 +1073,7 @@ def main():
         print(f"PagedAttention page_size: {args.page_size}")
         print(f"NPU Graph: {'on' if args.compiled_model else 'off'}")
         print(f"MoE parallel mode: {args.moe_parallel_mode.upper()}")
+        print(f"Partial Prefix Cache: {'on' if args.partial_prefix_cache else 'off'}")
 
     load_generator(
         args.checkpoints_dir,
@@ -1090,6 +1107,7 @@ def main():
                 chunked_prefill=args.chunked_prefill,
                 prefill_chunk_size=args.prefill_chunk_size,
                 max_preemptions=args.max_preemptions,
+                partial_prefix_cache=args.partial_prefix_cache,
             )
         print(f"Server starting on http://{args.host}:{args.port}")
         print(f"Endpoints:")

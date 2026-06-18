@@ -2,6 +2,20 @@
 
 所有触发版本升级的变更按发布时间倒序记录。详细规则见[版本管理与发布规范](docs/versioning.md)。
 
+## [0.0.7rc6] - 2026-06-18
+
+Bugfix release for the v0.0.7 KV-cache line.
+
+### Fixed
+
+- Changed page-aligned partial Prefix Cache reuse from default-on to explicit opt-in via `--partial_prefix_cache`.
+- Preserved exact Prefix Cache as the default greedy repeated-prompt optimization.
+- Avoided EvalScope random-prompt TTFT regression caused by conservative token-by-token suffix replay on shared chat-template prefixes.
+
+### Docs
+
+- [v0.0.7rc6 release report](docs/releases/v0.0.7rc6.md)
+
 ## [0.0.7rc5] - 2026-06-18
 
 KV-cache optimization closeout for the v0.0.7 line.

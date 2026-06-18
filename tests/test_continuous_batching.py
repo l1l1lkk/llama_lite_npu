@@ -552,6 +552,36 @@ class ContinuousBatchModelBackendTest(unittest.TestCase):
         self.assertEqual(second.model_request_id, 1)
         self.assertEqual(backend._device_positions[1].tolist(), 3)
 
+    def test_partial_prefix_cache_is_disabled_by_default(self):
+        module = load_batching_module()
+
+        class PartialPrefixExecutor(FakeExecutor):
+            def __init__(self):
+                super().__init__()
+                self.partial_lookup_calls = 0
+
+            def share_paged_prefix_from_cache(self, prompt_tokens):
+                self.partial_lookup_calls += 1
+                return (1, 4, None)
+
+        executor = PartialPrefixExecutor()
+        generator = SimpleNamespace(
+            model_executor=executor,
+            tokenizer=SimpleNamespace(eos_token_id=99),
+        )
+        backend = module.ContinuousBatchModelBackend(generator)
+        request = module.BatchRequest("partial-disabled", [1, 2, 3, 4, 5, 6], 4, 0.0, 1.0)
+
+        tokens = backend.prefill([request])
+
+        self.assertEqual(tokens, [40])
+        self.assertEqual(executor.partial_lookup_calls, 0)
+        forwarded_token_ids = [
+            input_ids.tolist()[0]
+            for input_ids, _ in executor.forward_inputs
+        ]
+        self.assertEqual(forwarded_token_ids, [[1, 2, 3, 4, 5, 6]])
+
     def test_partial_prefix_cache_hit_replays_only_suffix_tokens(self):
         module = load_batching_module()
 
@@ -578,7 +608,9 @@ class ContinuousBatchModelBackendTest(unittest.TestCase):
             model_executor=executor,
             tokenizer=SimpleNamespace(eos_token_id=99),
         )
-        backend = module.ContinuousBatchModelBackend(generator)
+        backend = module.ContinuousBatchModelBackend(
+            generator, enable_partial_prefix_cache=True
+        )
         request = module.BatchRequest("partial", [1, 2, 3, 4, 5, 6], 4, 0.0, 1.0)
 
         tokens = backend.prefill([request])

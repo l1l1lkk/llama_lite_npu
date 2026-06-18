@@ -34,6 +34,11 @@ class ServerContinuousBatchingContractTest(unittest.TestCase):
             self.source,
         )
 
+    def test_server_exposes_partial_prefix_cache_switch(self):
+        self.assertIn("--partial_prefix_cache", self.source)
+        self.assertIn("partial_prefix_cache=args.partial_prefix_cache", self.source)
+        self.assertIn("enable_partial_prefix_cache=_partial_prefix_cache", self.source)
+
     def test_tp_worker_uses_step_level_batch_commands(self):
         self.assertIn("_tp_continuous_worker_loop", self.source)
         self.assertIn("prefill", self.source)
