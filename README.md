@@ -37,7 +37,7 @@ Current version: **0.0.7rc6** (2026-06-18)
 - [推理性能历史记录](docs/inference_performance_history.md)
 - [文档索引](docs/README.md)
 
-`v0.0.7rc6` keeps exact Prefix Cache enabled by default and makes page-aligned partial Prefix Cache explicit via `--partial_prefix_cache`, avoiding random-prompt TTFT regressions from conservative suffix replay.
+`v0.0.7rc6` keeps exact Prefix Cache enabled by default and makes page-aligned partial Prefix Cache explicit via `--partial_prefix_cache`. The opt-in partial path now uses block-level cache-map lookup over complete KV pages instead of scanning cached full prompts.
 
 ## 主要能力
 
@@ -110,7 +110,7 @@ Current version: **0.0.7rc6** (2026-06-18)
   - KV-pressure preemption can release/requeue active requests and rebuild context from prompt plus generated tokens;
   - Exact-prompt Prefix Cache is wired into greedy continuous batching and can skip repeated-prompt prefill;
   - Exact Prefix Cache remains enabled by default for greedy repeated prompts;
-  - Page-aligned partial Prefix Cache reuse can share cached KV pages and replay only the uncached suffix when `--partial_prefix_cache` is enabled;
+  - Page-aligned partial Prefix Cache reuse can share cached KV pages and replay only the uncached suffix when `--partial_prefix_cache` is enabled; the partial lookup uses block-level complete-page cache keys instead of full-prompt scanning;
   - Chunked Prefill can process long prompts across scheduler ticks for decode/prefill interleaving;
   - Mixed-length packed prefill metadata exists, while no-padding packed prefill kernels remain future work.
   - Ascend PyTorch Profiler；

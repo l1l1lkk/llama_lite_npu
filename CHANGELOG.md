@@ -9,6 +9,7 @@ Bugfix release for the v0.0.7 KV-cache line.
 ### Fixed
 
 - Changed page-aligned partial Prefix Cache reuse from default-on to explicit opt-in via `--partial_prefix_cache`.
+- Reworked opt-in partial Prefix Cache to use block-level cache-map lookup over complete KV pages, avoiding full-prompt cache scans.
 - Preserved exact Prefix Cache as the default greedy repeated-prompt optimization.
 - Avoided EvalScope random-prompt TTFT regression caused by conservative token-by-token suffix replay on shared chat-template prefixes.
 

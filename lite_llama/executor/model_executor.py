@@ -281,6 +281,13 @@ class ModelExecutor:
             tuple[int, ...], tuple[object, int, int]
         ] = OrderedDict()
         self._paged_prefix_cache_max_entries = 128
+        # Block-level Prefix Cache: keys form a parent-fingerprint chain over
+        # full KV pages.  Partial-prefix lookup is O(prompt_blocks) and never
+        # scans all cached full prompts. Only complete blocks are cached/reused.
+        self._paged_block_prefix_cache: OrderedDict[
+            tuple[int | None, tuple[int, ...]], tuple[object, int]
+        ] = OrderedDict()
+        self._paged_block_prefix_cache_max_entries = 4096
 
         # --- NPU Graph (decode kernel launch batching) ---
         self.graph_runner = None
@@ -532,28 +539,65 @@ class ModelExecutor:
                 return None
             return int(req_idx), len(prompt_key), int(first_token_id)
 
-        best_key: tuple[int, ...] | None = None
-        best_pages = None
-        best_tokens = 0
+        matched_pages = []
+        matched_tokens = 0
+        parent_fingerprint = None
         page_size = int(self.page_size)
-        for cached_key, (page_indices, _, _) in self._paged_prefix_cache.items():
-            common = 0
-            max_common = min(len(prompt_key), len(cached_key))
-            while common < max_common and prompt_key[common] == cached_key[common]:
-                common += 1
-            matched_tokens = (common // page_size) * page_size
-            if matched_tokens > best_tokens:
-                best_key = cached_key
-                best_pages = page_indices
-                best_tokens = matched_tokens
+        for start in range(0, len(prompt_key) - page_size + 1, page_size):
+            block_tokens = prompt_key[start : start + page_size]
+            block_key = self._paged_block_key(parent_fingerprint, block_tokens)
+            cached_block = self._paged_block_prefix_cache.get(block_key)
+            if cached_block is None:
+                break
+            self._paged_block_prefix_cache.move_to_end(block_key)
+            page_index, token_count = cached_block
+            matched_pages.append(page_index.reshape(-1))
+            matched_tokens = int(token_count)
+            parent_fingerprint = hash(block_key)
 
-        if best_key is None or best_pages is None or best_tokens <= 0:
+        if not matched_pages or matched_tokens <= 0:
             return None
-        req_idx = self.req_tokens_manager.reserve_shared_req(best_pages, best_tokens)
+        best_pages = torch.cat(matched_pages).to(device="cpu", dtype=torch.long)
+        req_idx = self.req_tokens_manager.reserve_shared_req(best_pages, matched_tokens)
         if req_idx is None:
             return None
-        self._paged_prefix_cache.move_to_end(best_key)
-        return int(req_idx), int(best_tokens), None
+        return int(req_idx), int(matched_tokens), None
+
+    def _paged_block_key(
+        self, parent_fingerprint: int | None, block_tokens: list[int] | tuple[int, ...]
+    ) -> tuple[int | None, tuple[int, ...]]:
+        return parent_fingerprint, tuple(int(token) for token in block_tokens)
+
+    def _store_paged_prompt_blocks(
+        self, prompt_tokens: tuple[int, ...], page_indices
+    ) -> None:
+        page_size = int(self.page_size)
+        full_blocks = len(prompt_tokens) // page_size
+        if full_blocks <= 0:
+            return
+        parent_fingerprint = None
+        for block_index in range(full_blocks):
+            start = block_index * page_size
+            block_tokens = prompt_tokens[start : start + page_size]
+            block_key = self._paged_block_key(parent_fingerprint, block_tokens)
+            if block_key in self._paged_block_prefix_cache:
+                self._paged_block_prefix_cache.move_to_end(block_key)
+                parent_fingerprint = hash(block_key)
+                continue
+            page_index = page_indices[block_index : block_index + 1].clone()
+            self.req_tokens_manager.page_mgr.add_ref(page_index)
+            self._paged_block_prefix_cache[block_key] = (
+                page_index,
+                (block_index + 1) * page_size,
+            )
+            self._paged_block_prefix_cache.move_to_end(block_key)
+            parent_fingerprint = hash(block_key)
+            while (
+                len(self._paged_block_prefix_cache)
+                > self._paged_block_prefix_cache_max_entries
+            ):
+                _, (old_page, _) = self._paged_block_prefix_cache.popitem(last=False)
+                self.req_tokens_manager.page_mgr.free(old_page)
 
     def store_paged_request_prefix(
         self,
@@ -577,6 +621,7 @@ class ModelExecutor:
             int(first_token_id),
         )
         self._paged_prefix_cache.move_to_end(key)
+        self._store_paged_prompt_blocks(key, page_indices)
         while len(self._paged_prefix_cache) > self._paged_prefix_cache_max_entries:
             _, (old_pages, _, _) = self._paged_prefix_cache.popitem(last=False)
             self.req_tokens_manager.page_mgr.free(old_pages)
