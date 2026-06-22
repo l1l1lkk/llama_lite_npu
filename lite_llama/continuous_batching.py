@@ -206,8 +206,13 @@ class ContinuousBatchScheduler:
         self.eos_token_id = int(eos_token_id)
         self.decode_tokens = decode_tokens
         self.max_waiting_requests = max_waiting_requests
+        default_max_prefill_tokens = (
+            max_prefill_tokens
+            if max_prefill_tokens is not None
+            else getattr(backend, "max_prefill_tokens", None)
+        )
         self.max_prefill_tokens = self._validate_optional_positive(
-            max_prefill_tokens, "max_prefill_tokens"
+            default_max_prefill_tokens, "max_prefill_tokens"
         )
         self.max_decode_tokens = self._validate_optional_positive(
             max_decode_tokens, "max_decode_tokens"
@@ -683,6 +688,191 @@ class ContinuousBatchModelBackend:
         gathered_logits = logits[0, sample_indices, :]
         return self._sample_device(gathered_logits, requests)
 
+    @property
+    def max_prefill_tokens(self) -> int | None:
+        value = getattr(self.executor, "max_prefill_tokens", None)
+        if value is None:
+            return None
+        return int(value)
+
+    @staticmethod
+    def _prefill_token_cost(request: BatchRequest) -> int:
+        return len(request.model_context_tokens)
+
+    def _split_indexed_requests_by_prefill_budget(
+        self,
+        indexed_requests: Sequence[tuple[int, BatchRequest]],
+    ) -> list[list[tuple[int, BatchRequest]]]:
+        budget = self.max_prefill_tokens
+        if budget is None or budget <= 0:
+            return [list(indexed_requests)]
+
+        batches: list[list[tuple[int, BatchRequest]]] = []
+        current: list[tuple[int, BatchRequest]] = []
+        current_tokens = 0
+        for item in indexed_requests:
+            token_cost = self._prefill_token_cost(item[1])
+            if current and current_tokens + token_cost > budget:
+                batches.append(current)
+                current = []
+                current_tokens = 0
+            current.append(item)
+            current_tokens += token_cost
+            if current_tokens >= budget:
+                batches.append(current)
+                current = []
+                current_tokens = 0
+        if current:
+            batches.append(current)
+        return batches
+
+    def _prefill_indexed_requests(
+        self,
+        indexed_requests: Sequence[tuple[int, BatchRequest]],
+        results: list[int | None],
+    ) -> None:
+        import torch
+
+        if not indexed_requests:
+            return
+
+        budget = self.max_prefill_tokens
+        total_tokens = sum(
+            self._prefill_token_cost(request)
+            for _, request in indexed_requests
+        )
+        if budget is not None and total_tokens > budget:
+            if len(indexed_requests) == 1:
+                original_index, request = indexed_requests[0]
+                if request.model_request_id is not None:
+                    self.executor.release_paged_request_ids(
+                        (int(request.model_request_id),)
+                    )
+                    request.model_request_id = None
+                    request.prefill_cursor = 0
+                token_id = self._run_prefill_chunk_incremental(request, None)
+                results[original_index] = token_id
+                return
+            for sub_batch in self._split_indexed_requests_by_prefill_budget(
+                indexed_requests
+            ):
+                self._prefill_indexed_requests(sub_batch, results)
+            return
+
+        groups: dict[int, list[tuple[int, BatchRequest]]] = {}
+        for index, request in indexed_requests:
+            groups.setdefault(len(request.model_context_tokens), []).append(
+                (index, request)
+            )
+
+        if len(groups) > 1 and hasattr(
+            self.executor, "activate_paged_packed_prefill_batch"
+        ):
+            group_requests = [request for _, request in indexed_requests]
+            group_ids = tuple(
+                int(request.model_request_id)
+                for request in group_requests
+            )
+            prompt_lengths = [
+                len(request.model_context_tokens)
+                for request in group_requests
+            ]
+            flat_tokens = [
+                int(token_id)
+                for request in group_requests
+                for token_id in request.model_context_tokens
+            ]
+            flat_position_ids, sample_indices = (
+                self.executor.activate_paged_packed_prefill_batch(
+                    group_ids, prompt_lengths
+                )
+            )
+            input_ids = torch.tensor(
+                [flat_tokens],
+                dtype=torch.long,
+                device=self.executor.device,
+            )
+            position_ids = flat_position_ids.reshape(1, -1)
+            logits = self.executor.forward(input_ids, position_ids)
+            sampled = self._sample_prefill_logits(
+                logits, group_requests, sample_indices
+            )
+            self._remember_sampled_tokens(
+                group_requests,
+                sampled,
+                initial_positions=prompt_lengths,
+            )
+            group_tokens = self._tokens_to_host(sampled)
+            self.executor.extend_paged_requests(group_ids)
+            if self.return_host_tokens:
+                for (original_index, _), token_id in zip(
+                    indexed_requests, group_tokens
+                ):
+                    results[original_index] = token_id
+            if hasattr(self.executor, "store_paged_request_prefix"):
+                host_tokens = (
+                    group_tokens
+                    if self.return_host_tokens
+                    else sampled.detach().cpu().tolist()
+                )
+                for request, token_id in zip(group_requests, host_tokens):
+                    if request.temperature == 0:
+                        self.executor.store_paged_request_prefix(
+                            request.model_context_tokens,
+                            int(request.model_request_id),
+                            int(token_id),
+                        )
+            return
+
+        for prompt_length, grouped_indexed_requests in groups.items():
+            group_requests = [
+                request for _, request in grouped_indexed_requests
+            ]
+            group_ids = tuple(
+                int(request.model_request_id)
+                for request in group_requests
+            )
+            self.executor.activate_paged_prefill_batch(
+                group_ids, prompt_length
+            )
+            input_ids = torch.tensor(
+                [request.model_context_tokens for request in group_requests],
+                dtype=torch.long,
+                device=self.executor.device,
+            )
+            position_ids = torch.arange(
+                prompt_length,
+                dtype=torch.long,
+                device=self.executor.device,
+            ).unsqueeze(0).expand(len(group_requests), -1)
+            logits = self.executor.forward(input_ids, position_ids)
+            sampled = self._sample_prefill_logits(logits, group_requests)
+            self._remember_sampled_tokens(
+                group_requests,
+                sampled,
+                initial_positions=[prompt_length] * len(group_requests),
+            )
+            group_tokens = self._tokens_to_host(sampled)
+            self.executor.extend_paged_requests(group_ids)
+            if self.return_host_tokens:
+                for (original_index, _), token_id in zip(
+                    grouped_indexed_requests, group_tokens
+                ):
+                    results[original_index] = token_id
+            if hasattr(self.executor, "store_paged_request_prefix"):
+                host_tokens = (
+                    group_tokens
+                    if self.return_host_tokens
+                    else sampled.detach().cpu().tolist()
+                )
+                for request, token_id in zip(group_requests, host_tokens):
+                    if request.temperature == 0:
+                        self.executor.store_paged_request_prefix(
+                            request.model_context_tokens,
+                            int(request.model_request_id),
+                            int(token_id),
+                        )
+
     def _cache_lookup(
         self, request: BatchRequest
     ) -> tuple[int, int, int | None] | None:
@@ -971,131 +1161,41 @@ class ContinuousBatchModelBackend:
                 return []
             return [int(token_id) for token_id in results]
 
-        miss_requests = [request for _, request in cache_misses]
-        context_lengths = [len(request.model_context_tokens) for request in miss_requests]
+        fallback_misses: list[tuple[int, BatchRequest]] = []
+        reserved_misses: list[tuple[int, BatchRequest]] = []
+        prefill_budget = self.max_prefill_tokens
+        for index, request in cache_misses:
+            if (
+                prefill_budget is not None
+                and len(request.model_context_tokens) > prefill_budget
+            ):
+                fallback_misses.append((index, request))
+            else:
+                reserved_misses.append((index, request))
+
+        for index, request in fallback_misses:
+            results[index] = self._run_prefill_chunk_incremental(request, None)
+
+        if not reserved_misses:
+            if not self.return_host_tokens:
+                return []
+            return [int(token_id) for token_id in results]
+
+        reserved_requests = [request for _, request in reserved_misses]
         request_ids = self.executor.reserve_paged_requests(
-            context_lengths
+            [len(request.model_context_tokens) for request in reserved_requests]
         )
-        for request, req_idx in zip(miss_requests, request_ids):
+        for request, req_idx in zip(reserved_requests, request_ids):
             request.model_request_id = req_idx
 
-        groups: dict[int, list[tuple[int, BatchRequest]]] = {}
-        for index, request in cache_misses:
-            groups.setdefault(len(request.model_context_tokens), []).append(
-                (index, request)
-            )
-
         try:
-            if len(groups) > 1 and hasattr(
-                self.executor, "activate_paged_packed_prefill_batch"
+            for indexed_batch in self._split_indexed_requests_by_prefill_budget(
+                reserved_misses
             ):
-                indexed_requests = list(cache_misses)
-                group_requests = [request for _, request in indexed_requests]
-                group_ids = tuple(
-                    int(request.model_request_id)
-                    for request in group_requests
-                )
-                prompt_lengths = [
-                    len(request.model_context_tokens)
-                    for request in group_requests
-                ]
-                flat_tokens = [
-                    int(token_id)
-                    for request in group_requests
-                    for token_id in request.model_context_tokens
-                ]
-                flat_position_ids, sample_indices = (
-                    self.executor.activate_paged_packed_prefill_batch(
-                        group_ids, prompt_lengths
-                    )
-                )
-                input_ids = torch.tensor(
-                    [flat_tokens],
-                    dtype=torch.long,
-                    device=self.executor.device,
-                )
-                position_ids = flat_position_ids.reshape(1, -1)
-                logits = self.executor.forward(input_ids, position_ids)
-                sampled = self._sample_prefill_logits(
-                    logits, group_requests, sample_indices
-                )
-                self._remember_sampled_tokens(
-                    group_requests,
-                    sampled,
-                    initial_positions=prompt_lengths,
-                )
-                group_tokens = self._tokens_to_host(sampled)
-                self.executor.extend_paged_requests(group_ids)
-                if self.return_host_tokens:
-                    for (original_index, _), token_id in zip(
-                        indexed_requests, group_tokens
-                    ):
-                        results[original_index] = token_id
-                if hasattr(self.executor, "store_paged_request_prefix"):
-                    host_tokens = (
-                        group_tokens
-                        if self.return_host_tokens
-                        else sampled.detach().cpu().tolist()
-                    )
-                    for request, token_id in zip(group_requests, host_tokens):
-                        if request.temperature == 0:
-                            self.executor.store_paged_request_prefix(
-                                request.model_context_tokens,
-                                int(request.model_request_id),
-                                int(token_id),
-                            )
-            else:
-                for prompt_length, indexed_requests in groups.items():
-                    group_requests = [
-                        request for _, request in indexed_requests
-                    ]
-                    group_ids = tuple(
-                        int(request.model_request_id)
-                        for request in group_requests
-                    )
-                    self.executor.activate_paged_prefill_batch(
-                        group_ids, prompt_length
-                    )
-                    input_ids = torch.tensor(
-                        [request.model_context_tokens for request in group_requests],
-                        dtype=torch.long,
-                        device=self.executor.device,
-                    )
-                    position_ids = torch.arange(
-                        prompt_length,
-                        dtype=torch.long,
-                        device=self.executor.device,
-                    ).unsqueeze(0).expand(len(group_requests), -1)
-                    logits = self.executor.forward(input_ids, position_ids)
-                    sampled = self._sample_prefill_logits(logits, group_requests)
-                    self._remember_sampled_tokens(
-                        group_requests,
-                        sampled,
-                        initial_positions=[prompt_length] * len(group_requests),
-                    )
-                    group_tokens = self._tokens_to_host(sampled)
-                    self.executor.extend_paged_requests(group_ids)
-                    if self.return_host_tokens:
-                        for (original_index, _), token_id in zip(
-                            indexed_requests, group_tokens
-                        ):
-                            results[original_index] = token_id
-                    if hasattr(self.executor, "store_paged_request_prefix"):
-                        host_tokens = (
-                            group_tokens
-                            if self.return_host_tokens
-                            else sampled.detach().cpu().tolist()
-                        )
-                        for request, token_id in zip(group_requests, host_tokens):
-                            if request.temperature == 0:
-                                self.executor.store_paged_request_prefix(
-                                    request.model_context_tokens,
-                                    int(request.model_request_id),
-                                    int(token_id),
-                                )
+                self._prefill_indexed_requests(indexed_batch, results)
         except BaseException:
             self.executor.release_paged_request_ids(request_ids)
-            for request in miss_requests:
+            for request in reserved_requests:
                 request.model_request_id = None
             raise
 

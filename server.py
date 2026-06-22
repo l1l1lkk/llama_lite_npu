@@ -220,6 +220,10 @@ class _TpCoordinatedContinuousBackend:
     def max_context_tokens(self):
         return getattr(self.local_backend, "max_context_tokens", None)
 
+    @property
+    def max_prefill_tokens(self):
+        return getattr(self.local_backend, "max_prefill_tokens", None)
+
     def tokenize(self, prompt):
         return self.local_backend.tokenize(prompt)
 
@@ -1213,10 +1217,13 @@ def main():
         print(f"  GET  /v1/models")
         print(f"  GET  /health")
         if _continuous_batching:
+            effective_max_prefill_tokens = getattr(
+                _continuous_scheduler, "max_prefill_tokens", args.max_prefill_tokens
+            )
             print(
                 "  [Continuous batching: "
                 f"max_batch_size={args.max_batch_size}, "
-                f"max_prefill_tokens={args.max_prefill_tokens}, "
+                f"max_prefill_tokens={effective_max_prefill_tokens}, "
                 f"max_decode_tokens={args.max_decode_tokens}, "
                 f"chunked_prefill={args.chunked_prefill}, "
                 f"max_preemptions={args.max_preemptions}]"

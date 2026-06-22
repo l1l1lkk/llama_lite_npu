@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.0.8rc8] - 2026-06-22
+
+Bugfix release for packed-prefill Triton grid overflow in continuous batching.
+
+### Fixed
+
+- Added a vLLM-style default prefill token budget: when `--max_prefill_tokens` is omitted, the scheduler reads the backend/model-derived safe packed-prefill budget.
+- Derived the default safe prefill budget from the model's local Q-head count to avoid Q/K RMSNorm Triton launches exceeding the 65535 grid-row limit.
+- Added a backend pre-forward guard that splits oversized packed prefill into smaller safe micro-batches.
+- Added a slow but safe fallback for a single prompt that exceeds the safe packed-prefill budget.
+- Exposed the effective auto `max_prefill_tokens` in server startup logs.
+
+### Tests
+
+- Added scheduler regression coverage for backend-derived default prefill token budget.
+- Added backend regression coverage for splitting mixed-length packed prefill by token budget.
+
+### Docs
+
+- [v0.0.8rc8 release report](docs/releases/v0.0.8rc8.md)
+
 ## [0.0.8rc7] - 2026-06-22
 
 Bugfix release for server-side `max_seq_len` propagation.

@@ -235,9 +235,11 @@ class ModelExecutor:
             self.llm_config = model_config
 
         # KV heads are sharded under TP
+        self.local_q_heads = self.llm_config.num_heads // self.tp.world_size
         self.local_kv_heads = self.llm_config.num_kv_heads // self.tp.world_size
 
         self.max_seq_len = self.llm_config.max_seq_len
+        self.max_prefill_tokens = self._infer_safe_prefill_tokens()
         self.model_type = model_config.model_type
         self.model = model
         self.logits_are_sharded = (
@@ -259,6 +261,21 @@ class ModelExecutor:
             self.kv_mem_manager = self._init_mem_manager(
                 max_gpu_num_blocks, block_size=1, device=self.device
             )
+
+    def _infer_safe_prefill_tokens(self) -> int | None:
+        """Return a conservative packed-prefill token budget.
+
+        Qwen3 applies Q/K RMSNorm on tensors shaped roughly as
+        ``[total_prefill_tokens, local_q_heads, head_dim]``.  The current
+        Triton RMSNorm launch uses one program per flattened row and cannot
+        exceed 65535 grid rows.  Keep scheduler-produced packed prefill below
+        that kernel limit by default.
+        """
+        local_q_heads = int(getattr(self, "local_q_heads", 0) or 0)
+        if local_q_heads <= 0:
+            return None
+        safe_grid_rows = 60000
+        return max(1, safe_grid_rows // local_q_heads)
 
         self.max_request_num = max_gpu_num_blocks // self.max_seq_len
 

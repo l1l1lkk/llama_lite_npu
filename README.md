@@ -9,7 +9,7 @@
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.7-orange)
 ![Ascend](https://img.shields.io/badge/Ascend-910B3-red)
-![Version](https://img.shields.io/badge/version-0.0.8rc7-blue)
+![Version](https://img.shields.io/badge/version-0.0.8rc8-blue)
 ![Status](https://img.shields.io/badge/status-active_development-yellow)
 
 </div>
@@ -29,15 +29,15 @@ Lite Llama NPU 的目标不是封装 Transformers，而是实现一条可以观�
 
 ## 最新版本
 
-Current version: **0.0.8rc7** (2026-06-22)
+Current version: **0.0.8rc8** (2026-06-22)
 
-- [v0.0.8rc7 release report](docs/releases/v0.0.8rc7.md)
+- [v0.0.8rc8 release report](docs/releases/v0.0.8rc8.md)
 - [完整CHANGELOG](CHANGELOG.md)
 - [版本管理与发布规范](docs/versioning.md)
 - [推理性能历史记录](docs/inference_performance_history.md)
 - [文档索引](docs/README.md)
 
-`v0.0.8rc7` exposes `server.py --max_seq_len` and passes it into the model executor, making the continuous-batching context guard configurable from the server entrypoint. Exact Prefix Cache remains enabled by default; page-aligned partial Prefix Cache remains explicit via `--partial_prefix_cache`.
+`v0.0.8rc8` adds a vLLM-style prefill token budget for continuous batching. When `--max_prefill_tokens` is not provided, the server derives a safe packed-prefill budget from the model/head layout and splits oversized packed prefill into safe micro-batches before forward. Exact Prefix Cache remains enabled by default; page-aligned partial Prefix Cache remains explicit via `--partial_prefix_cache`.
 
 ## 主要能力
 
@@ -150,7 +150,7 @@ Qwen3-32B、TP=2 时，每个 Decode Token 的主要 Linear 路径为：
 
 ## 最新实测性能
 
-`v0.0.8rc7` has not been re-benchmarked on Atlas yet. The table below keeps the latest reproducible measured baselines and is not a new-version performance claim:
+`v0.0.8rc8` has not been re-benchmarked on Atlas yet. The table below keeps the latest reproducible measured baselines and is not a new-version performance claim:
 
 
 1. Qwen3-30B-A3B使用项目Benchmark观察MoE TP/EP执行路径；
@@ -550,7 +550,7 @@ Profiler 数据通常包含：
 - TP 通信为同步 AllReduce/AllGather，尚未实现计算通信重叠；
 - 当前只支持单机多卡；设备映射、进程组和权重加载尚未完成多机适配；
 - Q+KV、Gate+Up 尚未融合；
-- v0.0.8rc7 Prefix Cache defaults to exact repeated greedy prompts only; page-aligned partial prefix reuse is opt-in through `--partial_prefix_cache`;
+- v0.0.8rc8 Prefix Cache defaults to exact repeated greedy prompts only; page-aligned partial prefix reuse is opt-in through `--partial_prefix_cache`;
 - Top-P Vocab Parallel Sampling在候选集无法覆盖精确nucleus时会回退完整Logits Gather；
 - Rank 0 in Continuous Batching still performs one batched token D2H per step for HTTP streaming; a dedicated suffix-prefill attention kernel is not implemented yet.
 - Qwen3 MoE TP Graph兼容性取决于CANN、torch_npu、GMM、Triton和HCCL版本；不兼容时按Bucket回退Eager；

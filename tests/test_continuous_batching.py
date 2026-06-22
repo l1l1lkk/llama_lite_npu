@@ -34,6 +34,7 @@ def load_batching_module():
 class FakeBackend:
     def __init__(self):
         self.max_context_tokens = None
+        self.max_prefill_tokens = None
         self.prefill_tokens = {}
         self.prefill_chunk_tokens = {}
         self.decode_tokens = {}
@@ -230,6 +231,31 @@ class ContinuousBatchSchedulerTest(unittest.TestCase):
         scheduler.step()
         self.assertEqual(backend.prefill_calls, [["a"], ["b"]])
 
+    def test_prefill_token_budget_defaults_from_backend(self):
+        module = load_batching_module()
+        backend = FakeBackend()
+        backend.max_prefill_tokens = 4
+        scheduler = module.ContinuousBatchScheduler(
+            backend=backend,
+            max_batch_size=4,
+            eos_token_id=99,
+            decode_tokens=lambda token_ids: "".join(
+                f"<{token_id}>" for token_id in token_ids
+            ),
+        )
+        backend.prefill_tokens = {"a": [10], "b": [20], "c": [30]}
+        backend.decode_tokens = {"a": [99], "b": [99], "c": [99]}
+
+        scheduler.submit("a", [1, 2, 3], 4, 0.0, 1.0)
+        scheduler.submit("b", [4, 5, 6], 4, 0.0, 1.0)
+        scheduler.submit("c", [7, 8], 4, 0.0, 1.0)
+
+        scheduler.step()
+
+        self.assertEqual(scheduler.max_prefill_tokens, 4)
+        self.assertEqual(backend.prefill_calls, [["a"]])
+        self.assertEqual(scheduler.pending_count, 2)
+
     def test_prefill_token_budget_admits_one_oversized_request(self):
         scheduler, backend = self._make_scheduler(max_batch_size=4)
         scheduler.max_prefill_tokens = 2
@@ -397,6 +423,7 @@ class FakeExecutor:
     def __init__(self):
         self.device = "cpu"
         self.use_paged_attn = True
+        self.max_prefill_tokens = None
         self.next_request_id = 0
         self.lengths = {}
         self.req_tokens_manager = SimpleNamespace(
@@ -524,6 +551,57 @@ class ContinuousBatchModelBackendTest(unittest.TestCase):
         self.assertEqual(input_ids.tolist(), [[1, 2, 3, 4, 5]])
         self.assertEqual(position_ids.tolist(), [[0, 1, 0, 0, 1]])
         self.assertEqual([r.model_request_id for r in requests], [0, 1, 2])
+
+    def test_prefill_splits_packed_batches_by_backend_token_budget(self):
+        module = load_batching_module()
+        executor = FakeExecutor()
+        executor.max_prefill_tokens = 3
+        tokenizer = SimpleNamespace(
+            eos_token_id=99,
+            decode=lambda ids, skip_special_tokens=True: str(ids[0]),
+        )
+        generator = SimpleNamespace(
+            model_executor=executor,
+            tokenizer=tokenizer,
+        )
+        backend = module.ContinuousBatchModelBackend(generator)
+        requests = [
+            module.BatchRequest("a", [1, 2], 4, 0.0, 1.0),
+            module.BatchRequest("b", [3, 4], 4, 0.0, 1.0),
+            module.BatchRequest("c", [5], 4, 0.0, 1.0),
+        ]
+
+        tokens = backend.prefill(requests)
+
+        self.assertEqual(tokens, [40, 41, 42])
+        self.assertEqual(
+            executor.packed_prefill_batches,
+            [((1, 2), (2, 1), (0, 2))],
+        )
+        self.assertEqual(executor.prefill_batches, [((0,), 2)])
+        self.assertEqual(len(executor.forward_inputs), 2)
+
+    def test_single_prompt_over_prefill_budget_falls_back_to_incremental_replay(self):
+        module = load_batching_module()
+        executor = FakeExecutor()
+        executor.max_prefill_tokens = 2
+        generator = SimpleNamespace(
+            model_executor=executor,
+            tokenizer=SimpleNamespace(eos_token_id=99),
+        )
+        backend = module.ContinuousBatchModelBackend(generator)
+        request = module.BatchRequest("long", [1, 2, 3, 4], 4, 0.0, 1.0)
+
+        tokens = backend.prefill([request])
+
+        self.assertEqual(tokens, [40])
+        self.assertEqual(executor.reserved_lengths, [(5,)])
+        self.assertEqual(executor.prefill_batches, [])
+        self.assertEqual(executor.packed_prefill_batches, [])
+        self.assertEqual(
+            [input_ids.tolist() for input_ids, _ in executor.forward_inputs],
+            [[[1]], [[2]], [[3]], [[4]]],
+        )
 
     def test_decode_rebuilds_dynamic_batch_metadata(self):
         module = load_batching_module()

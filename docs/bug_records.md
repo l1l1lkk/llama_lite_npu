@@ -1,5 +1,94 @@
 # Bug Records
 
+## 2026-06-22 - Non-chunked packed prefill exceeded Triton grid limit
+
+### Problem description
+
+In `v0.0.8rc7`, mixed-length concurrent benchmarks could crash during prefill even when `--chunked_prefill` was not enabled:
+
+```text
+RuntimeError: grid should be less than 65536!
+```
+
+The traceback pointed to:
+
+```text
+qwen3.py -> Qwen3Attention._get_qkv()
+skip_rmsnorm.py -> rms_norm_kernel[M,](...)
+```
+
+### Investigation process
+
+The failing path was not chunked prefill:
+
+```text
+server.py -> _tp_continuous_worker_loop()
+backend.prefill(worker_requests)
+ContinuousBatchModelBackend.prefill()
+executor.forward(...)
+```
+
+That means normal continuous-batching prefill could still create the bad shape. In Qwen3 attention, Q/K norm runs over:
+
+```text
+xq: [total_prefill_tokens, local_num_heads, head_dim]
+```
+
+`skip_rmsnorm` flattens this to:
+
+```text
+[total_prefill_tokens * local_num_heads, head_dim]
+```
+
+The current Triton RMSNorm launch uses:
+
+```text
+rms_norm_kernel[M,](...)
+```
+
+When `M >= 65536`, Triton rejects the launch.
+
+### Finding
+
+Disabling `--chunked_prefill` only disables chunked prompt replay. It does not disable packed prefill. The normal `backend.prefill()` path can still combine several prompts into one no-padding packed forward.
+
+With `parallel=4` and prompt lengths up to 1024, multiple long prompts can be admitted into the same prefill step. On Qwen3-32B TP=2, local Q heads are large enough that:
+
+```text
+total_prefill_tokens * local_q_heads >= 65536
+```
+
+is reachable.
+
+### Analysis
+
+The root cause was missing kernel-aware token budgeting. The scheduler had request-count admission and optional user-provided `--max_prefill_tokens`, but when the user omitted the option, it did not derive a safe default from the model/kernel shape.
+
+This differs from vLLM's scheduler design, where each scheduling step is bounded by a token budget such as `max_num_batched_tokens`. The framework should control kernel input shapes before launch instead of letting kernels fail.
+
+Only making the Triton RMSNorm kernel support larger `M` would be incomplete. Other kernels, KV capacity, and communication paths can also have shape limits. Scheduler-side shape control is the correct first line of defense; backend-side validation is the second.
+
+### Resolution
+
+`v0.0.8rc8` adds:
+
+- `ModelExecutor.max_prefill_tokens`, derived from local Q heads:
+
+```text
+safe_prefill_tokens = floor(60000 / local_q_heads)
+```
+
+- `ContinuousBatchScheduler` uses the backend-derived budget when `--max_prefill_tokens` is omitted.
+- `ContinuousBatchModelBackend.prefill()` splits oversized packed prefill into safe micro-batches before forward.
+- A single prompt larger than the safe packed-prefill budget falls back to the existing incremental prefill path.
+- Server startup logs now print the effective auto `max_prefill_tokens`.
+
+### Prevention
+
+- Continuous batching admission must be token-budget based, not only request-count based.
+- Backend forward paths should validate packed shapes before calling model kernels.
+- Kernel shape limits should become internal defaults, not user-discovered command-line folklore.
+
 ## 2026-06-22 - Server max_seq_len was not exposed to model loading
 
 ### Problem description
