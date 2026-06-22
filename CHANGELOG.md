@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.0.8rc3] - 2026-06-22
+
+Bugfix release for TP chunked-prefill capacity handling.
+
+### Fixed
+
+- Added a rank-0 `prepare_prefill_chunk(...)` phase before TP worker dispatch so KV capacity failures are detected by the scheduler before worker ranks enter mirrored model execution.
+- Added per-chunk KV capacity checks up to `target_end + 1` before replaying any token in that chunk.
+- Removed the unsafe silent clamp of chunked-prefill reserved capacity to `max_seq_len`; over-limit or exhausted-capacity cases now produce explicit capacity errors.
+- Improved Paged KV allocation failure diagnostics with current token count, max sequence length, and free page count.
+
+### Tests
+
+- Extended continuous-batching fake executor coverage for reserved-length request allocation and prefill-chunk capacity preparation.
+
+### Docs
+
+- [v0.0.8rc3 release report](docs/releases/v0.0.8rc3.md)
+
 ## [0.0.8rc2] - 2026-06-22
 
 Bugfix release for v0.0.8 chunked prefill.

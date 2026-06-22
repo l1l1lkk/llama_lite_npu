@@ -227,6 +227,8 @@ class _TpCoordinatedContinuousBackend:
     def prefill_chunk(self, requests, chunk_size):
         from lite_llama.executor.tp_control import encode_prefill_chunk
 
+        if hasattr(self.local_backend, "prepare_prefill_chunk"):
+            self.local_backend.prepare_prefill_chunk(requests, chunk_size)
         self.channel.send(encode_prefill_chunk(requests, chunk_size))
         return self.local_backend.prefill_chunk(requests, chunk_size)
 

@@ -50,7 +50,9 @@ The Paged KV allocator now supports reserving physical capacity independently fr
 - `ModelExecutor.reserve_paged_requests(..., reserved_lengths=...)`
 - `ModelExecutor.ensure_paged_request_capacity(...)`
 
-Chunked prefill now reserves `len(prompt_tokens) + 1` tokens of physical capacity, clamped by `max_seq_len`, while keeping logical token count at `1` and advancing it incrementally. Partial prefix replay also ensures full prompt capacity before suffix replay.
+Chunked prefill now reserves `len(prompt_tokens) + 1` tokens of physical capacity while keeping logical token count at `1` and advancing it incrementally. Partial prefix replay also ensures full prompt capacity before suffix replay.
+
+Follow-up in `v0.0.8rc3`: the first fix was not sufficient for TP continuous batching because rank 0 sent `prefill_chunk` commands to worker ranks before it verified the next chunk's KV capacity locally. If rank 1 encountered the allocation failure first, it exited before the rank 0 scheduler could preempt or fail the request cleanly. `v0.0.8rc3` adds `prepare_prefill_chunk(...)` on rank 0 before worker dispatch, checks capacity for each chunk up to `target_end + 1`, removes the unsafe silent `max_seq_len` clamp, and improves allocation diagnostics.
 
 ### Prevention
 

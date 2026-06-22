@@ -776,8 +776,19 @@ class ModelExecutor:
         """Allocate the KV position consumed by the next decode input."""
         for req_idx in request_ids:
             if not self.req_tokens_manager.extend_req(req_idx, 1):
+                current_tokens = self.req_tokens_manager.req_token_count.get(
+                    req_idx, "unknown"
+                )
+                max_seq_len = getattr(
+                    self.req_tokens_manager, "max_seq_len", "unknown"
+                )
+                free_pages = getattr(
+                    self.req_tokens_manager.page_mgr, "num_free_pages", "unknown"
+                )
                 raise RuntimeError(
-                    f"Paged KV allocation failed for request {req_idx}"
+                    "Paged KV allocation failed for request "
+                    f"{req_idx}: current_tokens={current_tokens}, "
+                    f"max_seq_len={max_seq_len}, free_pages={free_pages}"
                 )
         self.activate_paged_decode_batch(request_ids)
 

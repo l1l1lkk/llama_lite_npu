@@ -666,17 +666,31 @@ class ContinuousBatchModelBackend:
     def _chunked_prefill_reserved_tokens(self, request: BatchRequest) -> int:
         # Reserve prompt replay plus the first generated token slot up front.
         # Logical seq_len still advances incrementally through prefill_cursor.
-        requested = len(request.model_context_tokens) + 1
-        max_seq_len = getattr(self.executor.req_tokens_manager, "max_seq_len", requested)
-        return min(requested, int(max_seq_len))
+        return len(request.model_context_tokens) + 1
+
+    def _ensure_chunk_capacity(self, request: BatchRequest, target_tokens: int) -> None:
+        if not hasattr(self.executor, "ensure_paged_request_capacity"):
+            return
+        req_idx = int(request.model_request_id)
+        try:
+            self.executor.ensure_paged_request_capacity(req_idx, int(target_tokens))
+        except RuntimeError as error:
+            max_seq_len = getattr(
+                self.executor.req_tokens_manager, "max_seq_len", "unknown"
+            )
+            raise KVCacheCapacityError(
+                "chunked prefill KV capacity check failed: "
+                f"request_id={request.request_id}, model_request_id={req_idx}, "
+                f"target_tokens={int(target_tokens)}, max_seq_len={max_seq_len}, "
+                f"prompt_tokens={len(request.prompt_tokens)}, "
+                f"generated_tokens={len(request.generated_token_ids)}"
+            ) from error
 
     def _ensure_incremental_request(self, request: BatchRequest) -> None:
         if request.model_request_id is not None:
-            if hasattr(self.executor, "ensure_paged_request_capacity"):
-                self.executor.ensure_paged_request_capacity(
-                    int(request.model_request_id),
-                    self._chunked_prefill_reserved_tokens(request),
-                )
+            self._ensure_chunk_capacity(
+                request, self._chunked_prefill_reserved_tokens(request)
+            )
             return
         request_ids = self.executor.reserve_paged_requests(
             (1,),
@@ -760,9 +774,15 @@ class ContinuousBatchModelBackend:
             if not context_tokens:
                 raise RuntimeError("empty prompts are not supported by chunked prefill")
             self._ensure_incremental_request(request)
-            target_ends.append(
-                min(len(context_tokens), request.prefill_cursor + int(chunk_size))
+            target_end = min(
+                len(context_tokens), request.prefill_cursor + int(chunk_size)
             )
+            # Ensure the whole chunk and first generated-token slot are
+            # physically reserved before any token in this chunk is replayed.
+            # This prevents rank workers from failing halfway through a TP
+            # prefill_chunk operation.
+            self._ensure_chunk_capacity(request, target_end + 1)
+            target_ends.append(target_end)
 
         while True:
             step_items = [
@@ -849,6 +869,28 @@ class ContinuousBatchModelBackend:
                         )
 
         return results
+
+    def prepare_prefill_chunk(
+        self,
+        requests: Sequence[BatchRequest],
+        chunk_size: int,
+    ) -> None:
+        """Reserve KV capacity required by the next chunk without compute.
+
+        TP rank 0 uses this before sending a prefill_chunk command to worker
+        ranks.  Capacity failures must be discovered on rank 0, where the
+        scheduler can preempt or fail the request safely, instead of letting a
+        worker rank terminate inside a mirrored model operation.
+        """
+        for request in requests:
+            context_tokens = request.model_context_tokens
+            if not context_tokens:
+                raise RuntimeError("empty prompts are not supported by chunked prefill")
+            self._ensure_incremental_request(request)
+            target_end = min(
+                len(context_tokens), request.prefill_cursor + int(chunk_size)
+            )
+            self._ensure_chunk_capacity(request, target_end + 1)
 
     def prefill(self, requests: Sequence[BatchRequest]) -> Sequence[int]:
         import torch
@@ -1038,9 +1080,8 @@ class ContinuousBatchModelBackend:
                 if token_id is None and hasattr(
                     self.executor, "ensure_paged_request_capacity"
                 ):
-                    self.executor.ensure_paged_request_capacity(
-                        int(req_idx),
-                        self._chunked_prefill_reserved_tokens(request),
+                    self._ensure_chunk_capacity(
+                        request, self._chunked_prefill_reserved_tokens(request)
                     )
                 if token_id is not None:
                     import torch

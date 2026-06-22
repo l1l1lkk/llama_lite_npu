@@ -380,8 +380,14 @@ class FakeExecutor:
         self.packed_prefill_batches = []
         self.sample_indices = None
 
-    def reserve_paged_requests(self, prompt_lengths):
-        self.reserved_lengths.append(tuple(prompt_lengths))
+    def reserve_paged_requests(self, prompt_lengths, reserved_lengths=None):
+        self.reserved_lengths.append(
+            tuple(
+                reserved_lengths
+                if reserved_lengths is not None
+                else prompt_lengths
+            )
+        )
         result = []
         for length in prompt_lengths:
             req_idx = self.next_request_id
@@ -389,6 +395,9 @@ class FakeExecutor:
             self.lengths[req_idx] = length
             result.append(req_idx)
         return tuple(result)
+
+    def ensure_paged_request_capacity(self, req_idx, total_tokens):
+        return None
 
     def activate_paged_prefill_batch(self, request_ids, prompt_length):
         self.active_request_ids = tuple(request_ids)
