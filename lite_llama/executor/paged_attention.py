@@ -187,11 +187,26 @@ class PagedReqTokensManager:
         self.req_active = torch.zeros(max_requests, dtype=torch.bool, device="cpu")
         self.free_req_indices = list(range(max_requests))
 
-    def alloc_req(self, req_idx: int, num_tokens: int) -> bool:
-        """Allocate KV cache for an explicit request id."""
+    def alloc_req(
+        self, req_idx: int, num_tokens: int, reserved_tokens: int | None = None
+    ) -> bool:
+        """Allocate KV cache for an explicit request id.
+
+        ``num_tokens`` is the logical sequence length visible to attention.
+        ``reserved_tokens`` is the physical KV capacity to reserve up front.
+        Chunked prefill uses this to reserve the full prompt capacity while
+        exposing only the already-replayed prefix length to the model.
+        """
         if req_idx not in self.free_req_indices:
             return False
-        pages = self.page_mgr.alloc(num_tokens)
+        num_tokens = int(num_tokens)
+        capacity_tokens = int(reserved_tokens) if reserved_tokens is not None else num_tokens
+        if num_tokens < 1 or capacity_tokens < num_tokens:
+            return False
+        if capacity_tokens > self.max_seq_len:
+            return False
+
+        pages = self.page_mgr.alloc(capacity_tokens)
         if pages is None:
             return False
 
@@ -205,14 +220,46 @@ class PagedReqTokensManager:
         )
         return True
 
-    def reserve_req(self, num_tokens: int) -> Optional[int]:
+    def reserve_req(
+        self, num_tokens: int, reserved_tokens: int | None = None
+    ) -> Optional[int]:
         """Allocate the lowest free request id and its initial KV pages."""
         if not self.free_req_indices:
             return None
         req_idx = self.free_req_indices[0]
-        if not self.alloc_req(req_idx, num_tokens):
+        if not self.alloc_req(req_idx, num_tokens, reserved_tokens):
             return None
         return req_idx
+
+    def ensure_req_capacity(self, req_idx: int, total_tokens: int) -> bool:
+        """Ensure a request has enough physical pages for ``total_tokens``.
+
+        This does not change the logical token count.  New logical token
+        mappings are still appended by ``extend_req`` as replay/decode
+        progresses.
+        """
+        if req_idx not in self.req_page_table:
+            return False
+        total_tokens = int(total_tokens)
+        if total_tokens < self.req_token_count[req_idx]:
+            return True
+        if total_tokens > self.max_seq_len:
+            return False
+
+        required_pages = (
+            total_tokens + self.page_mgr.page_size - 1
+        ) // self.page_mgr.page_size
+        existing = self.req_page_table[req_idx]
+        current_pages = len(existing)
+        if required_pages <= current_pages:
+            return True
+
+        additional_pages = required_pages - current_pages
+        additional = self.page_mgr.alloc(additional_pages * self.page_mgr.page_size)
+        if additional is None:
+            return False
+        self.req_page_table[req_idx] = torch.cat([existing, additional])
+        return True
 
     def share_req_from_pages(
         self, req_idx: int, page_indices: torch.Tensor, num_tokens: int
@@ -292,11 +339,15 @@ class PagedReqTokensManager:
         if new_total > self.max_seq_len:
             return False
 
-        # Check if we need more pages
-        cur_pages = (cur_tokens + self.page_mgr.page_size - 1) // self.page_mgr.page_size
+        # Check if we need more pages.  Use the actual reserved page count
+        # instead of the logical token count so chunked prefill can reserve
+        # full prompt capacity up front while replaying it incrementally.
         new_pages = (new_total + self.page_mgr.page_size - 1) // self.page_mgr.page_size
-        if new_pages > cur_pages:
-            additional = self.page_mgr.alloc((new_pages - cur_pages) * self.page_mgr.page_size)
+        current_pages = len(self.req_page_table[req_idx])
+        if new_pages > current_pages:
+            additional = self.page_mgr.alloc(
+                (new_pages - current_pages) * self.page_mgr.page_size
+            )
             if additional is None:
                 return False
             existing = self.req_page_table[req_idx]

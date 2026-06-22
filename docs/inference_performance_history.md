@@ -15,6 +15,8 @@
 
 | 日期 | 项目版本 | 模型 | 测试工具 | TP / Batch或并发 | 输入 / 输出 | NPU Graph | 执行路径 | 核心吞吐 | 单Token指标 | 备注 |
 |---|---|---|---|---|---|---|---|---:|---:|---|
+| 2026-06-22 | 0.0.8rc1 | Qwen3-32B | EvalScope | TP=2 / concurrency=1 | avg 184 / 256 | enabled | Continuous Batching; Greedy; fixed-length prompt; packed prefill not stressed | Output 24.7089 tok/s; Total 42.4685 tok/s | TTFT 702.7ms; TPOT 37.9ms; ITL 37.7ms | 20 requests; fixed-length baseline; no decode regression vs v0.0.7rc6 |
+| 2026-06-22 | 0.0.8rc1 | Qwen3-32B | EvalScope | TP=2 / concurrency=4 | avg 285.475 / 245.7 | enabled | Continuous Batching; Greedy; mixed prompt lengths; packed prefill path | Output 50.158 tok/s; Total 108.436 tok/s | TTFT 5117.6ms; TPOT 57.8ms; ITL 57.1ms | 40 requests; mixed-length prefill stress; compare only against same workload |
 | 2026-06-18 | 0.0.7rc6 | Qwen3-32B | EvalScope | TP=2 / concurrency=1 | avg 184.0 / 255.95 | enabled | Continuous Batching; Greedy; exact Prefix Cache on by default; partial Prefix Cache off | Output 24.3149 tok/s; Total 41.7947 tok/s | TTFT 706.3ms; TPOT 38.5ms; ITL 38.4ms | 20 requests; random dataset; rc5 default-partial regression fixed |
 | 2026-06-18 | 0.0.7rc6 | Qwen3-32B | EvalScope | TP=2 / concurrency=4 | avg 184.0 / 215.775 | enabled | Continuous Batching; Greedy; exact Prefix Cache on by default; partial Prefix Cache off | Output 62.4598 tok/s; Total 115.7218 tok/s | TTFT 1502.2ms; TPOT 65.0ms; ITL 56.8ms | 40 requests; random dataset; average output shorter than 256, compare with caution |
 | 2026-06-18 | 0.0.7rc6 | Qwen3-32B | `benchmark_prefix_cache.py` | TP=2 / concurrency=1 | approx 62 / 256 | enabled | same prompt; Exact Prefix Cache | Output 26.56 tok/s/request-time; Wall 388.45 tok/s/wall | Avg TTFT 22.9ms; P50 TTFT 6.0ms | 20 requests; first request TTFT 344ms, later requests about 5-6ms |
@@ -32,6 +34,21 @@
 | 2026-05-18 | 历史代码，commit未记录 | Qwen3-32B | `benchmark_tp.py` | TP=2 / Batch=4 | 约128 / 256 | 关闭 | Eager Decode | 5.4 tok/s；Batch 21.6 tok/s | 185.56 ms/token | 5次平均47.503s |
 | 2026-05-18 | 历史代码，commit未记录 | Qwen3-32B | `benchmark_tp.py` | TP=2 / Batch=4 | 约128 / 256 | 开启但捕获效果未确认 | Graph runner已创建 | 5.3 tok/s；Batch 21.1 tok/s | 189.39 ms/token | 5次平均48.485s；不能作为有效Graph加速结果 |
 | 2026-05-18 | 历史代码，commit未记录 | Qwen3-32B | `benchmark_tp.py` | TP=2 / Batch=4 | 约128 / 256 | 关闭 | Eager Decode | 5.3 tok/s；Batch 21.3 tok/s | 187.91 ms/token | 早期Dense基线；5次平均48.106s |
+
+## 2026-06-22 v0.0.8rc1 EvalScope 固定长度与混合长度测试
+
+本轮记录 Qwen3-32B、TP=2、NPU Graph enabled、Greedy 采样下，v0.0.8rc1 packed prefill 改动后的表现。
+
+| 场景 | 并发 | 请求数 | 平均输入/输出 | Output Throughput | Total Throughput | Avg Latency | TTFT | TPOT | ITL |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 固定长度单并发 | 1 | 20 | 184 / 256 | 24.7089 tok/s | 42.4685 tok/s | 10.3601s | 702.7ms | 37.9ms | 37.7ms |
+| 混合长度并发 | 4 | 40 | 285.475 / 245.7 | 50.158 tok/s | 108.436 tok/s | 19.1015s | 5117.6ms | 57.8ms | 57.1ms |
+
+固定长度单并发与 v0.0.7rc6 固定长度单并发相比：Output Throughput 从 24.3149 提升到 24.7089 tok/s，约 +1.6%；Total Throughput 从 41.7947 提升到 42.4685 tok/s，约 +1.6%；Latency 从 10.5259s 降到 10.3601s，约 -1.6%；TPOT 从 38.5ms 降到 37.9ms，约 -1.6%。结论是 fixed-length decode 路径没有回归，结果略好但属于小幅收益/测试波动范围。
+
+混合长度并发结果不能直接与之前固定长度或短输入随机测试横向比较：本轮平均输入为 285.475 tokens，并且 P10 到 P99 输入长度约从 104 到 540 tokens，prefill 压力明显更高。TTFT 升高到 5.1176s 主要来自更长、更分散的 prompt prefill；ITL 为 57.1ms，说明 decode 阶段保持在接近 v0.0.7 并发测试的量级。该结果说明 packed prefill 的混合长度路径可以正常承载请求，但若要量化“提升多少”，需要在 v0.0.7rc6 和 v0.0.8rc1 上跑完全相同的混合长度命令。
+
+Chunked prefill 本轮未记录性能结果，因为测试报错，待补充完整 traceback 后单独记录。
 
 ## 当前同口径结论
 

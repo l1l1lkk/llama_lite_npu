@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.0.8rc2] - 2026-06-22
+
+Bugfix release for v0.0.8 chunked prefill.
+
+### Fixed
+
+- Fixed chunked prefill Paged KV allocation failure during incremental prompt replay.
+- Separated logical sequence length from physical KV page reservation in Paged KV request allocation.
+- Chunked prefill now reserves full prompt replay capacity plus the first generated-token slot while exposing only the currently replayed logical length to attention.
+- Partial Prefix Cache suffix replay now ensures full prompt KV capacity before replaying uncached suffix tokens.
+
+### Tests
+
+- Added CPU regression coverage for reserved KV capacity without advancing logical sequence length.
+
+### Docs
+
+- Added bug record for the chunked prefill mid-replay allocation failure.
+- Recorded v0.0.8rc1 fixed-length and mixed-length EvalScope measurements.
+- [v0.0.8rc2 release report](docs/releases/v0.0.8rc2.md)
+
 ## [0.0.8rc1] - 2026-06-18
 
 Packed-prefill release for the scheduler/KV-engine line.

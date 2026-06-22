@@ -72,6 +72,40 @@ class PagedKVRefcountTest(unittest.TestCase):
         self.assertEqual(len(pages), 2)
         self.assertTrue(all(isinstance(page, int) for page in pages))
 
+    def test_reserved_capacity_does_not_advance_logical_length(self):
+        module = load_paged_module()
+        page_manager = module.PagedKVCacheManager(
+            num_layers=1,
+            num_kv_heads=1,
+            head_dim=8,
+            num_pages=4,
+            page_size=4,
+            device="cpu",
+        )
+        req_manager = module.PagedReqTokensManager(
+            max_requests=2,
+            max_seq_len=16,
+            page_manager=page_manager,
+            device="cpu",
+        )
+
+        req_idx = req_manager.reserve_req(num_tokens=1, reserved_tokens=9)
+
+        self.assertEqual(req_idx, 0)
+        self.assertEqual(req_manager.req_token_count[0], 1)
+        self.assertEqual(len(req_manager.req_page_table[0]), 3)
+        self.assertEqual(page_manager.num_free_pages, 1)
+
+        self.assertTrue(req_manager.extend_req(0, 8))
+
+        self.assertEqual(req_manager.req_token_count[0], 9)
+        self.assertEqual(len(req_manager.req_page_table[0]), 3)
+        self.assertEqual(page_manager.num_free_pages, 1)
+        self.assertEqual(
+            req_manager.get_token_indices(0, 9).tolist(),
+            list(range(9)),
+        )
+
     def test_share_req_from_pages_reuses_existing_pages_with_refcounts(self):
         module = load_paged_module()
         page_manager = module.PagedKVCacheManager(

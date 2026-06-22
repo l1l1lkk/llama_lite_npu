@@ -466,17 +466,28 @@ class ModelExecutor:
         return self.atten_info.cur_select_index, num_patch_indexs
 
     def reserve_paged_requests(
-        self, prompt_lengths: list[int]
+        self,
+        prompt_lengths: list[int] | tuple[int, ...],
+        reserved_lengths: list[int] | tuple[int, ...] | None = None,
     ) -> tuple[int, ...]:
         """Reserve independent request ids for continuous batching."""
         if not self.use_paged_attn:
             raise RuntimeError(
                 "continuous batching requires PagedAttention"
             )
+        if reserved_lengths is not None and len(reserved_lengths) != len(prompt_lengths):
+            raise ValueError("reserved_lengths must match prompt_lengths")
         request_ids: list[int] = []
         try:
-            for prompt_length in prompt_lengths:
-                req_idx = self.req_tokens_manager.reserve_req(prompt_length)
+            for index, prompt_length in enumerate(prompt_lengths):
+                reserved_length = (
+                    None
+                    if reserved_lengths is None
+                    else int(reserved_lengths[index])
+                )
+                req_idx = self.req_tokens_manager.reserve_req(
+                    int(prompt_length), reserved_length
+                )
                 if req_idx is None:
                     raise RuntimeError(
                         "Paged KV request or page capacity is exhausted"
@@ -487,6 +498,17 @@ class ModelExecutor:
                 self.req_tokens_manager.free_req(req_idx)
             raise
         return tuple(request_ids)
+
+    def ensure_paged_request_capacity(
+        self, req_idx: int, total_tokens: int
+    ) -> None:
+        """Reserve physical KV pages without changing logical seq length."""
+        if not self.use_paged_attn:
+            return
+        if not self.req_tokens_manager.ensure_req_capacity(req_idx, total_tokens):
+            raise RuntimeError(
+                f"Paged KV capacity reservation failed for request {req_idx}"
+            )
 
     def share_paged_request_from_cache(
         self, prompt_tokens: list[int] | tuple[int, ...]

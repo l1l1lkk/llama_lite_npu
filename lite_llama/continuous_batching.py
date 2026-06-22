@@ -663,10 +663,25 @@ class ContinuousBatchModelBackend:
                 return int(req_idx), len(context_tokens), int(token_id)
         return None
 
+    def _chunked_prefill_reserved_tokens(self, request: BatchRequest) -> int:
+        # Reserve prompt replay plus the first generated token slot up front.
+        # Logical seq_len still advances incrementally through prefill_cursor.
+        requested = len(request.model_context_tokens) + 1
+        max_seq_len = getattr(self.executor.req_tokens_manager, "max_seq_len", requested)
+        return min(requested, int(max_seq_len))
+
     def _ensure_incremental_request(self, request: BatchRequest) -> None:
         if request.model_request_id is not None:
+            if hasattr(self.executor, "ensure_paged_request_capacity"):
+                self.executor.ensure_paged_request_capacity(
+                    int(request.model_request_id),
+                    self._chunked_prefill_reserved_tokens(request),
+                )
             return
-        request_ids = self.executor.reserve_paged_requests((1,))
+        request_ids = self.executor.reserve_paged_requests(
+            (1,),
+            reserved_lengths=(self._chunked_prefill_reserved_tokens(request),),
+        )
         request.model_request_id = int(request_ids[0])
         request.prefill_cursor = 0
 
@@ -1020,6 +1035,13 @@ class ContinuousBatchModelBackend:
                 req_idx, matched_tokens, token_id = cached
                 request.model_request_id = int(req_idx)
                 request.prefill_cursor = int(matched_tokens)
+                if token_id is None and hasattr(
+                    self.executor, "ensure_paged_request_capacity"
+                ):
+                    self.executor.ensure_paged_request_capacity(
+                        int(req_idx),
+                        self._chunked_prefill_reserved_tokens(request),
+                    )
                 if token_id is not None:
                     import torch
 
