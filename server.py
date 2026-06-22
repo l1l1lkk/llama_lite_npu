@@ -213,6 +213,10 @@ class _TpCoordinatedContinuousBackend:
     def eos_token_id(self):
         return self.local_backend.eos_token_id
 
+    @property
+    def max_context_tokens(self):
+        return getattr(self.local_backend, "max_context_tokens", None)
+
     def tokenize(self, prompt):
         return self.local_backend.tokenize(prompt)
 
@@ -531,13 +535,16 @@ def _submit_continuous_request(
     if _continuous_scheduler is None or _continuous_backend is None:
         raise RuntimeError("continuous batching scheduler is not running")
     prompt_tokens = _continuous_backend.tokenize(prompt)
-    return _continuous_scheduler.submit(
-        request_id=request_id,
-        prompt_tokens=prompt_tokens,
-        max_new_tokens=max_tokens,
-        temperature=temperature,
-        top_p=top_p,
-    )
+    try:
+        return _continuous_scheduler.submit(
+            request_id=request_id,
+            prompt_tokens=prompt_tokens,
+            max_new_tokens=max_tokens,
+            temperature=temperature,
+            top_p=top_p,
+        )
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from error
 
 
 async def _collect_continuous_request(batch_request):

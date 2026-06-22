@@ -166,6 +166,10 @@ class BatchRequest:
 
 
 class ContinuousBatchBackend(Protocol):
+    @property
+    def max_context_tokens(self) -> int | None:
+        ...
+
     def prefill(self, requests: Sequence[BatchRequest]) -> Sequence[int]:
         ...
 
@@ -219,6 +223,10 @@ class ContinuousBatchScheduler:
         self.max_preemptions = int(max_preemptions)
         if self.max_preemptions < 0:
             raise ValueError("max_preemptions must be non-negative")
+        max_context_tokens = getattr(backend, "max_context_tokens", None)
+        self.max_context_tokens = (
+            None if max_context_tokens is None else int(max_context_tokens)
+        )
         self._pending: deque[BatchRequest] = deque()
         self._prefilling: list[BatchRequest] = []
         self._active: list[BatchRequest] = []
@@ -260,6 +268,25 @@ class ContinuousBatchScheduler:
         with self._lock:
             if len(self._pending) >= self.max_waiting_requests:
                 raise RuntimeError("continuous batching waiting queue is full")
+            if self.max_context_tokens is not None:
+                prompt_length = len(prompt_tokens)
+                if prompt_length >= self.max_context_tokens:
+                    raise ValueError(
+                        "prompt length exceeds model context capacity: "
+                        f"prompt_tokens={prompt_length}, "
+                        f"max_seq_len={self.max_context_tokens}. "
+                        "Increase --max_seq_len or reduce prompt length."
+                    )
+                requested_total = prompt_length + int(max_new_tokens)
+                if requested_total > self.max_context_tokens:
+                    raise ValueError(
+                        "requested prompt plus generation exceeds model context "
+                        "capacity: "
+                        f"prompt_tokens={prompt_length}, "
+                        f"max_tokens={int(max_new_tokens)}, "
+                        f"max_seq_len={self.max_context_tokens}. "
+                        "Increase --max_seq_len or reduce --max-tokens."
+                    )
             request = BatchRequest(
                 request_id=request_id,
                 prompt_tokens=prompt_tokens,
@@ -373,6 +400,16 @@ class ContinuousBatchScheduler:
         limit = min(len(requests), int(self.max_decode_tokens))
         return list(requests[:limit]), list(requests[limit:])
 
+    def _release_context_full(
+        self, requests: Sequence[BatchRequest]
+    ) -> list[BatchRequest]:
+        if self.max_context_tokens is None:
+            return list(requests)
+        for request in requests:
+            if len(request.model_context_tokens) >= self.max_context_tokens:
+                request.finish("length")
+        return self._release_finished(requests)
+
     def _apply_tokens(
         self,
         requests: Sequence[BatchRequest],
@@ -460,6 +497,7 @@ class ContinuousBatchScheduler:
         decode_active, deferred_active = self._select_decode_requests(
             prior_active
         )
+        decode_active = self._release_context_full(decode_active)
         admitted = self._admit(
             self.max_batch_size - len(prior_active) - len(self._prefilling)
         )
@@ -584,6 +622,10 @@ class ContinuousBatchModelBackend:
     @property
     def eos_token_id(self) -> int:
         return int(self.tokenizer.eos_token_id)
+
+    @property
+    def max_context_tokens(self) -> int | None:
+        return int(getattr(self.executor, "max_seq_len", 0)) or None
 
     def tokenize(self, prompt: str) -> list[int]:
         return self.tokenizer.encode(prompt, add_special_tokens=True)

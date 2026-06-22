@@ -1,5 +1,60 @@
 # Bug Records
 
+## 2026-06-22 - Paged KV allocation failure at max_seq_len boundary
+
+### Problem description
+
+During continuous-batching chunked-prefill testing, TP rank 1 crashed in decode:
+
+```text
+RuntimeError: Paged KV allocation failed for request 3:
+current_tokens=1024, max_seq_len=1024, free_pages=10331
+```
+
+### Investigation process
+
+The error message showed that free KV pages were still available, so the failure was not global HBM/KV exhaustion. The request had reached its per-request sequence limit: `current_tokens == max_seq_len`.
+
+The stack trace failed at:
+
+```text
+ContinuousBatchModelBackend.decode()
+  -> ModelExecutor.extend_paged_requests()
+```
+
+That happens after a decode step when the backend tries to reserve KV space for the next token.
+
+### Finding
+
+The scheduler allowed impossible requests into the model path:
+
+```text
+prompt_tokens + requested_generation_tokens > max_seq_len
+```
+
+With `max_seq_len=1024`, a prompt close to 1024 tokens leaves no room for 128 generated tokens. The worker rank eventually hit the per-request context boundary and crashed.
+
+### Analysis
+
+This was not caused by NPU Graph capture, TP command acknowledgement, or `control_id` drift. The failing layer was admission control and decode-boundary handling.
+
+Production inference engines such as vLLM treat `max_model_len` as a hard request contract: the prompt plus requested output must fit the model context. If it does not fit, the request should be rejected before scheduling rather than allowed to fail inside KV allocation.
+
+### Resolution
+
+`v0.0.8rc6` adds context-length guards:
+
+- scheduler submission rejects prompts at or beyond context capacity;
+- scheduler submission rejects `prompt_tokens + max_new_tokens > max_seq_len`;
+- active requests whose context is already full are finished with `length` before backend decode;
+- the server returns HTTP 400 for context-capacity request errors.
+
+### Prevention
+
+- Benchmark commands must set `--max_seq_len >= prompt_tokens + max_tokens` after chat-template/tokenizer expansion.
+- For random EvalScope prompts up to about 1024 tokens with `--max-tokens 128`, use `--max_seq_len 1536` or `2048`.
+- Keep context-capacity validation in the scheduler, not only in the KV allocator.
+
 ## 2026-06-22 - TP command dispatch advanced state without worker acknowledgement
 
 ### Problem description

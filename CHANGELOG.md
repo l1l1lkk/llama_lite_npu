@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.0.8rc6] - 2026-06-22
+
+Bugfix release for continuous-batching context-length admission.
+
+### Fixed
+
+- Added scheduler admission validation for `prompt_tokens + max_tokens > max_seq_len`.
+- Added a decode-time context-full guard so active requests finish with `length` before entering backend decode when KV context capacity is exhausted.
+- Exposed `max_context_tokens` through the continuous-batching backend and TP coordinator.
+- Converted continuous-batching context-capacity submission failures into HTTP 400 errors.
+
+### Tests
+
+- Added regression coverage for prompt-at-capacity rejection.
+- Added regression coverage for prompt-plus-generation over-capacity rejection.
+- Added regression coverage that context-full active requests are released without calling backend decode.
+
+### Docs
+
+- [v0.0.8rc6 release report](docs/releases/v0.0.8rc6.md)
+
 ## [0.0.8rc5] - 2026-06-22
 
 Bugfix release for transactional TP continuous-batching control.

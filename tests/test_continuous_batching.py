@@ -33,6 +33,7 @@ def load_batching_module():
 
 class FakeBackend:
     def __init__(self):
+        self.max_context_tokens = None
         self.prefill_tokens = {}
         self.prefill_chunk_tokens = {}
         self.decode_tokens = {}
@@ -179,6 +180,37 @@ class ContinuousBatchSchedulerTest(unittest.TestCase):
         scheduler.step()
         self.assertEqual(backend.prefill_calls, [["a"], ["b"]])
 
+    def test_submit_rejects_prompt_at_context_capacity(self):
+        scheduler, backend = self._make_scheduler()
+        scheduler.max_context_tokens = 4
+        backend.max_context_tokens = 4
+
+        with self.assertRaisesRegex(ValueError, "prompt length exceeds"):
+            scheduler.submit("too-long", [1, 2, 3, 4], 1, 0.0, 1.0)
+
+    def test_submit_rejects_prompt_plus_generation_over_context_capacity(self):
+        scheduler, backend = self._make_scheduler()
+        scheduler.max_context_tokens = 4
+        backend.max_context_tokens = 4
+
+        with self.assertRaisesRegex(ValueError, "prompt plus generation"):
+            scheduler.submit("too-long", [1, 2, 3], 2, 0.0, 1.0)
+
+    def test_context_full_active_request_finishes_before_decode(self):
+        scheduler, backend = self._make_scheduler()
+        scheduler.max_context_tokens = 3
+        backend.decode_tokens = {"full": [99]}
+        request = scheduler.submit("full", [1], 2, 0.0, 1.0)
+        request.generated_token_ids = [10, 11]
+        scheduler._pending.clear()
+        scheduler._active = [request]
+
+        scheduler.step()
+
+        self.assertTrue(request.finished)
+        self.assertEqual(request.finish_reason, "length")
+        self.assertEqual(backend.decode_calls, [])
+        self.assertEqual(backend.released, ["full"])
 
     def test_prefill_token_budget_limits_admission(self):
         scheduler, backend = self._make_scheduler(max_batch_size=4)
