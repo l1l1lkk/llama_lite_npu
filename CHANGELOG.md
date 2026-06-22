@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.0.8rc4] - 2026-06-22
+
+Bugfix release for TP continuous-batching control-id synchronization.
+
+### Fixed
+
+- Added rank-0 worker-known control-id tracking for TP continuous batching.
+- Prevented rank 0 from sending decode commands for requests that were not mirrored to worker ranks.
+- Rolled back newly allocated local request ids when chunked-prefill preparation fails before worker dispatch.
+- Made worker ranks tolerate release commands for already-unknown control ids, keeping release cleanup idempotent.
+
+### Tests
+
+- Added server contract tests for worker-known control-id tracking and idempotent worker release handling.
+
+### Docs
+
+- [v0.0.8rc4 release report](docs/releases/v0.0.8rc4.md)
+
 ## [0.0.8rc3] - 2026-06-22
 
 Bugfix release for TP chunked-prefill capacity handling.

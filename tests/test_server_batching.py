@@ -53,6 +53,20 @@ class ServerContinuousBatchingContractTest(unittest.TestCase):
         self.assertNotIn("broadcast_object_list", coordinator_source)
         self.assertNotIn("TensorCommandChannel", coordinator_source)
 
+    def test_tp_coordinator_tracks_worker_known_control_ids(self):
+        start = self.source.index("class _TpCoordinatedContinuousBackend")
+        end = self.source.index("def _tp_continuous_worker_loop")
+        coordinator_source = self.source[start:end]
+        self.assertIn("_worker_known_control_ids", coordinator_source)
+        self.assertIn("prefill state was not mirrored", coordinator_source)
+        self.assertIn("prepare_prefill_chunk", coordinator_source)
+
+    def test_tp_worker_ignores_release_for_unknown_control_ids(self):
+        worker_start = self.source.index("def _tp_continuous_worker_loop")
+        worker_source = self.source[worker_start:]
+        self.assertIn('if command.operation == "release":', worker_source)
+        self.assertIn("continue", worker_source)
+
 
 if __name__ == "__main__":
     unittest.main()

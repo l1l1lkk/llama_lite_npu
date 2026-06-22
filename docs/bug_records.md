@@ -1,5 +1,50 @@
 # Bug Records
 
+## 2026-06-22 - TP worker unknown continuous batching control id
+
+### Problem description
+
+After the chunked-prefill KV capacity fixes, TP rank 1 could still crash with:
+
+```text
+RuntimeError: unknown continuous batching control_id: 19
+server.py -> _tp_continuous_worker_loop()
+```
+
+This happened when rank 0 sent a decode command for a request that rank 1 did not have in its `requests_by_id` mirror.
+
+### Investigation process
+
+The new error was no longer a KV allocation failure. It appeared in the TP control-plane reconstruction path before model execution. That means rank 0's scheduler believed the request had completed prefill and entered decode, while the worker rank had not seen or retained the corresponding prefill/chunked-prefill create command.
+
+### Finding
+
+`v0.0.8rc3` added rank-0 `prepare_prefill_chunk(...)` before worker dispatch. That fixed worker-first KV allocation failures, but it introduced/left exposed a control-plane edge case: local request state could be prepared or partially rolled forward before the worker-side mirror was guaranteed to exist.
+
+### Analysis
+
+In TP continuous batching there are two independent states:
+
+- rank 0 scheduler/local model state;
+- worker-rank mirrored request state keyed by `control_id`.
+
+Decode commands are only valid if the worker already knows the same `control_id`. If rank 0 sends decode for an unmirrored id, the worker cannot safely reconstruct KV state because doing prefill locally would not match rank 0's collective execution shape.
+
+### Resolution
+
+`v0.0.8rc4` adds worker-known control-id tracking in `_TpCoordinatedContinuousBackend`:
+
+- rank 0 records ids after sending `prefill` or `prefill_chunk`;
+- rank 0 refuses to send `decode` for ids not known by workers;
+- failed `prepare_prefill_chunk(...)` rolls back newly allocated local request ids before any worker command is sent;
+- worker `release` ignores unknown ids so cleanup remains idempotent.
+
+### Prevention
+
+- Treat TP worker request creation as a control-plane contract.
+- Do not send decode unless prefill creation was mirrored.
+- Release commands should be idempotent and safe for unknown ids.
+
 ## 2026-06-22 - Chunked prefill mid-replay Paged KV allocation failure
 
 ### Problem description

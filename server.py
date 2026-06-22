@@ -207,6 +207,7 @@ class _TpCoordinatedContinuousBackend:
 
         self.local_backend = local_backend
         self.channel = StoreCommandChannel()
+        self._worker_known_control_ids = set()
 
     @property
     def eos_token_id(self):
@@ -222,19 +223,51 @@ class _TpCoordinatedContinuousBackend:
         from lite_llama.executor.tp_control import encode_prefill
 
         self.channel.send(encode_prefill(requests))
+        self._worker_known_control_ids.update(
+            int(request.control_id) for request in requests
+        )
         return self.local_backend.prefill(requests)
 
     def prefill_chunk(self, requests, chunk_size):
         from lite_llama.executor.tp_control import encode_prefill_chunk
 
-        if hasattr(self.local_backend, "prepare_prefill_chunk"):
-            self.local_backend.prepare_prefill_chunk(requests, chunk_size)
+        previous_model_request_ids = {
+            request: request.model_request_id for request in requests
+        }
+        try:
+            if hasattr(self.local_backend, "prepare_prefill_chunk"):
+                self.local_backend.prepare_prefill_chunk(requests, chunk_size)
+        except BaseException:
+            newly_allocated = [
+                request
+                for request, previous_id in previous_model_request_ids.items()
+                if previous_id is None and request.model_request_id is not None
+            ]
+            if newly_allocated:
+                try:
+                    self.local_backend.release(newly_allocated)
+                except BaseException:
+                    pass
+            raise
         self.channel.send(encode_prefill_chunk(requests, chunk_size))
+        self._worker_known_control_ids.update(
+            int(request.control_id) for request in requests
+        )
         return self.local_backend.prefill_chunk(requests, chunk_size)
 
     def decode(self, requests):
         from lite_llama.executor.tp_control import encode_decode
 
+        unknown = [
+            int(request.control_id)
+            for request in requests
+            if int(request.control_id) not in self._worker_known_control_ids
+        ]
+        if unknown:
+            raise RuntimeError(
+                "TP worker decode requested for unknown control_id(s): "
+                f"{unknown}. This indicates prefill state was not mirrored."
+            )
         self.channel.send(
             encode_decode([request.control_id for request in requests])
         )
@@ -246,7 +279,11 @@ class _TpCoordinatedContinuousBackend:
         self.channel.send(
             encode_release([request.control_id for request in requests])
         )
-        return self.local_backend.release(requests)
+        try:
+            return self.local_backend.release(requests)
+        finally:
+            for request in requests:
+                self._worker_known_control_ids.discard(int(request.control_id))
 
     def preempt(self, requests):
         return self.release(requests)
@@ -298,6 +335,8 @@ def _tp_continuous_worker_loop():
             for control_id in command.control_ids:
                 request = requests_by_id.get(control_id)
                 if request is None:
+                    if command.operation == "release":
+                        continue
                     raise RuntimeError(
                         f"unknown continuous batching control_id: "
                         f"{control_id}"
