@@ -1,5 +1,61 @@
 # Bug Records
 
+## 2026-06-22 - TP command dispatch advanced state without worker acknowledgement
+
+### Problem description
+
+After `v0.0.8rc4`, TP continuous batching could still fail around chunked prefill / decode transitions. The visible symptom was usually a worker-side control-plane crash:
+
+```text
+RuntimeError: unknown continuous batching control_id: 19
+```
+
+or a later NPU/HCCL failure caused by rank 0 and worker ranks entering decode with different request state.
+
+### Investigation process
+
+The failure was not in attention, KV page allocation, or NPU Graph capture itself. The failing layer was the TP continuous-batching control protocol:
+
+```text
+rank0 scheduler -> StoreCommandChannel -> worker requests_by_id mirror -> backend decode/prefill
+```
+
+`v0.0.8rc4` tracked which `control_id`s rank 0 believed workers knew, but that tracking was still optimistic: rank 0 updated local mirror state after sending a command, not after the worker rank had successfully executed it.
+
+### Finding
+
+The protocol did not have a worker acknowledgement or a state snapshot. A command send and a command execution were treated as equivalent. They are not equivalent in a distributed scheduler.
+
+For decode, rank 0 sent only `control_id`s. That was insufficient to prove the worker had the same logical sequence length / decode position as rank 0 before entering the next collective model step.
+
+### Analysis
+
+This is a control-plane consistency bug. TP ranks must enter every model forward with the same batch shape and compatible per-request positions. If rank 0 and rank 1 disagree about:
+
+- whether a request exists;
+- whether chunked prefill finished;
+- the logical sequence length before decode;
+
+then the next collective path is unsafe. The correct invariant is: rank 0 may advance mirrored worker state only after workers acknowledge the exact command that created or updated that state.
+
+### Resolution
+
+`v0.0.8rc5` makes TP continuous-batching dispatch transactional:
+
+- `StoreCommandChannel.send(...)` now returns a sequence id.
+- Workers call `ack(sequence)` only after successful command execution.
+- Workers call `ack(sequence, ok=False, message=...)` before re-raising failures.
+- Rank 0 calls `wait_ack(sequence)` before marking worker state as mirrored.
+- Decode commands now use `decode_state` and carry expected logical sequence lengths.
+- Workers validate decode state before entering model decode and report `TP worker decode_state mismatch` if ranks diverge.
+
+### Prevention
+
+- Treat scheduler commands as execution plans, not fire-and-forget notifications.
+- Make worker execution observable before rank 0 mutates mirrored-state assumptions.
+- Carry enough state in decode commands to validate shape/position invariants before collectives.
+- Keep release idempotent and failure messages explicit.
+
 ## 2026-06-22 - TP worker unknown continuous batching control id
 
 ### Problem description

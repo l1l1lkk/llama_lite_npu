@@ -102,12 +102,24 @@ class TensorCommandCodecTest(unittest.TestCase):
         store = FakeStore()
         sender = module.StoreCommandChannel(store=store)
         receiver = module.StoreCommandChannel(store=store)
-        sender.send(module.encode_decode([7, 8]))
+        sequence = sender.send(module.encode_decode([7, 8]))
 
-        decoded = receiver.receive()
+        received_sequence, decoded = receiver.receive_with_sequence()
 
+        self.assertEqual(sequence, 0)
+        self.assertEqual(received_sequence, 0)
         self.assertEqual(decoded.operation, "decode")
         self.assertEqual(decoded.control_ids, [7, 8])
+
+    def test_store_command_channel_has_ack_protocol(self):
+        source = MODULE_PATH.read_text(encoding="utf-8")
+        start = source.index("class StoreCommandChannel")
+        end = source.index("class TensorCommandChannel")
+        store_source = source[start:end]
+
+        self.assertIn("def ack", store_source)
+        self.assertIn("def wait_ack", store_source)
+        self.assertIn("/ack/", store_source)
 
     def test_decode_release_and_shutdown_round_trip(self):
         module = load_module()
@@ -123,6 +135,26 @@ class TensorCommandCodecTest(unittest.TestCase):
         shutdown = module.decode_command(*module.encode_shutdown())
         self.assertEqual(shutdown.operation, "shutdown")
         self.assertEqual(shutdown.control_ids, [])
+
+    def test_decode_state_round_trip(self):
+        module = load_module()
+        requests = [
+            SimpleNamespace(
+                control_id=3,
+                model_context_tokens=[10, 11, 12],
+            ),
+            SimpleNamespace(
+                control_id=8,
+                model_context_tokens=[20, 21],
+            ),
+        ]
+
+        decoded = module.decode_command(*module.encode_decode_state(requests))
+
+        self.assertEqual(decoded.operation, "decode_state")
+        self.assertEqual(decoded.control_ids, [3, 8])
+        self.assertEqual(decoded.expected_seq_lens, [3, 2])
+        self.assertEqual(decoded.prompt_tokens, [])
 
     def test_prefill_chunk_round_trip(self):
         module = load_module()

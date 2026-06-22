@@ -222,11 +222,13 @@ class _TpCoordinatedContinuousBackend:
     def prefill(self, requests):
         from lite_llama.executor.tp_control import encode_prefill
 
-        self.channel.send(encode_prefill(requests))
+        sequence = self.channel.send(encode_prefill(requests))
+        result = self.local_backend.prefill(requests)
+        self.channel.wait_ack(sequence)
         self._worker_known_control_ids.update(
             int(request.control_id) for request in requests
         )
-        return self.local_backend.prefill(requests)
+        return result
 
     def prefill_chunk(self, requests, chunk_size):
         from lite_llama.executor.tp_control import encode_prefill_chunk
@@ -249,14 +251,16 @@ class _TpCoordinatedContinuousBackend:
                 except BaseException:
                     pass
             raise
-        self.channel.send(encode_prefill_chunk(requests, chunk_size))
+        sequence = self.channel.send(encode_prefill_chunk(requests, chunk_size))
+        result = self.local_backend.prefill_chunk(requests, chunk_size)
+        self.channel.wait_ack(sequence)
         self._worker_known_control_ids.update(
             int(request.control_id) for request in requests
         )
-        return self.local_backend.prefill_chunk(requests, chunk_size)
+        return result
 
     def decode(self, requests):
-        from lite_llama.executor.tp_control import encode_decode
+        from lite_llama.executor.tp_control import encode_decode_state
 
         unknown = [
             int(request.control_id)
@@ -268,19 +272,21 @@ class _TpCoordinatedContinuousBackend:
                 "TP worker decode requested for unknown control_id(s): "
                 f"{unknown}. This indicates prefill state was not mirrored."
             )
-        self.channel.send(
-            encode_decode([request.control_id for request in requests])
-        )
-        return self.local_backend.decode(requests)
+        sequence = self.channel.send(encode_decode_state(requests))
+        result = self.local_backend.decode(requests)
+        self.channel.wait_ack(sequence)
+        return result
 
     def release(self, requests):
         from lite_llama.executor.tp_control import encode_release
 
-        self.channel.send(
+        sequence = self.channel.send(
             encode_release([request.control_id for request in requests])
         )
         try:
-            return self.local_backend.release(requests)
+            result = self.local_backend.release(requests)
+            self.channel.wait_ack(sequence)
+            return result
         finally:
             for request in requests:
                 self._worker_known_control_ids.discard(int(request.control_id))
@@ -291,7 +297,8 @@ class _TpCoordinatedContinuousBackend:
     def shutdown_workers(self):
         from lite_llama.executor.tp_control import encode_shutdown
 
-        self.channel.send(encode_shutdown())
+        sequence = self.channel.send(encode_shutdown())
+        self.channel.wait_ack(sequence)
 
 
 def _tp_continuous_worker_loop():
@@ -310,54 +317,80 @@ def _tp_continuous_worker_loop():
     channel = StoreCommandChannel()
     requests_by_id = {}
     while True:
-        command = channel.receive()
+        sequence, command = channel.receive_with_sequence()
         if command.operation == "shutdown":
+            channel.ack(sequence)
             break
 
-        worker_requests = []
-        if command.operation in ("prefill", "prefill_chunk"):
-            for index, control_id in enumerate(command.control_ids):
-                request = requests_by_id.get(control_id)
-                if request is None:
-                    request = BatchRequest(
-                        request_id=f"tp-worker-{control_id}",
-                        control_id=control_id,
-                        prompt_tokens=command.prompt_tokens[index],
-                        max_new_tokens=command.max_new_tokens[index],
-                        temperature=command.temperatures[index],
-                        top_p=command.top_ps[index],
-                    )
-                    requests_by_id[control_id] = request
-                if command.operation == "prefill_chunk":
-                    request.prefill_cursor = command.prefill_cursors[index]
-                worker_requests.append(request)
-        else:
-            for control_id in command.control_ids:
-                request = requests_by_id.get(control_id)
-                if request is None:
-                    if command.operation == "release":
-                        continue
-                    raise RuntimeError(
-                        f"unknown continuous batching control_id: "
-                        f"{control_id}"
-                    )
-                worker_requests.append(request)
+        try:
+            worker_requests = []
+            if command.operation in ("prefill", "prefill_chunk"):
+                for index, control_id in enumerate(command.control_ids):
+                    request = requests_by_id.get(control_id)
+                    if request is None:
+                        request = BatchRequest(
+                            request_id=f"tp-worker-{control_id}",
+                            control_id=control_id,
+                            prompt_tokens=command.prompt_tokens[index],
+                            max_new_tokens=command.max_new_tokens[index],
+                            temperature=command.temperatures[index],
+                            top_p=command.top_ps[index],
+                        )
+                        requests_by_id[control_id] = request
+                    if command.operation == "prefill_chunk":
+                        request.prefill_cursor = command.prefill_cursors[index]
+                    worker_requests.append(request)
+            else:
+                for control_id in command.control_ids:
+                    request = requests_by_id.get(control_id)
+                    if request is None:
+                        if command.operation == "release":
+                            continue
+                        raise RuntimeError(
+                            f"unknown continuous batching control_id: "
+                            f"{control_id}"
+                        )
+                    worker_requests.append(request)
 
-        if command.operation == "prefill":
-            backend.prefill(worker_requests)
-        elif command.operation == "prefill_chunk":
-            backend.prefill_chunk(worker_requests, command.chunk_size)
-        elif command.operation == "decode":
-            backend.decode(worker_requests)
-        elif command.operation == "release":
-            backend.release(worker_requests)
-            for request in worker_requests:
-                requests_by_id.pop(request.control_id, None)
-        else:
-            raise RuntimeError(
-                f"unknown continuous batching TP operation: "
-                f"{command.operation}"
-            )
+            if command.operation == "prefill":
+                backend.prefill(worker_requests)
+            elif command.operation == "prefill_chunk":
+                backend.prefill_chunk(worker_requests, command.chunk_size)
+            elif command.operation in ("decode", "decode_state"):
+                if command.operation == "decode_state":
+                    for request, expected_seq_len in zip(
+                        worker_requests, command.expected_seq_lens
+                    ):
+                        req_idx = int(request.model_request_id)
+                        expected_input_position = int(expected_seq_len) - 1
+                        actual_input_position = int(
+                            backend._device_positions[req_idx]
+                            .detach()
+                            .cpu()
+                            .item()
+                        )
+                        if actual_input_position != expected_input_position:
+                            raise RuntimeError(
+                                "TP worker decode_state mismatch: "
+                                f"control_id={request.control_id}, "
+                                f"model_request_id={req_idx}, "
+                                f"expected_seq_len={expected_seq_len}, "
+                                f"actual_input_position={actual_input_position}"
+                            )
+                backend.decode(worker_requests)
+            elif command.operation == "release":
+                backend.release(worker_requests)
+                for request in worker_requests:
+                    requests_by_id.pop(request.control_id, None)
+            else:
+                raise RuntimeError(
+                    f"unknown continuous batching TP operation: "
+                    f"{command.operation}"
+                )
+            channel.ack(sequence)
+        except BaseException as error:
+            channel.ack(sequence, ok=False, message=str(error))
+            raise
 
 
 # ---------------------------------------------------------------------------

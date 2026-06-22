@@ -60,12 +60,31 @@ class ServerContinuousBatchingContractTest(unittest.TestCase):
         self.assertIn("_worker_known_control_ids", coordinator_source)
         self.assertIn("prefill state was not mirrored", coordinator_source)
         self.assertIn("prepare_prefill_chunk", coordinator_source)
+        self.assertIn("wait_ack", coordinator_source)
 
     def test_tp_worker_ignores_release_for_unknown_control_ids(self):
         worker_start = self.source.index("def _tp_continuous_worker_loop")
         worker_source = self.source[worker_start:]
         self.assertIn('if command.operation == "release":', worker_source)
         self.assertIn("continue", worker_source)
+
+    def test_tp_worker_acks_success_and_failure(self):
+        worker_start = self.source.index("def _tp_continuous_worker_loop")
+        worker_source = self.source[worker_start:]
+        self.assertIn("receive_with_sequence", worker_source)
+        self.assertIn("channel.ack(sequence)", worker_source)
+        self.assertIn("channel.ack(sequence, ok=False", worker_source)
+
+    def test_tp_decode_carries_state_snapshot(self):
+        start = self.source.index("class _TpCoordinatedContinuousBackend")
+        worker_start = self.source.index("def _tp_continuous_worker_loop")
+        coordinator_source = self.source[start:worker_start]
+        worker_source = self.source[worker_start:]
+
+        self.assertIn("encode_decode_state", coordinator_source)
+        self.assertIn('"decode_state"', worker_source)
+        self.assertIn("expected_seq_lens", worker_source)
+        self.assertIn("TP worker decode_state mismatch", worker_source)
 
 
 if __name__ == "__main__":

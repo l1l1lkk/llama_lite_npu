@@ -19,6 +19,7 @@ _OP_DECODE = 2
 _OP_RELEASE = 3
 _OP_SHUTDOWN = 4
 _OP_PREFILL_CHUNK = 5
+_OP_DECODE_STATE = 6
 
 _OPERATION_NAMES = {
     _OP_PREFILL: "prefill",
@@ -26,6 +27,7 @@ _OPERATION_NAMES = {
     _OP_RELEASE: "release",
     _OP_SHUTDOWN: "shutdown",
     _OP_PREFILL_CHUNK: "prefill_chunk",
+    _OP_DECODE_STATE: "decode_state",
 }
 
 
@@ -38,6 +40,7 @@ class DecodedCommand(NamedTuple):
     top_ps: list[float]
     prefill_cursors: list[int] = []
     chunk_size: int = 0
+    expected_seq_lens: list[int] = []
 
 
 def _header(operation: int, batch_size: int, ints, floats):
@@ -92,6 +95,20 @@ def encode_decode(control_ids: Sequence[int]):
     return _encode_ids(_OP_DECODE, control_ids)
 
 
+def encode_decode_state(requests):
+    integers: list[int] = []
+    for request in requests:
+        if request.control_id is None:
+            raise RuntimeError("continuous batching request has no control_id")
+        integers.extend(
+            [
+                int(request.control_id),
+                len(request.model_context_tokens),
+            ]
+        )
+    return _header(_OP_DECODE_STATE, len(requests), integers, []), integers, []
+
+
 def encode_release(control_ids: Sequence[int]):
     return _encode_ids(_OP_RELEASE, control_ids)
 
@@ -122,6 +139,7 @@ def decode_command(header, integers, floats) -> DecodedCommand:
 
     prefill_cursors: list[int] = []
     chunk_size = 0
+    expected_seq_lens: list[int] = []
     if operation == "prefill":
         control_ids: list[int] = []
         prompt_tokens: list[list[int]] = []
@@ -171,6 +189,19 @@ def decode_command(header, integers, floats) -> DecodedCommand:
             raise RuntimeError("invalid TP prefill_chunk payload")
         temperatures = floats[0::2]
         top_ps = floats[1::2]
+    elif operation == "decode_state":
+        if len(integers) != batch_size * 2 or floats:
+            raise RuntimeError("invalid TP decode_state payload")
+        control_ids = []
+        expected_seq_lens = []
+        for index in range(batch_size):
+            control_id, expected_seq_len = integers[index * 2 : index * 2 + 2]
+            control_ids.append(control_id)
+            expected_seq_lens.append(expected_seq_len)
+        prompt_tokens = []
+        max_new_tokens = []
+        temperatures = []
+        top_ps = []
     else:
         if len(integers) != batch_size or floats:
             raise RuntimeError(f"invalid TP {operation} payload")
@@ -189,6 +220,7 @@ def decode_command(header, integers, floats) -> DecodedCommand:
         top_ps=top_ps,
         prefill_cursors=prefill_cursors,
         chunk_size=chunk_size,
+        expected_seq_lens=expected_seq_lens,
     )
 
 
@@ -273,14 +305,59 @@ class StoreCommandChannel:
     def _key(self) -> str:
         return f"{self.prefix}/{self.sequence}"
 
-    def send(self, encoded) -> None:
+    def _ack_key(self, sequence: int, rank: int) -> str:
+        return f"{self.prefix}/ack/{int(sequence)}/{int(rank)}"
+
+    def send(self, encoded) -> int:
+        sequence = self.sequence
         self.store.set(self._key(), encode_store_payload(encoded))
         self.sequence += 1
+        return sequence
 
     def receive(self) -> DecodedCommand:
         payload = self.store.get(self._key())
         self.sequence += 1
         return decode_store_payload(payload)
+
+    def receive_with_sequence(self) -> tuple[int, DecodedCommand]:
+        sequence = self.sequence
+        return sequence, self.receive()
+
+    def ack(self, sequence: int, ok: bool = True, message: str = "") -> None:
+        import torch
+
+        if not torch.distributed.is_available() or not torch.distributed.is_initialized():
+            return
+        rank = torch.distributed.get_rank()
+        payload = json.dumps(
+            {
+                "ok": bool(ok),
+                "message": str(message),
+            },
+            separators=(",", ":"),
+        ).encode("utf-8")
+        self.store.set(self._ack_key(sequence, rank), payload)
+
+    def wait_ack(self, sequence: int) -> None:
+        import torch
+
+        if not torch.distributed.is_available() or not torch.distributed.is_initialized():
+            return
+        rank = torch.distributed.get_rank()
+        world_size = torch.distributed.get_world_size()
+        for worker_rank in range(world_size):
+            if worker_rank == rank:
+                continue
+            payload = self.store.get(self._ack_key(sequence, worker_rank))
+            if isinstance(payload, bytes):
+                payload = payload.decode("utf-8")
+            data = json.loads(payload)
+            if not data.get("ok", False):
+                raise RuntimeError(
+                    "TP worker command failed: "
+                    f"sequence={sequence}, rank={worker_rank}, "
+                    f"message={data.get('message', '')}"
+                )
 
 
 class TensorCommandChannel:

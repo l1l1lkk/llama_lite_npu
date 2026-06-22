@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.0.8rc5] - 2026-06-22
+
+Bugfix release for transactional TP continuous-batching control.
+
+### Fixed
+
+- Added a TCPStore command acknowledgement protocol for TP continuous batching so rank 0 only advances mirrored worker state after worker ranks finish the command.
+- Replaced decode-only `control_id` messages with `decode_state` snapshots carrying expected logical sequence lengths.
+- Added worker-side decode-state validation before entering decode collectives, turning rank drift into an explicit control-plane error instead of a late NPU/HCCL failure.
+- Made TP worker shutdown acknowledge the final command before rank 0 exits the control loop.
+
+### Tests
+
+- Added command-channel acknowledgement protocol coverage.
+- Added decode-state codec coverage.
+- Added server contract coverage for transactional decode-state dispatch.
+
+### Docs
+
+- [v0.0.8rc5 release report](docs/releases/v0.0.8rc5.md)
+
 ## [0.0.8rc4] - 2026-06-22
 
 Bugfix release for TP continuous-batching control-id synchronization.
