@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.0.8rc9] - 2026-06-22
+
+Bugfix release for a `v0.0.8rc8` `ModelExecutor` initialization regression.
+
+### Fixed
+
+- Moved `_infer_safe_prefill_tokens()` out of the middle of `ModelExecutor.__init__`.
+- Restored initialization of request manager, attention metadata, prefix cache, block prefix cache, and NPU Graph runner state.
+- Added a source-level regression test to ensure the safe-prefill helper does not split constructor initialization again.
+
+### Docs
+
+- [v0.0.8rc9 release report](docs/releases/v0.0.8rc9.md)
+
 ## [0.0.8rc8] - 2026-06-22
 
 Bugfix release for packed-prefill Triton grid overflow in continuous batching.

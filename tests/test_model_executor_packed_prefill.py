@@ -21,6 +21,16 @@ class ModelExecutorPackedPrefillContractTest(unittest.TestCase):
         self.assertIn("sample_indices", source)
         self.assertIn("position_ids", source)
 
+    def test_safe_prefill_helper_does_not_split_constructor_initialization(self):
+        source = MODULE_PATH.read_text(encoding="utf-8")
+
+        helper_index = source.index("def _infer_safe_prefill_tokens")
+        prefix_cache_index = source.index("self._paged_prefix_cache")
+        request_manager_index = source.index("self.req_tokens_manager =")
+
+        self.assertGreater(helper_index, prefix_cache_index)
+        self.assertGreater(helper_index, request_manager_index)
+
 
 if __name__ == "__main__":
     unittest.main()

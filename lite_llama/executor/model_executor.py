@@ -262,21 +262,6 @@ class ModelExecutor:
                 max_gpu_num_blocks, block_size=1, device=self.device
             )
 
-    def _infer_safe_prefill_tokens(self) -> int | None:
-        """Return a conservative packed-prefill token budget.
-
-        Qwen3 applies Q/K RMSNorm on tensors shaped roughly as
-        ``[total_prefill_tokens, local_q_heads, head_dim]``.  The current
-        Triton RMSNorm launch uses one program per flattened row and cannot
-        exceed 65535 grid rows.  Keep scheduler-produced packed prefill below
-        that kernel limit by default.
-        """
-        local_q_heads = int(getattr(self, "local_q_heads", 0) or 0)
-        if local_q_heads <= 0:
-            return None
-        safe_grid_rows = 60000
-        return max(1, safe_grid_rows // local_q_heads)
-
         self.max_request_num = max_gpu_num_blocks // self.max_seq_len
 
         if self.use_paged_attn:
@@ -323,6 +308,21 @@ class ModelExecutor:
                     self.model_type,
                     self.tp.moe_parallel_mode,
                 )
+
+    def _infer_safe_prefill_tokens(self) -> int | None:
+        """Return a conservative packed-prefill token budget.
+
+        Qwen3 applies Q/K RMSNorm on tensors shaped roughly as
+        ``[total_prefill_tokens, local_q_heads, head_dim]``.  The current
+        Triton RMSNorm launch uses one program per flattened row and cannot
+        exceed 65535 grid rows.  Keep scheduler-produced packed prefill below
+        that kernel limit by default.
+        """
+        local_q_heads = int(getattr(self, "local_q_heads", 0) or 0)
+        if local_q_heads <= 0:
+            return None
+        safe_grid_rows = 60000
+        return max(1, safe_grid_rows // local_q_heads)
 
     def _get_max_avaliable_tokens(self,model, gpu_memory_utilization=0.9, block_size=1):
         avaliable_blocks = ComputeMaxAvailableBlocks(

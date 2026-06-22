@@ -1,5 +1,61 @@
 # Bug Records
 
+## 2026-06-22 - ModelExecutor constructor was split by safe-prefill helper
+
+### Problem description
+
+After `v0.0.8rc8`, the server started successfully and printed:
+
+```text
+[Continuous batching: max_batch_size=32, max_prefill_tokens=1875, ...]
+```
+
+but rank 1 crashed on the first continuous-batching prefill:
+
+```text
+AttributeError: 'ModelExecutor' object has no attribute '_paged_prefix_cache'
+```
+
+### Investigation process
+
+The traceback pointed to prefix-cache lookup:
+
+```text
+ContinuousBatchModelBackend.prefill()
+  -> _cache_lookup()
+  -> ModelExecutor.share_paged_request_from_cache()
+  -> self._paged_prefix_cache
+```
+
+`_paged_prefix_cache` is supposed to be initialized in `ModelExecutor.__init__`. Inspecting the recent `v0.0.8rc8` diff showed that `_infer_safe_prefill_tokens()` had been inserted before the latter half of constructor initialization.
+
+### Finding
+
+The helper method definition ended the `__init__` block early. Everything after it became unreachable code inside `_infer_safe_prefill_tokens()` after a `return`, including:
+
+```text
+self.max_request_num
+self.req_tokens_manager
+self.atten_info
+self._paged_prefix_cache
+self._paged_block_prefix_cache
+self.graph_runner
+```
+
+### Analysis
+
+This was a code-placement regression, not a runtime race. `py_compile` did not catch it because the file was syntactically valid. Existing tests also did not instantiate a real `ModelExecutor`, so missing constructor attributes were not detected.
+
+### Resolution
+
+`v0.0.8rc9` moves `_infer_safe_prefill_tokens()` below the full constructor body and adds a regression test that checks the helper is placed after request-manager and prefix-cache initialization in the source file.
+
+### Prevention
+
+- Do not insert new methods into the middle of long constructors.
+- For constructor refactors, inspect the surrounding indentation and run source-level contract tests when full hardware instantiation is not feasible.
+- Keep helper methods after the completed constructor or extract constructor sections into explicitly named private initialization methods.
+
 ## 2026-06-22 - Non-chunked packed prefill exceeded Triton grid limit
 
 ### Problem description
