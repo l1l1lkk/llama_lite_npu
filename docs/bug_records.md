@@ -1,5 +1,58 @@
 # Bug Records
 
+## 2026-06-22 - Server max_seq_len was not exposed to model loading
+
+### Problem description
+
+After `v0.0.8rc6`, the server correctly rejected requests whose prompt plus generation exceeded the model context. However, the server CLI did not expose `--max_seq_len`, so users could not raise the context length from the server entrypoint.
+
+Passing this command failed:
+
+```text
+server.py: error: unrecognized arguments: --max_seq_len 2048
+```
+
+### Investigation process
+
+The model generator already supported `max_seq_len`:
+
+```text
+GenerateStreamText(..., max_seq_len=1024)
+Qwen3VLGeneratorStream(..., max_seq_len=2048)
+```
+
+The missing link was `server.py`:
+
+```text
+server CLI -> load_generator(...) -> GenerateStreamText(...)
+```
+
+`server.py` accepted `page_size`, `compiled_model`, and batching parameters, but not `max_seq_len`. Therefore all text server runs used the `GenerateStreamText` default of 1024 regardless of benchmark needs.
+
+### Finding
+
+The rc6 context guard was correct, but server configuration was incomplete. The guard used `ModelExecutor.max_seq_len`, and that value was stuck at 1024 because the server never propagated a user-supplied value.
+
+### Analysis
+
+This was a configuration propagation bug. The execution stack was internally self-consistent, but the public server entrypoint did not expose the key parameter controlling the context limit.
+
+### Resolution
+
+`v0.0.8rc7` adds:
+
+- `server.py --max_seq_len`;
+- propagation into `load_generator(..., max_seq_len=...)`;
+- propagation into `GenerateStreamText` and `Qwen3VLGeneratorStream`;
+- startup logging of the effective max sequence length;
+- server contract tests for this CLI/config path.
+
+### Prevention
+
+- Any runtime parameter used by `ModelExecutor.build(...)` must be exposed or intentionally fixed at the server entrypoint.
+- Startup logs should print effective dynamic benchmark-critical parameters.
+- Contract tests should assert CLI arguments are wired to model construction, not merely parsed.
+
 ## 2026-06-22 - Paged KV allocation failure at max_seq_len boundary
 
 ### Problem description

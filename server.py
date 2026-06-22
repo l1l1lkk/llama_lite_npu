@@ -103,6 +103,7 @@ def load_generator(
     checkpoints_dir: str,
     device: str,
     *,
+    max_seq_len: int = 1024,
     page_size: int = 16,
     compiled_model: bool = True,
     moe_parallel_mode: str = "tp",
@@ -123,6 +124,7 @@ def load_generator(
         _generator = Qwen3VLGeneratorStream(
             checkpoints_dir=checkpoints_dir,
             tokenizer_path=checkpoints_dir,
+            max_seq_len=max_seq_len,
             device=device,
         )
     else:
@@ -130,6 +132,7 @@ def load_generator(
         _generator = GenerateStreamText(
             checkpoints_dir=checkpoints_dir,
             tokenizer_path=checkpoints_dir,
+            max_seq_len=max_seq_len,
             compiled_model=compiled_model,
             page_size=page_size,
             moe_parallel_mode=moe_parallel_mode,
@@ -1035,6 +1038,16 @@ def main():
     parser.add_argument("--page_size", type=int, default=16,
                         help="PagedAttention page size; use 0 to disable.")
     parser.add_argument(
+        "--max_seq_len",
+        type=int,
+        default=1024,
+        help=(
+            "Maximum per-request model context length. This must cover "
+            "prompt tokens plus generated tokens after chat-template "
+            "expansion."
+        ),
+    )
+    parser.add_argument(
         "--compiled_model",
         dest="compiled_model",
         action="store_true",
@@ -1152,6 +1165,7 @@ def main():
     if _rank == 0:
         print(f"Loading model from {args.checkpoints_dir}")
         print(f"Device: {device}, TP: world_size={tp.world_size if _is_tp else 1}")
+        print(f"Max seq len: {args.max_seq_len}")
         print(f"PagedAttention page_size: {args.page_size}")
         print(f"NPU Graph: {'on' if args.compiled_model else 'off'}")
         print(f"MoE parallel mode: {args.moe_parallel_mode.upper()}")
@@ -1160,6 +1174,7 @@ def main():
     load_generator(
         args.checkpoints_dir,
         device,
+        max_seq_len=args.max_seq_len,
         page_size=args.page_size,
         compiled_model=args.compiled_model,
         moe_parallel_mode=args.moe_parallel_mode,

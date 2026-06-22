@@ -17,10 +17,17 @@ class ServerContinuousBatchingContractTest(unittest.TestCase):
             "--continuous_batching",
             "--no_continuous_batching",
             "--max_batch_size",
+            "--max_seq_len",
             "--max_waiting_requests",
             "--scheduler_poll_ms",
         ):
             self.assertIn(option, self.source)
+
+    def test_server_passes_max_seq_len_to_generator(self):
+        self.assertIn("max_seq_len: int = 1024", self.source)
+        self.assertIn("max_seq_len=max_seq_len", self.source)
+        self.assertIn("max_seq_len=args.max_seq_len", self.source)
+        self.assertIn("Max seq len:", self.source)
 
     def test_text_endpoints_submit_to_shared_scheduler(self):
         self.assertIn("_submit_continuous_request", self.source)

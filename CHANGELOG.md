@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.0.8rc7] - 2026-06-22
+
+Bugfix release for server-side `max_seq_len` propagation.
+
+### Fixed
+
+- Exposed `server.py --max_seq_len`.
+- Passed `max_seq_len` from server CLI into `GenerateStreamText` and `Qwen3VLGeneratorStream`.
+- Printed `Max seq len` during server startup so benchmark logs show the actual context length.
+- Added server contract coverage to prevent future CLI/config drift.
+
+### Docs
+
+- [v0.0.8rc7 release report](docs/releases/v0.0.8rc7.md)
+
 ## [0.0.8rc6] - 2026-06-22
 
 Bugfix release for continuous-batching context-length admission.
