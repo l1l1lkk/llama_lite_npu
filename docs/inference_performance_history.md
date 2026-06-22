@@ -15,6 +15,8 @@
 
 | 日期 | 项目版本 | 模型 | 测试工具 | TP / Batch或并发 | 输入 / 输出 | NPU Graph | 执行路径 | 核心吞吐 | 单Token指标 | 备注 |
 |---|---|---|---|---|---|---|---|---:|---:|---|
+| 2026-06-22 | 0.0.8rc9 | Qwen3-32B | EvalScope | TP=2 / concurrency=4 | avg 574.225 / 128 | enabled | Continuous Batching; Greedy; no chunked prefill; auto max_prefill_tokens=1875; packed prefill micro-batch guard | Output 16.6703 tok/s; Total 91.4556 tok/s | TTFT 14.6301s; TPOT 125.8ms; ITL 125.0ms | 40 requests; long mixed prompts; stable after packed-prefill budget guard |
+| 2026-06-22 | 0.0.8rc9 | Qwen3-32B | EvalScope | TP=2 / concurrency=4 | avg 581.1 / 73.75 | enabled | Continuous Batching; Greedy; chunked prefill enabled; prefill chunk replay path | Output 3.4904 tok/s; Total 30.9925 tok/s | TTFT 32.9762s; TPOT 747.4ms; ITL 759.8ms | 40 requests; output path name still used v008rc7; chunked prefill is severe negative for this workload |
 | 2026-06-22 | 0.0.8rc1 | Qwen3-32B | EvalScope | TP=2 / concurrency=1 | avg 184 / 256 | enabled | Continuous Batching; Greedy; fixed-length prompt; packed prefill not stressed | Output 24.7089 tok/s; Total 42.4685 tok/s | TTFT 702.7ms; TPOT 37.9ms; ITL 37.7ms | 20 requests; fixed-length baseline; no decode regression vs v0.0.7rc6 |
 | 2026-06-22 | 0.0.8rc1 | Qwen3-32B | EvalScope | TP=2 / concurrency=4 | avg 285.475 / 245.7 | enabled | Continuous Batching; Greedy; mixed prompt lengths; packed prefill path | Output 50.158 tok/s; Total 108.436 tok/s | TTFT 5117.6ms; TPOT 57.8ms; ITL 57.1ms | 40 requests; mixed-length prefill stress; compare only against same workload |
 | 2026-06-18 | 0.0.7rc6 | Qwen3-32B | EvalScope | TP=2 / concurrency=1 | avg 184.0 / 255.95 | enabled | Continuous Batching; Greedy; exact Prefix Cache on by default; partial Prefix Cache off | Output 24.3149 tok/s; Total 41.7947 tok/s | TTFT 706.3ms; TPOT 38.5ms; ITL 38.4ms | 20 requests; random dataset; rc5 default-partial regression fixed |
@@ -34,6 +36,53 @@
 | 2026-05-18 | 历史代码，commit未记录 | Qwen3-32B | `benchmark_tp.py` | TP=2 / Batch=4 | 约128 / 256 | 关闭 | Eager Decode | 5.4 tok/s；Batch 21.6 tok/s | 185.56 ms/token | 5次平均47.503s |
 | 2026-05-18 | 历史代码，commit未记录 | Qwen3-32B | `benchmark_tp.py` | TP=2 / Batch=4 | 约128 / 256 | 开启但捕获效果未确认 | Graph runner已创建 | 5.3 tok/s；Batch 21.1 tok/s | 189.39 ms/token | 5次平均48.485s；不能作为有效Graph加速结果 |
 | 2026-05-18 | 历史代码，commit未记录 | Qwen3-32B | `benchmark_tp.py` | TP=2 / Batch=4 | 约128 / 256 | 关闭 | Eager Decode | 5.3 tok/s；Batch 21.3 tok/s | 187.91 ms/token | 早期Dense基线；5次平均48.106s |
+
+## 2026-06-22 v0.0.8rc9 Chunked Prefill A/B Test
+
+Environment and command shape:
+
+- Model: Qwen3-32B
+- Hardware: 2 x Atlas 910B3
+- Runtime: OpenAI-compatible `server.py`
+- TP: 2
+- Continuous Batching: enabled
+- Decode NPU Graph: enabled
+- Dataset: EvalScope random
+- Requests: 40
+- Concurrency: 4
+- Prompt length range: 128-1024
+- Max output tokens: 128
+- Sampling: Greedy, `temperature=0`
+- `max_seq_len=2048`
+
+### Raw results
+
+| Scenario | Requests | Concurrency | Avg input tokens | Avg output tokens | Output throughput | Total throughput | Req throughput | Avg latency | TTFT | TPOT | ITL |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| No chunked prefill; auto prefill budget | 40 | 4 | 574.225 | 128.000 | 16.6703 tok/s | 91.4556 tok/s | 0.1302 req/s | 30.6027s | 14.6301s | 125.8ms | 125.0ms |
+| Chunked prefill enabled | 40 | 4 | 581.100 | 73.750 | 3.4904 tok/s | 30.9925 tok/s | 0.0473 req/s | 84.3843s | 32.9762s | 747.4ms | 759.8ms |
+
+### Interpretation
+
+For this long mixed-prompt workload with concurrency 4 and max output 128, `chunked_prefill` is a clear regression:
+
+- Output throughput: 16.6703 -> 3.4904 tok/s, about -79.1%.
+- Total throughput: 91.4556 -> 30.9925 tok/s, about -66.1%.
+- Request throughput: 0.1302 -> 0.0473 req/s, about -63.7%.
+- Avg latency: 30.6027s -> 84.3843s, about +175.7%.
+- TTFT: 14.6301s -> 32.9762s, about +125.4%.
+- TPOT: 125.8ms -> 747.4ms, about 5.94x slower.
+- ITL: 125.0ms -> 759.8ms, about 6.08x slower.
+
+The chunked-prefill run also produced fewer output tokens on average: 73.75 vs 128.0. That makes raw output-throughput comparison less clean, but TTFT, latency, TPOT, and ITL all move in the wrong direction by a large margin, so the conclusion is still stable.
+
+Main reason: the current chunked prefill path still replays prompt tokens through small chunks / token-level steps. Under TP continuous batching this adds control-plane synchronization, KV capacity checks, `extend_paged_requests`, attention metadata rebuilds, and extra forwards. For 128-1024 token prompts at concurrency 4, splitting prefill does not create enough decode-overlap benefit to offset that overhead.
+
+Current conclusion:
+
+- Keep `chunked_prefill=False` as the default.
+- The auto `max_prefill_tokens` budget plus packed-prefill micro-batch guard is the safer default strategy.
+- Re-evaluate chunked prefill only after implementing true chunk-level packed prefill, decode/prefill overlap, and lower TP control-plane overhead.
 
 ## 2026-06-22 v0.0.8rc1 EvalScope 固定长度与混合长度测试
 
