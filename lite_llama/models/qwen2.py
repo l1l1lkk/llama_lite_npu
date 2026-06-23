@@ -33,15 +33,29 @@ class Attention(nn.Module):
         )
 
         # 2. sel-attention. flashattention 计算: softmax(qk^t) * v
-        output = flash_attention2_no_pad(
-            xq,
-            xk,
-            xv,
-            qk_scale,
-            atten_info.b_start_loc,  # 批次中每个请求的开始索引位置
-            atten_info.b_seq_len,
-            atten_info.max_actual_seq_len,
-        )
+        if getattr(atten_info, "is_paged_chunk_prefill", False):
+            output = paged_chunk_flash_attention(
+                xq,
+                atten_info.kv_buffer[layer_index][:, : self.num_kv_heads, :],
+                atten_info.kv_buffer[layer_index][:, self.num_kv_heads :, :],
+                qk_scale,
+                atten_info.b_req_tokens_table,
+                atten_info.b_req_idx,
+                atten_info.b_start_loc,
+                atten_info.chunk_context_len,
+                atten_info.chunk_q_seq_len,
+                atten_info.max_actual_q_seq_len,
+            )
+        else:
+            output = flash_attention2_no_pad(
+                xq,
+                xk,
+                xv,
+                qk_scale,
+                atten_info.b_start_loc,
+                atten_info.b_seq_len,
+                atten_info.max_actual_seq_len,
+            )
         return output  # shape is [batch_size*seq_len, num_heads, head_dim]
 
     def token_forward(

@@ -33,6 +33,7 @@ import torch_npu
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from lite_llama.executor.tp_utils import detect_tp_env
+from lite_llama.sampling import format_top_p_setting
 from lite_llama.generate_stream import GenerateStreamText
 from lite_llama.utils.prompt_templates import get_prompter
 
@@ -351,7 +352,10 @@ def main():
         print(f"  Batch size:  {args.batch_size}")
         print(f"  Max gen len: {args.max_gen_len}")
         print(f"  Temperature: {args.temperature}")
-        print(f"  Top-p:       {args.top_p}")
+        print(
+            f"  Top-p:       "
+            f"{format_top_p_setting(args.temperature, args.top_p)}"
+        )
         print(f"  Thinking:    {'on' if args.enable_thinking else 'off'}")
         print(f"  Page size:   {args.page_size}")
         print(f"  NPU Graph:   {'on' if args.compiled_model else 'off'}")

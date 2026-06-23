@@ -6,7 +6,7 @@ from typing import Optional, Tuple
 from .model_config import Qwen3Config
 from .RotaryEmbedding import Qwen3RotaryEmbedding
 from ..kernels import *
-from ..executor.tp_utils import TPConfig, tp_all_reduce, tp_all_gather
+from ..executor.tp_utils import TPConfig, tp_all_reduce
 
 
 class Attention(nn.Module):
@@ -30,10 +30,24 @@ class Attention(nn.Module):
         update_kv_buffer(
             combined_kv, atten_info.cur_select_index, atten_info.kv_buffer[layer_index]
         )
-        output = flash_attention2_no_pad(
-            xq, xk, xv, qk_scale,
-            atten_info.b_start_loc, atten_info.b_seq_len, atten_info.max_actual_seq_len,
-        )
+        if getattr(atten_info, "is_paged_chunk_prefill", False):
+            output = paged_chunk_flash_attention(
+                xq,
+                atten_info.kv_buffer[layer_index][:, : self.num_kv_heads, :],
+                atten_info.kv_buffer[layer_index][:, self.num_kv_heads :, :],
+                qk_scale,
+                atten_info.b_req_tokens_table,
+                atten_info.b_req_idx,
+                atten_info.b_start_loc,
+                atten_info.chunk_context_len,
+                atten_info.chunk_q_seq_len,
+                atten_info.max_actual_q_seq_len,
+            )
+        else:
+            output = flash_attention2_no_pad(
+                xq, xk, xv, qk_scale,
+                atten_info.b_start_loc, atten_info.b_seq_len, atten_info.max_actual_seq_len,
+            )
         return output
 
     def token_forward(
@@ -296,9 +310,9 @@ class Qwen3Model(nn.Module):
 
         h, _ = skip_rmsnorm(h, residual, self.norm_weight.data, self.rmsnorm_eps)
 
-        # TP: column-sharded lm_head, then all-gather full logits
+        # TP: keep the LM-head vocabulary shard local. Sampling performs only
+        # the collectives required by the selected strategy.
         output = F.linear(h, self.lm_head_weight.data)
-        output = tp_all_gather(output, dim=-1)
         return output
 
     def get_input_embeddings(self, input_ids: torch.Tensor) -> torch.Tensor:

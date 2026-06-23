@@ -1,6 +1,508 @@
 # Changelog
 
+## [0.0.10rc1] - 2026-06-23
+
+Decode hot-path cleanup release before merging the 0.0.10 line toward the main branch.
+
+### Changed
+
+- Removed the default per-token TP worker decode-state host synchronization.
+- Added `LLAMA_LITE_NPU_VALIDATE_TP_DECODE_STATE=1` as an explicit debug switch for the previous worker-side host validation.
+- Skipped prefix-cache host-token storage on worker ranks when `return_host_tokens=False`; rank 0 behavior remains unchanged.
+- Avoided a chunked-prefill incremental fallback host copy on worker ranks when host tokens are not needed.
+
+### Notes
+
+- Chunked Prefill remains available, but it is not the recommended path for the current short/mid prompt Qwen3-32B benchmark shape.
+- The main optimized path for current testing is packed prefill plus Decode NPU Graph.
+
+### Tests
+
+- Added regression coverage for debug-gated TP decode-state validation.
+- Added regression coverage that worker `return_host_tokens=False` paths do not perform prefix-cache host copies.
+
+### Docs
+
+- [v0.0.10rc1 release report](docs/releases/v0.0.10rc1.md)
+
+## [0.0.9rc5] - 2026-06-23
+
+Bugfix/performance release for paged chunk FlashAttention tile selection.
+
+### Changed
+
+- Replaced the fixed 16x32 paged chunk FA tile with runtime tile selection.
+- The kernel now tries larger tiles first: 64x64, 32x64, 32x32, 16x32, 16x16.
+- Successful tile choices are cached per process/shape; failed tile choices are remembered and skipped on later calls.
+- Error logging now reports a short compiler summary instead of dumping the full Triton compiler trace repeatedly.
+
+### Notes
+
+- The later-chunk input path already projects only current chunk tokens; `max_q_len` is the chunk length, not the full context length.
+- The fallback remains correctness-first and is only used when all Triton tile candidates fail.
+
+### Docs
+
+- [v0.0.9rc5 release report](docs/releases/v0.0.9rc5.md)
+
+## [0.0.9rc4] - 2026-06-23
+
+Bugfix release for paged chunk FlashAttention Triton Ascend compilation failure.
+
+### Fixed
+
+- Reduced the `paged_chunk_flash_attention` Triton tile from the original 64x64 shape to a conservative 16x32 shape to avoid 910B3 BiShengIR UB overflow during Chunked Prefill.
+- Added a one-shot safe torch attention fallback when the paged chunk Triton kernel fails to compile or launch, so the service does not crash on unsupported compiler shapes.
+- Kept the default Chunked Prefill behavior unchanged: later chunks still try `paged_chunk_flash_attention` first, then fall back only on failure.
+
+### Tests
+
+- Added source contract coverage for the paged chunk FA tile size and fallback path.
+
+### Docs
+
+- [v0.0.9rc4 release report](docs/releases/v0.0.9rc4.md)
+
+## [0.0.9rc3] - 2026-06-23
+
+Bugfix release for TP Chunked Prefill rank desynchronization.
+
+### Fixed
+
+- Fixed a TP path split in Chunked Prefill where rank 0 preflight capacity preparation allocated `model_request_id` for first-chunk requests before worker ranks saw the command.
+- Rank 0 and worker ranks now keep first-chunk request state unchanged until `prefill_chunk()` executes on every rank, so both sides enter the same packed prefill / FlashAttention path.
+- Existing later-chunk requests still receive rank-0 capacity checks before the command is mirrored.
+
+### Tests
+
+- Added regression coverage that `prepare_prefill_chunk()` does not mutate first-chunk requests.
+
+### Docs
+
+- [v0.0.9rc3 release report](docs/releases/v0.0.9rc3.md)
+
+## [0.0.9rc2] - 2026-06-23
+
+Feature release for paged chunk FlashAttention in Chunked Prefill.
+
+### Added
+
+- Added a Triton `paged_chunk_flash_attention` kernel for later Chunked Prefill chunks.
+- Added executor metadata setup for paged chunk prefill: context lengths, chunk lengths, flat Q start locations, and current-chunk KV write indices.
+- Routed Qwen3, Qwen2, and Llama text prefill attention through the paged chunk kernel when `atten_info.is_paged_chunk_prefill` is active.
+
+### Changed
+
+- Chunked Prefill now uses:
+  - full prefill: `flash_attention2_no_pad`
+  - packed/mixed prefill: `flash_attention2_no_pad`
+  - first chunk: packed prefill / `flash_attention2_no_pad`
+  - later chunks: Triton `paged_chunk_flash_attention` with safe incremental fallback
+
+### Tests
+
+- Added regression coverage that later chunked-prefill chunks use the paged chunk fast path when the executor exposes it.
+- Added ModelExecutor contract coverage for paged chunk prefill metadata.
+
+### Docs
+
+- [v0.0.9rc2 release report](docs/releases/v0.0.9rc2.md)
+
+## [0.0.9rc1] - 2026-06-23
+
+Feature release for chunked-prefill attention routing.
+
+### Changed
+
+- Added a chunked-prefill first-chunk fast path that uses packed prefill, therefore reusing the existing `flash_attention2_no_pad` prefill attention path.
+- Kept later chunked-prefill chunks on the existing incremental replay fallback because the current no-pad full-context FlashAttention kernel cannot attend to historical paged KV.
+- Added one-shot startup/runtime logging that reports the effective prefill attention paths:
+  - full prefill: `flash_attention2_no_pad`
+  - packed prefill: `flash_attention2_no_pad`
+  - chunked first chunk: `flash_attention2_no_pad`
+  - chunked later chunks: paged chunk FA if available, otherwise incremental fallback
+
+### Tests
+
+- Added regression coverage that the first chunk of chunked prefill uses packed prefill instead of decode micro-batch replay.
+- Updated later-chunk coverage to ensure non-first chunks still use the safe incremental replay fallback.
+
+### Docs
+
+- [v0.0.9rc1 release report](docs/releases/v0.0.9rc1.md)
+
+## [0.0.8rc9] - 2026-06-22
+
+Bugfix release for a `v0.0.8rc8` `ModelExecutor` initialization regression.
+
+### Fixed
+
+- Moved `_infer_safe_prefill_tokens()` out of the middle of `ModelExecutor.__init__`.
+- Restored initialization of request manager, attention metadata, prefix cache, block prefix cache, and NPU Graph runner state.
+- Added a source-level regression test to ensure the safe-prefill helper does not split constructor initialization again.
+
+### Docs
+
+- [v0.0.8rc9 release report](docs/releases/v0.0.8rc9.md)
+
+## [0.0.8rc8] - 2026-06-22
+
+Bugfix release for packed-prefill Triton grid overflow in continuous batching.
+
+### Fixed
+
+- Added a vLLM-style default prefill token budget: when `--max_prefill_tokens` is omitted, the scheduler reads the backend/model-derived safe packed-prefill budget.
+- Derived the default safe prefill budget from the model's local Q-head count to avoid Q/K RMSNorm Triton launches exceeding the 65535 grid-row limit.
+- Added a backend pre-forward guard that splits oversized packed prefill into smaller safe micro-batches.
+- Added a slow but safe fallback for a single prompt that exceeds the safe packed-prefill budget.
+- Exposed the effective auto `max_prefill_tokens` in server startup logs.
+
+### Tests
+
+- Added scheduler regression coverage for backend-derived default prefill token budget.
+- Added backend regression coverage for splitting mixed-length packed prefill by token budget.
+
+### Docs
+
+- [v0.0.8rc8 release report](docs/releases/v0.0.8rc8.md)
+
+## [0.0.8rc7] - 2026-06-22
+
+Bugfix release for server-side `max_seq_len` propagation.
+
+### Fixed
+
+- Exposed `server.py --max_seq_len`.
+- Passed `max_seq_len` from server CLI into `GenerateStreamText` and `Qwen3VLGeneratorStream`.
+- Printed `Max seq len` during server startup so benchmark logs show the actual context length.
+- Added server contract coverage to prevent future CLI/config drift.
+
+### Docs
+
+- [v0.0.8rc7 release report](docs/releases/v0.0.8rc7.md)
+
+## [0.0.8rc6] - 2026-06-22
+
+Bugfix release for continuous-batching context-length admission.
+
+### Fixed
+
+- Added scheduler admission validation for `prompt_tokens + max_tokens > max_seq_len`.
+- Added a decode-time context-full guard so active requests finish with `length` before entering backend decode when KV context capacity is exhausted.
+- Exposed `max_context_tokens` through the continuous-batching backend and TP coordinator.
+- Converted continuous-batching context-capacity submission failures into HTTP 400 errors.
+
+### Tests
+
+- Added regression coverage for prompt-at-capacity rejection.
+- Added regression coverage for prompt-plus-generation over-capacity rejection.
+- Added regression coverage that context-full active requests are released without calling backend decode.
+
+### Docs
+
+- [v0.0.8rc6 release report](docs/releases/v0.0.8rc6.md)
+
+## [0.0.8rc5] - 2026-06-22
+
+Bugfix release for transactional TP continuous-batching control.
+
+### Fixed
+
+- Added a TCPStore command acknowledgement protocol for TP continuous batching so rank 0 only advances mirrored worker state after worker ranks finish the command.
+- Replaced decode-only `control_id` messages with `decode_state` snapshots carrying expected logical sequence lengths.
+- Added worker-side decode-state validation before entering decode collectives, turning rank drift into an explicit control-plane error instead of a late NPU/HCCL failure.
+- Made TP worker shutdown acknowledge the final command before rank 0 exits the control loop.
+
+### Tests
+
+- Added command-channel acknowledgement protocol coverage.
+- Added decode-state codec coverage.
+- Added server contract coverage for transactional decode-state dispatch.
+
+### Docs
+
+- [v0.0.8rc5 release report](docs/releases/v0.0.8rc5.md)
+
+## [0.0.8rc4] - 2026-06-22
+
+Bugfix release for TP continuous-batching control-id synchronization.
+
+### Fixed
+
+- Added rank-0 worker-known control-id tracking for TP continuous batching.
+- Prevented rank 0 from sending decode commands for requests that were not mirrored to worker ranks.
+- Rolled back newly allocated local request ids when chunked-prefill preparation fails before worker dispatch.
+- Made worker ranks tolerate release commands for already-unknown control ids, keeping release cleanup idempotent.
+
+### Tests
+
+- Added server contract tests for worker-known control-id tracking and idempotent worker release handling.
+
+### Docs
+
+- [v0.0.8rc4 release report](docs/releases/v0.0.8rc4.md)
+
+## [0.0.8rc3] - 2026-06-22
+
+Bugfix release for TP chunked-prefill capacity handling.
+
+### Fixed
+
+- Added a rank-0 `prepare_prefill_chunk(...)` phase before TP worker dispatch so KV capacity failures are detected by the scheduler before worker ranks enter mirrored model execution.
+- Added per-chunk KV capacity checks up to `target_end + 1` before replaying any token in that chunk.
+- Removed the unsafe silent clamp of chunked-prefill reserved capacity to `max_seq_len`; over-limit or exhausted-capacity cases now produce explicit capacity errors.
+- Improved Paged KV allocation failure diagnostics with current token count, max sequence length, and free page count.
+
+### Tests
+
+- Extended continuous-batching fake executor coverage for reserved-length request allocation and prefill-chunk capacity preparation.
+
+### Docs
+
+- [v0.0.8rc3 release report](docs/releases/v0.0.8rc3.md)
+
+## [0.0.8rc2] - 2026-06-22
+
+Bugfix release for v0.0.8 chunked prefill.
+
+### Fixed
+
+- Fixed chunked prefill Paged KV allocation failure during incremental prompt replay.
+- Separated logical sequence length from physical KV page reservation in Paged KV request allocation.
+- Chunked prefill now reserves full prompt replay capacity plus the first generated-token slot while exposing only the currently replayed logical length to attention.
+- Partial Prefix Cache suffix replay now ensures full prompt KV capacity before replaying uncached suffix tokens.
+
+### Tests
+
+- Added CPU regression coverage for reserved KV capacity without advancing logical sequence length.
+
+### Docs
+
+- Added bug record for the chunked prefill mid-replay allocation failure.
+- Recorded v0.0.8rc1 fixed-length and mixed-length EvalScope measurements.
+- [v0.0.8rc2 release report](docs/releases/v0.0.8rc2.md)
+
+## [0.0.8rc1] - 2026-06-18
+
+Packed-prefill release for the scheduler/KV-engine line.
+
+### Core changes
+
+- Added live mixed-length packed prefill for continuous batching cache misses. Requests with different prompt lengths can now share one flattened prefill forward instead of being split into equal-length groups.
+- Added `ModelExecutor.activate_paged_packed_prefill_batch(...)` to build no-padding PagedAttention metadata: `b_start_loc`, `b_seq_len`, flattened `cur_select_index`, flat position ids, and per-request sample indices.
+- Updated chunked prefill replay to process active prefill requests as decode micro-batches instead of looping request-by-request.
+- Preserved exact Prefix Cache default behavior and kept page-aligned partial Prefix Cache opt-in via `--partial_prefix_cache`.
+
+### Expected test-visible benefit
+
+- Mixed prompt-length concurrency should reduce TTFT versus equal-length grouping because the scheduler can run heterogeneous prefill work in fewer model forwards.
+- `--chunked_prefill` should show lower Python overhead when multiple long prompts are prefilling concurrently.
+- Single-request decode speed is not expected to change materially.
+
+### Compatibility and limitations
+
+- This release does not add a dedicated suffix-prefill attention kernel. Chunk replay still uses decode-style KV replay for correctness.
+- New Atlas performance numbers are not recorded yet; use EvalScope and profiler runs before updating the performance table.
+
+### Tests
+
+- Added packed prefill backend and executor contract tests.
+- Added chunked prefill micro-batch replay regression coverage.
+
+### Docs
+
+- [v0.0.8rc1 release report](docs/releases/v0.0.8rc1.md)
+
+
 所有触发版本升级的变更按发布时间倒序记录。详细规则见[版本管理与发布规范](docs/versioning.md)。
+
+## [0.0.7rc6] - 2026-06-18
+
+Bugfix release for the v0.0.7 KV-cache line.
+
+### Fixed
+
+- Changed page-aligned partial Prefix Cache reuse from default-on to explicit opt-in via `--partial_prefix_cache`.
+- Reworked opt-in partial Prefix Cache to use block-level cache-map lookup over complete KV pages, avoiding full-prompt cache scans.
+- Preserved exact Prefix Cache as the default greedy repeated-prompt optimization.
+- Avoided EvalScope random-prompt TTFT regression caused by conservative token-by-token suffix replay on shared chat-template prefixes.
+
+### Docs
+
+- [v0.0.7rc6 release report](docs/releases/v0.0.7rc6.md)
+
+## [0.0.7rc5] - 2026-06-18
+
+KV-cache optimization closeout for the v0.0.7 line.
+
+### Core changes
+
+- Added live page-aligned partial prefix reuse for greedy requests. Exact prompt hits still skip prefill entirely; prefix-extension prompts now share cached pages and replay only the uncached suffix.
+- Changed chunked prefill from admission-only scheduling into a real multi-tick execution path using safe incremental prompt replay.
+- Added TP continuous-batching `prefill_chunk` control messages so worker ranks mirror chunked prefill state correctly.
+- Kept mixed-length packed prefill as a tested metadata contract; no-padding packed prefill kernels remain future work.
+
+### Compatibility and limitations
+
+- Prefix reuse remains disabled for sampling requests (`temperature>0`).
+- Partial suffix replay is correctness-first and token-by-token; expected benefit is TTFT reduction on repeated prefixes, not maximum raw prefill throughput.
+- No Atlas performance number is recorded yet.
+
+### Docs
+
+- [v0.0.7rc5 release report](docs/releases/v0.0.7rc5.md)
+
+## [0.0.7rc4] - 2026-06-17
+
+Runtime-benefit release for the v0.0.7 scheduler/KV-engine line.
+
+### Core changes
+
+- Added exact-prompt live Prefix Cache for greedy requests (`temperature=0`). Repeated identical prompts can skip the full prefill forward and share cached Paged KV pages plus the first sampled token.
+- Prefix Cache is intentionally disabled for sampling requests (`temperature>0`) to avoid changing stochastic generation semantics.
+- Added Paged KV request sharing APIs backed by page refcounts. Shared pages are released only after all request/cache references are gone.
+- Added bounded LRU ownership for cached prompt pages to avoid unbounded KV retention.
+- Improved chunked-prefill scheduling behavior: long prompts accumulate chunk credit and can be deferred while shorter prompts are admitted, improving mixed long/short prompt responsiveness without unsafe suffix-prefill execution.
+
+### Expected test-visible benefit
+
+- Repeated exact greedy prompts should show lower TTFT because prefill forward is skipped on cache hits.
+- Mixed long/short prompt concurrency should show better short-request responsiveness when `--chunked_prefill --prefill_chunk_size` and a prefill token budget are enabled.
+- Random datasets with no repeated prompts should not show Prefix Cache gains.
+
+### Limitations
+
+- This is exact full-prompt caching, not arbitrary partial-prefix reuse yet.
+- Chunked prefill is scheduler interleaving, not true suffix-prefill kernel execution.
+- Prefix Cache currently targets greedy correctness; stochastic Top-P requests stay on the uncached path.
+
+### Tests
+
+- Added regression tests for shared Paged KV pages, exact Prefix Cache hits, sampling-cache bypass, and chunked long-prompt deferral.
+
+### Docs
+
+- [v0.0.7rc4 release report](docs/releases/v0.0.7rc4.md)
+
+## [0.0.7rc3] - 2026-06-17
+
+Complete the safe runtime pieces of the v0.0.7 scheduler/KV-engine refactor.
+
+### Core changes
+
+- Added scheduler-level KV-pressure preemption. When prefill/decode reports KV capacity pressure, the scheduler can release one active request, requeue it, and rebuild its context from `prompt_tokens + generated_token_ids` without duplicating streamed tokens.
+- Added `--max_preemptions` server option for continuous batching; default is `1`, and `0` disables preemption.
+- Added live PagedAttention page reference counts, so shared/future prefix-cache pages are not returned to the free pool until the last reference is released.
+- Added request page introspection for Paged KV debugging and future prefix-cache integration.
+- Added mixed-length no-padding prefill packing metadata (`MixedLengthPrefillPacker`) as the stable contract for future packed prefill kernels.
+- Existing chunked-prefill planner remains the explicit chunk contract; runtime execution stays conservative until the Attention path supports suffix-prefill safely.
+
+### Compatibility and limitations
+
+- Default behavior remains unchanged unless KV capacity pressure occurs or `--max_preemptions` is changed.
+- True live prefix-cache reuse and no-padding/chunked prefill execution still require Attention/KV writer changes and are not falsely enabled in this release.
+- No Atlas performance numbers are recorded for this release.
+
+### Tests
+
+- Added tests for KV page refcounts, mixed-length prefill packing, preempted-request context rebuild, and scheduler KV-pressure recovery.
+
+### Docs
+
+- [v0.0.7rc3 release report](docs/releases/v0.0.7rc3.md)
+
+## [0.0.7rc2] - 2026-06-17
+
+Bugfix release for TP continuous batching idle stability on Ascend.
+
+### Bug fix
+
+- Replaced continuous-batching TP control-plane HCCL tensor broadcast with CPU `StoreCommandChannel` backed by `torch.distributed.TCPStore`.
+- Fixed rank 1 idle-time watchdog failure: `ACL stream synchronize failed, error code:507048` / `fftsplus timeout`.
+- Worker ranks now block on CPU store metadata while idle and only enter NPU/HCCL for actual model execution.
+- Added regression tests to prevent server continuous batching from using `TensorCommandChannel` again.
+
+### Docs
+
+- [v0.0.7rc2 release report](docs/releases/v0.0.7rc2.md)
+- [Bug records](docs/bug_records.md)
+
+## [0.0.7rc1] - 2026-06-17
+
+Scheduler and KV-engine refactor foundation release.
+
+### Core changes
+
+- Continuous Batching adds `max_prefill_tokens` for prefill token-budget admission per scheduler tick.
+- Oversized prompts can be admitted alone to avoid long-prompt starvation.
+- Continuous Batching adds `max_decode_tokens` for active decode-row budgeting per scheduler tick.
+- Added CPU-side `KVBlockRefCounter` for logical KV block refcount metadata.
+- Added `PrefixCache` for block-aligned longest-prefix matching metadata.
+- Added `ChunkedPrefillPlanner` as the planning entry for future chunked prefill execution.
+- Server CLI adds `--max_prefill_tokens`, `--max_decode_tokens`, `--chunked_prefill`, and `--prefill_chunk_size`.
+
+### Compatibility and limitations
+
+- Defaults remain compatible: when token budgets are omitted, scheduling still follows `max_batch_size`.
+- Prefix cache is metadata-only and is not wired into live PagedAttention KV reuse yet.
+- Chunked prefill is a planning/configuration entry and does not change model execution semantics yet.
+- No predicted Atlas 910B3 performance numbers are recorded in this release.
+
+### Docs
+
+- [v0.0.7rc1 release report](docs/releases/v0.0.7rc1.md)
+
+## [0.0.6rc2] - 2026-06-12
+
+修复v0.0.6rc1首版Vocab Parallel Greedy按Batch逐行发起小Collective导致的性能回归。
+
+### Bug修复
+
+- Greedy对整个Batch一次性计算局部最大Logit和Token ID；
+- 将最大值和精确float32 Token ID打包为`[batch, 2]`，每个Decode Step只执行一次
+  AllGather；
+- 保持全局Greedy选择与旧版完整词表Argmax语义一致；
+- 移除Batch=4时每Token八次小AllGather产生的HCCL启动开销；
+- Benchmark在`temperature=0`时打印`Top-p: inactive (temperature=0)`，避免把默认
+  `top_p=0.9`误解为实际启用。
+
+### 验证状态
+
+- 采样单元测试覆盖Batch级单Collective、跨Rank全局Token选择和Top-P状态显示；
+- 本地CPU回归和Python静态编译通过；
+- Atlas 910B3需要复测是否消除v0.0.6rc1相对v0.0.5rc2约7.5%的Greedy回归。
+
+### 文档
+
+- [v0.0.6rc2完整版本报告](docs/releases/v0.0.6rc2.md)
+
+## [0.0.6rc1] - 2026-06-12
+
+优化Qwen3 TP与Continuous Batching的Decode热路径，减少每Token的全词表通信、
+Host同步、重复反分词和Python对象广播。
+
+### 核心能力
+
+- Qwen3 Dense、Qwen3 MoE和Qwen3-VL在TP模式下保留本地LM Head词表分片；
+- Greedy采样仅交换各Rank局部最大值和全局Token ID；
+- Top-P采样先交换有界候选集，并在无法证明候选集覆盖精确nucleus时自动回退完整
+  Logits Gather，保证采样语义不变；
+- Continuous Batching将最新Token和Decode Position保留在NPU；
+- Rank 0每个模型Step只执行一次批量Token D2H，worker Rank不再复制Token到Host；
+- 流式输出使用有界后缀增量反分词，边界不稳定时自动回退完整解码；
+- TP Continuous Batching控制面由`broadcast_object_list`改为固定头部和张量Payload。
+
+### 兼容性与验证
+
+- 不改变现有`.pth`权重、PagedAttention、NPU Graph Bucket和OpenAI API；
+- 完整Logprobs API仍按需Gather全词表Logits；
+- Legacy单请求与多模态请求初始化仍可使用对象广播，它们不位于逐Token热路径；
+- 本地相关CPU单元测试和Python静态编译通过；
+- Atlas 910B3 TP=2吞吐与输出一致性需要服务器实测，本版本不填写预测性能。
+
+### 文档
+
+- [v0.0.6rc1完整版本报告](docs/releases/v0.0.6rc1.md)
 
 ## [0.0.5rc3] - 2026-06-12
 
@@ -213,3 +715,5 @@
 [0.0.5rc1]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.5rc1
 [0.0.5rc2]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.5rc2
 [0.0.5rc3]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.5rc3
+[0.0.6rc1]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.6rc1
+[0.0.6rc2]: https://gitlab.com/l1l1lkk/llama_lite_npu/-/tags/v0.0.6rc2

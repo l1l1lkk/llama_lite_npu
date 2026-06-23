@@ -26,4 +26,4 @@ lite_llama per token latency: 1.369015 ms/token
 Transformers per token latency: 5.436221 ms/token
 ```
 
-For more performance test results refer to the documentation [benchmark_models](./docs/benchmark_models.md)(More model performance test results to be updated)
+For more performance test results refer to the documentation [benchmark_models](benchmark_models.md)(More model performance test results to be updated)

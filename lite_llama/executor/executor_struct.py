@@ -35,3 +35,6 @@ class AttentionInfo:
     b_req_tokens_table = None
     b_start_loc = None
     b_req_idx = None
+    is_paged_chunk_prefill = False
+    chunk_context_len = None
+    chunk_q_seq_len = None

@@ -22,6 +22,7 @@ import asyncio
 import base64
 import io
 import json
+import os
 import threading
 import time
 import uuid
@@ -93,6 +94,7 @@ _tp_lock = None  # threading.Lock for single-request-at-a-time in TP mode
 _continuous_batching = False
 _continuous_backend = None
 _continuous_scheduler = None
+_partial_prefix_cache = False
 _scheduler_thread = None
 _scheduler_stop = None
 _scheduler_poll_seconds = 0.001
@@ -102,6 +104,7 @@ def load_generator(
     checkpoints_dir: str,
     device: str,
     *,
+    max_seq_len: int = 1024,
     page_size: int = 16,
     compiled_model: bool = True,
     moe_parallel_mode: str = "tp",
@@ -122,6 +125,7 @@ def load_generator(
         _generator = Qwen3VLGeneratorStream(
             checkpoints_dir=checkpoints_dir,
             tokenizer_path=checkpoints_dir,
+            max_seq_len=max_seq_len,
             device=device,
         )
     else:
@@ -129,6 +133,7 @@ def load_generator(
         _generator = GenerateStreamText(
             checkpoints_dir=checkpoints_dir,
             tokenizer_path=checkpoints_dir,
+            max_seq_len=max_seq_len,
             compiled_model=compiled_model,
             page_size=page_size,
             moe_parallel_mode=moe_parallel_mode,
@@ -198,27 +203,27 @@ def _tp_worker_loop():
             pass
 
 
-def _serialize_batch_request(request) -> dict:
-    return {
-        "request_id": request.request_id,
-        "prompt_tokens": request.prompt_tokens,
-        "max_new_tokens": request.max_new_tokens,
-        "temperature": request.temperature,
-        "top_p": request.top_p,
-        "generated_token_ids": request.generated_token_ids,
-        "model_request_id": request.model_request_id,
-    }
-
-
 class _TpCoordinatedContinuousBackend:
-    """Broadcast scheduler operations before executing them on rank 0."""
+    """Mirror scheduler operations with a CPU-side TP control channel."""
 
     def __init__(self, local_backend):
+        from lite_llama.executor.tp_control import StoreCommandChannel
+
         self.local_backend = local_backend
+        self.channel = StoreCommandChannel()
+        self._worker_known_control_ids = set()
 
     @property
     def eos_token_id(self):
         return self.local_backend.eos_token_id
+
+    @property
+    def max_context_tokens(self):
+        return getattr(self.local_backend, "max_context_tokens", None)
+
+    @property
+    def max_prefill_tokens(self):
+        return getattr(self.local_backend, "max_prefill_tokens", None)
 
     def tokenize(self, prompt):
         return self.local_backend.tokenize(prompt)
@@ -226,28 +231,86 @@ class _TpCoordinatedContinuousBackend:
     def decode_tokens(self, token_ids):
         return self.local_backend.decode_tokens(token_ids)
 
-    @staticmethod
-    def _broadcast(operation: str, requests) -> None:
-        command = [{
-            "operation": operation,
-            "requests": [
-                _serialize_batch_request(request)
-                for request in requests
-            ],
-        }]
-        torch.distributed.broadcast_object_list(command, src=0)
-
     def prefill(self, requests):
-        self._broadcast("prefill", requests)
-        return self.local_backend.prefill(requests)
+        from lite_llama.executor.tp_control import encode_prefill
+
+        sequence = self.channel.send(encode_prefill(requests))
+        result = self.local_backend.prefill(requests)
+        self.channel.wait_ack(sequence)
+        self._worker_known_control_ids.update(
+            int(request.control_id) for request in requests
+        )
+        return result
+
+    def prefill_chunk(self, requests, chunk_size):
+        from lite_llama.executor.tp_control import encode_prefill_chunk
+
+        previous_model_request_ids = {
+            request: request.model_request_id for request in requests
+        }
+        try:
+            if hasattr(self.local_backend, "prepare_prefill_chunk"):
+                self.local_backend.prepare_prefill_chunk(requests, chunk_size)
+        except BaseException:
+            newly_allocated = [
+                request
+                for request, previous_id in previous_model_request_ids.items()
+                if previous_id is None and request.model_request_id is not None
+            ]
+            if newly_allocated:
+                try:
+                    self.local_backend.release(newly_allocated)
+                except BaseException:
+                    pass
+            raise
+        sequence = self.channel.send(encode_prefill_chunk(requests, chunk_size))
+        result = self.local_backend.prefill_chunk(requests, chunk_size)
+        self.channel.wait_ack(sequence)
+        self._worker_known_control_ids.update(
+            int(request.control_id) for request in requests
+        )
+        return result
 
     def decode(self, requests):
-        self._broadcast("decode", requests)
-        return self.local_backend.decode(requests)
+        from lite_llama.executor.tp_control import encode_decode_state
+
+        unknown = [
+            int(request.control_id)
+            for request in requests
+            if int(request.control_id) not in self._worker_known_control_ids
+        ]
+        if unknown:
+            raise RuntimeError(
+                "TP worker decode requested for unknown control_id(s): "
+                f"{unknown}. This indicates prefill state was not mirrored."
+            )
+        sequence = self.channel.send(encode_decode_state(requests))
+        result = self.local_backend.decode(requests)
+        self.channel.wait_ack(sequence)
+        return result
 
     def release(self, requests):
-        self._broadcast("release", requests)
-        return self.local_backend.release(requests)
+        from lite_llama.executor.tp_control import encode_release
+
+        sequence = self.channel.send(
+            encode_release([request.control_id for request in requests])
+        )
+        try:
+            result = self.local_backend.release(requests)
+            self.channel.wait_ack(sequence)
+            return result
+        finally:
+            for request in requests:
+                self._worker_known_control_ids.discard(int(request.control_id))
+
+    def preempt(self, requests):
+        return self.release(requests)
+
+    def shutdown_workers(self):
+        from lite_llama.executor.tp_control import encode_shutdown
+
+        sequence = self.channel.send(encode_shutdown())
+        self.channel.wait_ack(sequence)
 
 
 def _tp_continuous_worker_loop():
@@ -256,49 +319,93 @@ def _tp_continuous_worker_loop():
         BatchRequest,
         ContinuousBatchModelBackend,
     )
+    from lite_llama.executor.tp_control import StoreCommandChannel
 
-    backend = ContinuousBatchModelBackend(_generator)
+    backend = ContinuousBatchModelBackend(
+        _generator,
+        return_host_tokens=False,
+        enable_partial_prefix_cache=_partial_prefix_cache,
+    )
+    channel = StoreCommandChannel()
     requests_by_id = {}
+    validate_decode_state = os.environ.get(
+        "LLAMA_LITE_NPU_VALIDATE_TP_DECODE_STATE", ""
+    ).lower() in ("1", "true", "yes", "on")
     while True:
-        command = [None]
-        torch.distributed.broadcast_object_list(command, src=0)
-        payload = command[0]
-        operation = payload["operation"]
-        if operation == "shutdown":
+        sequence, command = channel.receive_with_sequence()
+        if command.operation == "shutdown":
+            channel.ack(sequence)
             break
 
-        worker_requests = []
-        for item in payload["requests"]:
-            request_id = item["request_id"]
-            request = requests_by_id.get(request_id)
-            if request is None:
-                request = BatchRequest(
-                    request_id=request_id,
-                    prompt_tokens=item["prompt_tokens"],
-                    max_new_tokens=item["max_new_tokens"],
-                    temperature=item["temperature"],
-                    top_p=item["top_p"],
-                )
-                requests_by_id[request_id] = request
-            request.generated_token_ids = list(
-                item["generated_token_ids"]
-            )
-            if item["model_request_id"] is not None:
-                request.model_request_id = item["model_request_id"]
-            worker_requests.append(request)
+        try:
+            worker_requests = []
+            if command.operation in ("prefill", "prefill_chunk"):
+                for index, control_id in enumerate(command.control_ids):
+                    request = requests_by_id.get(control_id)
+                    if request is None:
+                        request = BatchRequest(
+                            request_id=f"tp-worker-{control_id}",
+                            control_id=control_id,
+                            prompt_tokens=command.prompt_tokens[index],
+                            max_new_tokens=command.max_new_tokens[index],
+                            temperature=command.temperatures[index],
+                            top_p=command.top_ps[index],
+                        )
+                        requests_by_id[control_id] = request
+                    if command.operation == "prefill_chunk":
+                        request.prefill_cursor = command.prefill_cursors[index]
+                    worker_requests.append(request)
+            else:
+                for control_id in command.control_ids:
+                    request = requests_by_id.get(control_id)
+                    if request is None:
+                        if command.operation == "release":
+                            continue
+                        raise RuntimeError(
+                            f"unknown continuous batching control_id: "
+                            f"{control_id}"
+                        )
+                    worker_requests.append(request)
 
-        if operation == "prefill":
-            backend.prefill(worker_requests)
-        elif operation == "decode":
-            backend.decode(worker_requests)
-        elif operation == "release":
-            backend.release(worker_requests)
-            for request in worker_requests:
-                requests_by_id.pop(request.request_id, None)
-        else:
-            raise RuntimeError(
-                f"unknown continuous batching TP operation: {operation}"
-            )
+            if command.operation == "prefill":
+                backend.prefill(worker_requests)
+            elif command.operation == "prefill_chunk":
+                backend.prefill_chunk(worker_requests, command.chunk_size)
+            elif command.operation in ("decode", "decode_state"):
+                if command.operation == "decode_state" and validate_decode_state:
+                    for request, expected_seq_len in zip(
+                        worker_requests, command.expected_seq_lens
+                    ):
+                        req_idx = int(request.model_request_id)
+                        expected_input_position = int(expected_seq_len) - 1
+                        actual_input_position = int(
+                            backend._device_positions[req_idx]
+                            .detach()
+                            .cpu()
+                            .item()
+                        )
+                        if actual_input_position != expected_input_position:
+                            raise RuntimeError(
+                                "TP worker decode_state mismatch: "
+                                f"control_id={request.control_id}, "
+                                f"model_request_id={req_idx}, "
+                                f"expected_seq_len={expected_seq_len}, "
+                                f"actual_input_position={actual_input_position}"
+                            )
+                backend.decode(worker_requests)
+            elif command.operation == "release":
+                backend.release(worker_requests)
+                for request in worker_requests:
+                    requests_by_id.pop(request.control_id, None)
+            else:
+                raise RuntimeError(
+                    f"unknown continuous batching TP operation: "
+                    f"{command.operation}"
+                )
+            channel.ack(sequence)
+        except BaseException as error:
+            channel.ack(sequence, ok=False, message=str(error))
+            raise
 
 
 # ---------------------------------------------------------------------------
@@ -308,6 +415,12 @@ def _start_continuous_scheduler(
     max_batch_size: int,
     max_waiting_requests: int,
     scheduler_poll_ms: float,
+    max_prefill_tokens: int | None = None,
+    max_decode_tokens: int | None = None,
+    chunked_prefill: bool = False,
+    prefill_chunk_size: int | None = None,
+    max_preemptions: int = 1,
+    partial_prefix_cache: bool = False,
 ) -> None:
     global _continuous_backend, _continuous_scheduler
     global _scheduler_thread, _scheduler_stop, _scheduler_poll_seconds
@@ -317,7 +430,10 @@ def _start_continuous_scheduler(
         ContinuousBatchScheduler,
     )
 
-    local_backend = ContinuousBatchModelBackend(_generator)
+    local_backend = ContinuousBatchModelBackend(
+        _generator,
+        enable_partial_prefix_cache=partial_prefix_cache,
+    )
     _continuous_backend = (
         _TpCoordinatedContinuousBackend(local_backend)
         if _is_tp
@@ -329,6 +445,11 @@ def _start_continuous_scheduler(
         eos_token_id=_continuous_backend.eos_token_id,
         decode_tokens=_continuous_backend.decode_tokens,
         max_waiting_requests=max_waiting_requests,
+        max_prefill_tokens=max_prefill_tokens,
+        max_decode_tokens=max_decode_tokens,
+        chunked_prefill=chunked_prefill,
+        prefill_chunk_size=prefill_chunk_size,
+        max_preemptions=max_preemptions,
     )
     _scheduler_poll_seconds = max(0.0001, scheduler_poll_ms / 1000.0)
     _scheduler_stop = threading.Event()
@@ -360,8 +481,7 @@ async def lifespan(app: FastAPI):
     if _continuous_scheduler is not None:
         _continuous_scheduler.shutdown()
     if _is_tp and _continuous_batching:
-        command = [{"operation": "shutdown", "requests": []}]
-        torch.distributed.broadcast_object_list(command, src=0)
+        _continuous_backend.shutdown_workers()
     _continuous_scheduler = None
     _generator = None
 
@@ -426,13 +546,16 @@ def _submit_continuous_request(
     if _continuous_scheduler is None or _continuous_backend is None:
         raise RuntimeError("continuous batching scheduler is not running")
     prompt_tokens = _continuous_backend.tokenize(prompt)
-    return _continuous_scheduler.submit(
-        request_id=request_id,
-        prompt_tokens=prompt_tokens,
-        max_new_tokens=max_tokens,
-        temperature=temperature,
-        top_p=top_p,
-    )
+    try:
+        return _continuous_scheduler.submit(
+            request_id=request_id,
+            prompt_tokens=prompt_tokens,
+            max_new_tokens=max_tokens,
+            temperature=temperature,
+            top_p=top_p,
+        )
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from error
 
 
 async def _collect_continuous_request(batch_request):
@@ -923,6 +1046,16 @@ def main():
     parser.add_argument("--page_size", type=int, default=16,
                         help="PagedAttention page size; use 0 to disable.")
     parser.add_argument(
+        "--max_seq_len",
+        type=int,
+        default=1024,
+        help=(
+            "Maximum per-request model context length. This must cover "
+            "prompt tokens plus generated tokens after chat-template "
+            "expansion."
+        ),
+    )
+    parser.add_argument(
         "--compiled_model",
         dest="compiled_model",
         action="store_true",
@@ -965,6 +1098,57 @@ def main():
         help="Idle scheduler polling interval in milliseconds.",
     )
     parser.add_argument(
+        "--max_prefill_tokens",
+        type=int,
+        default=None,
+        help=(
+            "Optional continuous-batching prefill token budget per "
+            "scheduler tick. Disabled when omitted."
+        ),
+    )
+    parser.add_argument(
+        "--max_decode_tokens",
+        type=int,
+        default=None,
+        help=(
+            "Optional continuous-batching decode row budget per "
+            "scheduler tick. Disabled when omitted."
+        ),
+    )
+    parser.add_argument(
+        "--partial_prefix_cache",
+        action="store_true",
+        help=(
+            "Enable page-aligned partial Prefix Cache reuse. Disabled by "
+            "default because suffix replay is correctness-first and can slow "
+            "random prompt benchmarks."
+        ),
+    )
+    parser.add_argument(
+        "--chunked_prefill",
+        action="store_true",
+        help=(
+            "Enable chunked prefill execution across scheduler ticks. "
+            "v0.0.8 batches chunk replay across active prefill requests; "
+            "full prompt-cache attention kernels remain future work."
+        ),
+    )
+    parser.add_argument(
+        "--prefill_chunk_size",
+        type=int,
+        default=None,
+        help="Chunk size used when --chunked_prefill is enabled.",
+    )
+    parser.add_argument(
+        "--max_preemptions",
+        type=int,
+        default=1,
+        help=(
+            "Maximum KV-pressure preemptions per request in continuous "
+            "batching. Set 0 to fail instead of preempting."
+        ),
+    )
+    parser.add_argument(
         "--moe_parallel_mode",
         choices=("tp", "ep"),
         default="tp",
@@ -978,23 +1162,27 @@ def main():
 
     # Detect TP
     from lite_llama.executor.tp_utils import detect_tp_env
-    global _rank, _is_tp, _continuous_batching
+    global _rank, _is_tp, _continuous_batching, _partial_prefix_cache
     tp = detect_tp_env()
     _rank = tp.rank if tp else 0
     _is_tp = tp is not None and tp.enabled
     _continuous_batching = args.continuous_batching
+    _partial_prefix_cache = bool(args.partial_prefix_cache)
 
     device = f"npu:{_rank}" if _is_tp else get_device(args.device)
     if _rank == 0:
         print(f"Loading model from {args.checkpoints_dir}")
         print(f"Device: {device}, TP: world_size={tp.world_size if _is_tp else 1}")
+        print(f"Max seq len: {args.max_seq_len}")
         print(f"PagedAttention page_size: {args.page_size}")
         print(f"NPU Graph: {'on' if args.compiled_model else 'off'}")
         print(f"MoE parallel mode: {args.moe_parallel_mode.upper()}")
+        print(f"Partial Prefix Cache: {'on' if args.partial_prefix_cache else 'off'}")
 
     load_generator(
         args.checkpoints_dir,
         device,
+        max_seq_len=args.max_seq_len,
         page_size=args.page_size,
         compiled_model=args.compiled_model,
         moe_parallel_mode=args.moe_parallel_mode,
@@ -1019,6 +1207,12 @@ def main():
                 max_batch_size=args.max_batch_size,
                 max_waiting_requests=args.max_waiting_requests,
                 scheduler_poll_ms=args.scheduler_poll_ms,
+                max_prefill_tokens=args.max_prefill_tokens,
+                max_decode_tokens=args.max_decode_tokens,
+                chunked_prefill=args.chunked_prefill,
+                prefill_chunk_size=args.prefill_chunk_size,
+                max_preemptions=args.max_preemptions,
+                partial_prefix_cache=args.partial_prefix_cache,
             )
         print(f"Server starting on http://{args.host}:{args.port}")
         print(f"Endpoints:")
@@ -1027,9 +1221,16 @@ def main():
         print(f"  GET  /v1/models")
         print(f"  GET  /health")
         if _continuous_batching:
+            effective_max_prefill_tokens = getattr(
+                _continuous_scheduler, "max_prefill_tokens", args.max_prefill_tokens
+            )
             print(
                 "  [Continuous batching: "
-                f"max_batch_size={args.max_batch_size}]"
+                f"max_batch_size={args.max_batch_size}, "
+                f"max_prefill_tokens={effective_max_prefill_tokens}, "
+                f"max_decode_tokens={args.max_decode_tokens}, "
+                f"chunked_prefill={args.chunked_prefill}, "
+                f"max_preemptions={args.max_preemptions}]"
             )
         elif _is_tp:
             print(f"  [TP mode: single-request-at-a-time]")

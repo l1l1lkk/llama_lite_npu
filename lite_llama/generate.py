@@ -6,6 +6,7 @@ from transformers import AutoTokenizer
 from .executor.model_executor import ModelExecutor
 from .utils.device import get_device
 from .utils.file_interface import get_model_name_from_path
+from .sampling import sample_next_token
 
 
 class CompletionPrediction(TypedDict, total=False):
@@ -162,13 +163,12 @@ class GenerateText:
             decode_select_index = self.model_executor.decode_alloc_kv_cache(bsz)
             all_select_index_list.append(decode_select_index)
 
-            last_logits = logits[:, -1, :]  # [batch_size, vocab_size]
-            probs = torch.softmax(
-                last_logits / temperature, dim=-1
-            )  # [batch_size, vocab_size]
-            next_token = sample_top_p(probs, top_p)  # [batch_size]
-            if torch.distributed.is_initialized():
-                torch.distributed.broadcast(next_token, src=0)
+            next_token = sample_next_token(
+                logits,
+                temperature=temperature,
+                top_p=top_p,
+                vocab_parallel=self.model_executor.logits_are_sharded,
+            )
             input_ids = next_token  # [batch_size, 1]
 
             mask = ~input_text_mask[:, cur_pos]  # [batch_size]

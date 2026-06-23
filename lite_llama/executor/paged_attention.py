@@ -73,8 +73,10 @@ class PagedKVCacheManager:
             for _ in range(num_layers)
         ]
 
-        # Free page pool: True = free, False = allocated
+        # Free page pool: True = free, False = allocated.  Refcounts are kept
+        # on Host because page ownership is scheduler metadata, not model data.
         self.page_free = torch.ones(num_pages, dtype=torch.bool, device="cpu")
+        self.page_refcount = torch.zeros(num_pages, dtype=torch.int32, device="cpu")
         self.num_free_pages = num_pages
 
     # ------------------------------------------------------------------
@@ -88,17 +90,36 @@ class PagedKVCacheManager:
 
         free_indices = torch.nonzero(self.page_free).squeeze(-1)[:num_needed]
         self.page_free[free_indices] = False
+        self.page_refcount[free_indices] = 1
         self.num_free_pages -= num_needed
         return free_indices
 
+    def add_ref(self, page_indices: torch.Tensor):
+        """Add references to already allocated pages."""
+        if len(page_indices) == 0:
+            return
+        page_indices = page_indices.to(device="cpu", dtype=torch.long)
+        if torch.any(self.page_refcount[page_indices] <= 0):
+            raise ValueError("cannot add ref to a free KV page")
+        self.page_refcount[page_indices] += 1
+
     def free(self, page_indices: torch.Tensor):
-        """Return pages to the free pool."""
-        self.page_free[page_indices] = True
-        self.num_free_pages += len(page_indices)
+        """Drop one reference and return pages to the pool at refcount zero."""
+        if len(page_indices) == 0:
+            return
+        page_indices = page_indices.to(device="cpu", dtype=torch.long)
+        if torch.any(self.page_refcount[page_indices] <= 0):
+            raise ValueError("KV page refcount would become negative")
+        self.page_refcount[page_indices] -= 1
+        released = page_indices[self.page_refcount[page_indices] == 0]
+        if len(released) > 0:
+            self.page_free[released] = True
+            self.num_free_pages += int(len(released))
 
     def free_all(self):
         """Reset all pages to free."""
         self.page_free[:] = True
+        self.page_refcount[:] = 0
         self.num_free_pages = self.num_pages
 
     # ------------------------------------------------------------------
@@ -166,11 +187,26 @@ class PagedReqTokensManager:
         self.req_active = torch.zeros(max_requests, dtype=torch.bool, device="cpu")
         self.free_req_indices = list(range(max_requests))
 
-    def alloc_req(self, req_idx: int, num_tokens: int) -> bool:
-        """Allocate KV cache for an explicit request id."""
+    def alloc_req(
+        self, req_idx: int, num_tokens: int, reserved_tokens: int | None = None
+    ) -> bool:
+        """Allocate KV cache for an explicit request id.
+
+        ``num_tokens`` is the logical sequence length visible to attention.
+        ``reserved_tokens`` is the physical KV capacity to reserve up front.
+        Chunked prefill uses this to reserve the full prompt capacity while
+        exposing only the already-replayed prefix length to the model.
+        """
         if req_idx not in self.free_req_indices:
             return False
-        pages = self.page_mgr.alloc(num_tokens)
+        num_tokens = int(num_tokens)
+        capacity_tokens = int(reserved_tokens) if reserved_tokens is not None else num_tokens
+        if num_tokens < 1 or capacity_tokens < num_tokens:
+            return False
+        if capacity_tokens > self.max_seq_len:
+            return False
+
+        pages = self.page_mgr.alloc(capacity_tokens)
         if pages is None:
             return False
 
@@ -184,12 +220,79 @@ class PagedReqTokensManager:
         )
         return True
 
-    def reserve_req(self, num_tokens: int) -> Optional[int]:
+    def reserve_req(
+        self, num_tokens: int, reserved_tokens: int | None = None
+    ) -> Optional[int]:
         """Allocate the lowest free request id and its initial KV pages."""
         if not self.free_req_indices:
             return None
         req_idx = self.free_req_indices[0]
-        if not self.alloc_req(req_idx, num_tokens):
+        if not self.alloc_req(req_idx, num_tokens, reserved_tokens):
+            return None
+        return req_idx
+
+    def ensure_req_capacity(self, req_idx: int, total_tokens: int) -> bool:
+        """Ensure a request has enough physical pages for ``total_tokens``.
+
+        This does not change the logical token count.  New logical token
+        mappings are still appended by ``extend_req`` as replay/decode
+        progresses.
+        """
+        if req_idx not in self.req_page_table:
+            return False
+        total_tokens = int(total_tokens)
+        if total_tokens < self.req_token_count[req_idx]:
+            return True
+        if total_tokens > self.max_seq_len:
+            return False
+
+        required_pages = (
+            total_tokens + self.page_mgr.page_size - 1
+        ) // self.page_mgr.page_size
+        existing = self.req_page_table[req_idx]
+        current_pages = len(existing)
+        if required_pages <= current_pages:
+            return True
+
+        additional_pages = required_pages - current_pages
+        additional = self.page_mgr.alloc(additional_pages * self.page_mgr.page_size)
+        if additional is None:
+            return False
+        self.req_page_table[req_idx] = torch.cat([existing, additional])
+        return True
+
+    def share_req_from_pages(
+        self, req_idx: int, page_indices: torch.Tensor, num_tokens: int
+    ) -> bool:
+        """Map a request to existing pages and increment their refcounts."""
+        if req_idx not in self.free_req_indices:
+            return False
+        num_tokens = int(num_tokens)
+        if num_tokens < 1 or num_tokens > self.max_seq_len:
+            return False
+        required_pages = (num_tokens + self.page_mgr.page_size - 1) // self.page_mgr.page_size
+        if len(page_indices) < required_pages:
+            return False
+
+        pages = page_indices[:required_pages].to(device="cpu", dtype=torch.long)
+        self.page_mgr.add_ref(pages)
+        self.free_req_indices.remove(req_idx)
+        self.req_page_table[req_idx] = pages
+        self.req_token_count[req_idx] = num_tokens
+        self.req_active[req_idx] = True
+        self.page_mgr.build_token_table(
+            pages, num_tokens, self.b_req_tokens_table, req_idx,
+        )
+        return True
+
+    def reserve_shared_req(
+        self, page_indices: torch.Tensor, num_tokens: int
+    ) -> Optional[int]:
+        """Allocate a request id that shares existing KV pages."""
+        if not self.free_req_indices:
+            return None
+        req_idx = self.free_req_indices[0]
+        if not self.share_req_from_pages(req_idx, page_indices, num_tokens):
             return None
         return req_idx
 
@@ -236,11 +339,15 @@ class PagedReqTokensManager:
         if new_total > self.max_seq_len:
             return False
 
-        # Check if we need more pages
-        cur_pages = (cur_tokens + self.page_mgr.page_size - 1) // self.page_mgr.page_size
+        # Check if we need more pages.  Use the actual reserved page count
+        # instead of the logical token count so chunked prefill can reserve
+        # full prompt capacity up front while replaying it incrementally.
         new_pages = (new_total + self.page_mgr.page_size - 1) // self.page_mgr.page_size
-        if new_pages > cur_pages:
-            additional = self.page_mgr.alloc((new_pages - cur_pages) * self.page_mgr.page_size)
+        current_pages = len(self.req_page_table[req_idx])
+        if new_pages > current_pages:
+            additional = self.page_mgr.alloc(
+                (new_pages - current_pages) * self.page_mgr.page_size
+            )
             if additional is None:
                 return False
             existing = self.req_page_table[req_idx]
@@ -281,3 +388,9 @@ class PagedReqTokensManager:
         if req_idx not in self.free_req_indices:
             self.free_req_indices.append(req_idx)
             self.free_req_indices.sort()
+
+    def request_pages(self, req_idx: int) -> Tuple[int, ...]:
+        """Return Host page ids owned by a request."""
+        if req_idx not in self.req_page_table:
+            raise KeyError(f"request {req_idx} is not allocated")
+        return tuple(int(page_id) for page_id in self.req_page_table[req_idx].tolist())

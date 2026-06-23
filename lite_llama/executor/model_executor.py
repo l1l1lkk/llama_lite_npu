@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 
 import json, time
+from collections import OrderedDict
 from pathlib import Path
 
 from transformers import LlavaConfig
@@ -234,11 +235,17 @@ class ModelExecutor:
             self.llm_config = model_config
 
         # KV heads are sharded under TP
+        self.local_q_heads = self.llm_config.num_heads // self.tp.world_size
         self.local_kv_heads = self.llm_config.num_kv_heads // self.tp.world_size
 
         self.max_seq_len = self.llm_config.max_seq_len
+        self.max_prefill_tokens = self._infer_safe_prefill_tokens()
         self.model_type = model_config.model_type
         self.model = model
+        self.logits_are_sharded = (
+            self.tp.enabled
+            and self.model_type in {"qwen3", "qwen3_moe", "qwen3_vl"}
+        )
         self.model_runner = None
         self.compiled_model = compiled_model
         self.page_size = getattr(self.llm_config, "page_size", 0)
@@ -272,6 +279,17 @@ class ModelExecutor:
         # prefill so decode does not synchronize an NPU tensor via .tolist()
         # for every generated token.
         self._paged_request_ids: tuple[int, ...] = ()
+        self._paged_prefix_cache: OrderedDict[
+            tuple[int, ...], tuple[object, int, int]
+        ] = OrderedDict()
+        self._paged_prefix_cache_max_entries = 128
+        # Block-level Prefix Cache: keys form a parent-fingerprint chain over
+        # full KV pages.  Partial-prefix lookup is O(prompt_blocks) and never
+        # scans all cached full prompts. Only complete blocks are cached/reused.
+        self._paged_block_prefix_cache: OrderedDict[
+            tuple[int | None, tuple[int, ...]], tuple[object, int]
+        ] = OrderedDict()
+        self._paged_block_prefix_cache_max_entries = 4096
 
         # --- NPU Graph (decode kernel launch batching) ---
         self.graph_runner = None
@@ -290,6 +308,21 @@ class ModelExecutor:
                     self.model_type,
                     self.tp.moe_parallel_mode,
                 )
+
+    def _infer_safe_prefill_tokens(self) -> int | None:
+        """Return a conservative packed-prefill token budget.
+
+        Qwen3 applies Q/K RMSNorm on tensors shaped roughly as
+        ``[total_prefill_tokens, local_q_heads, head_dim]``.  The current
+        Triton RMSNorm launch uses one program per flattened row and cannot
+        exceed 65535 grid rows.  Keep scheduler-produced packed prefill below
+        that kernel limit by default.
+        """
+        local_q_heads = int(getattr(self, "local_q_heads", 0) or 0)
+        if local_q_heads <= 0:
+            return None
+        safe_grid_rows = 60000
+        return max(1, safe_grid_rows // local_q_heads)
 
     def _get_max_avaliable_tokens(self,model, gpu_memory_utilization=0.9, block_size=1):
         avaliable_blocks = ComputeMaxAvailableBlocks(
@@ -450,17 +483,28 @@ class ModelExecutor:
         return self.atten_info.cur_select_index, num_patch_indexs
 
     def reserve_paged_requests(
-        self, prompt_lengths: list[int]
+        self,
+        prompt_lengths: list[int] | tuple[int, ...],
+        reserved_lengths: list[int] | tuple[int, ...] | None = None,
     ) -> tuple[int, ...]:
         """Reserve independent request ids for continuous batching."""
         if not self.use_paged_attn:
             raise RuntimeError(
                 "continuous batching requires PagedAttention"
             )
+        if reserved_lengths is not None and len(reserved_lengths) != len(prompt_lengths):
+            raise ValueError("reserved_lengths must match prompt_lengths")
         request_ids: list[int] = []
         try:
-            for prompt_length in prompt_lengths:
-                req_idx = self.req_tokens_manager.reserve_req(prompt_length)
+            for index, prompt_length in enumerate(prompt_lengths):
+                reserved_length = (
+                    None
+                    if reserved_lengths is None
+                    else int(reserved_lengths[index])
+                )
+                req_idx = self.req_tokens_manager.reserve_req(
+                    int(prompt_length), reserved_length
+                )
                 if req_idx is None:
                     raise RuntimeError(
                         "Paged KV request or page capacity is exhausted"
@@ -472,10 +516,166 @@ class ModelExecutor:
             raise
         return tuple(request_ids)
 
+    def ensure_paged_request_capacity(
+        self, req_idx: int, total_tokens: int
+    ) -> None:
+        """Reserve physical KV pages without changing logical seq length."""
+        if not self.use_paged_attn:
+            return
+        if not self.req_tokens_manager.ensure_req_capacity(req_idx, total_tokens):
+            raise RuntimeError(
+                f"Paged KV capacity reservation failed for request {req_idx}"
+            )
+
+    def _reset_paged_chunk_prefill_metadata(self) -> None:
+        self.atten_info.is_paged_chunk_prefill = False
+        self.atten_info.chunk_context_len = None
+        self.atten_info.chunk_q_seq_len = None
+        self.atten_info.max_actual_q_seq_len = None
+
+    def share_paged_request_from_cache(
+        self, prompt_tokens: list[int] | tuple[int, ...]
+    ) -> tuple[int, int] | None:
+        """Share a full-prompt cached KV prefix and return (request_id, token).
+
+        The cache intentionally starts with exact full-prompt matches only. It
+        avoids unsafe suffix-prefill semantics while still making repeated
+        prompts skip prefill forward entirely.
+        """
+        if not self.use_paged_attn:
+            return None
+        cached = self._paged_prefix_cache.get(tuple(int(t) for t in prompt_tokens))
+        if cached is None:
+            return None
+        self._paged_prefix_cache.move_to_end(tuple(int(t) for t in prompt_tokens))
+        page_indices, num_tokens, first_token_id = cached
+        req_idx = self.req_tokens_manager.reserve_shared_req(
+            page_indices, num_tokens
+        )
+        if req_idx is None:
+            return None
+        return int(req_idx), int(first_token_id)
+
+    def share_paged_prefix_from_cache(
+        self, prompt_tokens: list[int] | tuple[int, ...]
+    ) -> tuple[int, int, int | None] | None:
+        """Share the longest cached page-aligned prefix for a prompt.
+
+        Returns ``(request_id, matched_tokens, first_token_id)``.  For exact
+        prompt hits, ``first_token_id`` is the cached first generated token and
+        the caller can skip prefill entirely.  For partial prefix hits,
+        ``first_token_id`` is ``None`` and the caller must replay only the
+        suffix tokens.
+        """
+        if not self.use_paged_attn:
+            return None
+        prompt_key = tuple(int(t) for t in prompt_tokens)
+        if not prompt_key:
+            return None
+
+        exact = self._paged_prefix_cache.get(prompt_key)
+        if exact is not None:
+            self._paged_prefix_cache.move_to_end(prompt_key)
+            page_indices, num_tokens, first_token_id = exact
+            req_idx = self.req_tokens_manager.reserve_shared_req(
+                page_indices, num_tokens
+            )
+            if req_idx is None:
+                return None
+            return int(req_idx), len(prompt_key), int(first_token_id)
+
+        matched_pages = []
+        matched_tokens = 0
+        parent_fingerprint = None
+        page_size = int(self.page_size)
+        for start in range(0, len(prompt_key) - page_size + 1, page_size):
+            block_tokens = prompt_key[start : start + page_size]
+            block_key = self._paged_block_key(parent_fingerprint, block_tokens)
+            cached_block = self._paged_block_prefix_cache.get(block_key)
+            if cached_block is None:
+                break
+            self._paged_block_prefix_cache.move_to_end(block_key)
+            page_index, token_count = cached_block
+            matched_pages.append(page_index.reshape(-1))
+            matched_tokens = int(token_count)
+            parent_fingerprint = hash(block_key)
+
+        if not matched_pages or matched_tokens <= 0:
+            return None
+        best_pages = torch.cat(matched_pages).to(device="cpu", dtype=torch.long)
+        req_idx = self.req_tokens_manager.reserve_shared_req(best_pages, matched_tokens)
+        if req_idx is None:
+            return None
+        return int(req_idx), int(matched_tokens), None
+
+    def _paged_block_key(
+        self, parent_fingerprint: int | None, block_tokens: list[int] | tuple[int, ...]
+    ) -> tuple[int | None, tuple[int, ...]]:
+        return parent_fingerprint, tuple(int(token) for token in block_tokens)
+
+    def _store_paged_prompt_blocks(
+        self, prompt_tokens: tuple[int, ...], page_indices
+    ) -> None:
+        page_size = int(self.page_size)
+        full_blocks = len(prompt_tokens) // page_size
+        if full_blocks <= 0:
+            return
+        parent_fingerprint = None
+        for block_index in range(full_blocks):
+            start = block_index * page_size
+            block_tokens = prompt_tokens[start : start + page_size]
+            block_key = self._paged_block_key(parent_fingerprint, block_tokens)
+            if block_key in self._paged_block_prefix_cache:
+                self._paged_block_prefix_cache.move_to_end(block_key)
+                parent_fingerprint = hash(block_key)
+                continue
+            page_index = page_indices[block_index : block_index + 1].clone()
+            self.req_tokens_manager.page_mgr.add_ref(page_index)
+            self._paged_block_prefix_cache[block_key] = (
+                page_index,
+                (block_index + 1) * page_size,
+            )
+            self._paged_block_prefix_cache.move_to_end(block_key)
+            parent_fingerprint = hash(block_key)
+            while (
+                len(self._paged_block_prefix_cache)
+                > self._paged_block_prefix_cache_max_entries
+            ):
+                _, (old_page, _) = self._paged_block_prefix_cache.popitem(last=False)
+                self.req_tokens_manager.page_mgr.free(old_page)
+
+    def store_paged_request_prefix(
+        self,
+        prompt_tokens: list[int] | tuple[int, ...],
+        req_idx: int,
+        first_token_id: int,
+    ) -> None:
+        """Retain one KV page reference for an exact prompt cache entry."""
+        if not self.use_paged_attn:
+            return
+        if req_idx not in self.req_tokens_manager.req_page_table:
+            return
+        key = tuple(int(t) for t in prompt_tokens)
+        if key in self._paged_prefix_cache:
+            return
+        page_indices = self.req_tokens_manager.req_page_table[int(req_idx)]
+        self.req_tokens_manager.page_mgr.add_ref(page_indices)
+        self._paged_prefix_cache[key] = (
+            page_indices.clone(),
+            int(self.req_tokens_manager.req_token_count[int(req_idx)]),
+            int(first_token_id),
+        )
+        self._paged_prefix_cache.move_to_end(key)
+        self._store_paged_prompt_blocks(key, page_indices)
+        while len(self._paged_prefix_cache) > self._paged_prefix_cache_max_entries:
+            _, (old_pages, _, _) = self._paged_prefix_cache.popitem(last=False)
+            self.req_tokens_manager.page_mgr.free(old_pages)
+
     def activate_paged_prefill_batch(
         self, request_ids: tuple[int, ...], prompt_length: int
     ) -> None:
         """Select an equal-length request group for one prefill forward."""
+        self._reset_paged_chunk_prefill_metadata()
         if not request_ids:
             raise ValueError("request_ids must not be empty")
         for req_idx in request_ids:
@@ -514,10 +714,176 @@ class ModelExecutor:
         )
         self.atten_info.max_actual_seq_len = prompt_length
 
+    def activate_paged_packed_prefill_batch(
+        self, request_ids: tuple[int, ...], prompt_lengths: list[int] | tuple[int, ...]
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Select a mixed-length request group for one no-padding prefill.
+
+        The model receives flattened tensors with shape ``[1, total_tokens]``.
+        Attention kernels still see the logical request batch through
+        ``b_start_loc`` and ``b_seq_len``.  The returned tensors are the flat
+        position ids and the flat logits indices that correspond to the last
+        prompt token of each logical request.
+        """
+        self._reset_paged_chunk_prefill_metadata()
+        if not request_ids:
+            raise ValueError("request_ids must not be empty")
+        if len(request_ids) != len(prompt_lengths):
+            raise ValueError("request_ids and prompt_lengths must have same length")
+
+        lengths = tuple(int(length) for length in prompt_lengths)
+        if any(length <= 0 for length in lengths):
+            raise ValueError("prompt_lengths must be positive")
+        for req_idx, prompt_length in zip(request_ids, lengths):
+            actual_length = self.req_tokens_manager.req_token_count[int(req_idx)]
+            if actual_length != prompt_length:
+                raise ValueError(
+                    "packed prefill request length mismatch: "
+                    f"request={req_idx}, expected={prompt_length}, "
+                    f"actual={actual_length}"
+                )
+
+        starts: list[int] = []
+        sample_indices: list[int] = []
+        position_ids: list[int] = []
+        cursor = 0
+        for prompt_length in lengths:
+            starts.append(cursor)
+            sample_indices.append(cursor + prompt_length - 1)
+            position_ids.extend(range(prompt_length))
+            cursor += prompt_length
+
+        self._paged_request_ids = tuple(int(req_idx) for req_idx in request_ids)
+        self.atten_info.b_req_idx = torch.tensor(
+            self._paged_request_ids, dtype=torch.int32, device=self.device
+        )
+        self.atten_info.b_seq_len = torch.tensor(
+            lengths, dtype=torch.long, device=self.device
+        )
+        self.atten_info.cur_select_index = torch.cat(
+            [
+                self.req_tokens_manager.get_token_indices(req_idx, prompt_length)
+                for req_idx, prompt_length in zip(self._paged_request_ids, lengths)
+            ]
+        ).to(torch.int32)
+        self.atten_info.b_start_loc = torch.tensor(
+            starts, dtype=torch.int32, device=self.device
+        )
+        self.atten_info.max_actual_seq_len = max(lengths)
+
+        return (
+            torch.tensor(position_ids, dtype=torch.long, device=self.device),
+            torch.tensor(sample_indices, dtype=torch.long, device=self.device),
+        )
+
+    def activate_paged_chunk_prefill_batch(
+        self,
+        request_ids: tuple[int, ...],
+        context_lengths: list[int] | tuple[int, ...],
+        chunk_lengths: list[int] | tuple[int, ...],
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Select later chunked-prefill requests for paged chunk attention.
+
+        The model receives a flattened current-Q chunk.  K/V for the chunk are
+        written to the paged KV cache first, then attention reads
+        historical-paged KV plus current chunk KV through the request token
+        table.  ``context_lengths`` are the existing logical lengths before
+        this chunk; ``chunk_lengths`` are the number of new prompt tokens.
+        """
+        if not request_ids:
+            raise ValueError("request_ids must not be empty")
+        if len(request_ids) != len(context_lengths) or len(request_ids) != len(chunk_lengths):
+            raise ValueError(
+                "request_ids, context_lengths and chunk_lengths must have same length"
+            )
+
+        request_ids = tuple(int(req_idx) for req_idx in request_ids)
+        contexts = tuple(int(length) for length in context_lengths)
+        chunks = tuple(int(length) for length in chunk_lengths)
+        if any(length < 0 for length in contexts):
+            raise ValueError("context_lengths must be non-negative")
+        if any(length <= 0 for length in chunks):
+            raise ValueError("chunk_lengths must be positive")
+
+        for req_idx, context_length, chunk_length in zip(request_ids, contexts, chunks):
+            actual_length = self.req_tokens_manager.req_token_count[int(req_idx)]
+            if actual_length != context_length:
+                raise ValueError(
+                    "paged chunk prefill context length mismatch: "
+                    f"request={req_idx}, expected={context_length}, "
+                    f"actual={actual_length}"
+                )
+            if not self.req_tokens_manager.extend_req(req_idx, chunk_length):
+                current_tokens = self.req_tokens_manager.req_token_count.get(
+                    req_idx, "unknown"
+                )
+                max_seq_len = getattr(
+                    self.req_tokens_manager, "max_seq_len", "unknown"
+                )
+                free_pages = getattr(
+                    self.req_tokens_manager.page_mgr, "num_free_pages", "unknown"
+                )
+                raise RuntimeError(
+                    "Paged KV allocation failed for chunked prefill request "
+                    f"{req_idx}: context_tokens={context_length}, "
+                    f"chunk_tokens={chunk_length}, current_tokens={current_tokens}, "
+                    f"max_seq_len={max_seq_len}, free_pages={free_pages}"
+                )
+
+        starts: list[int] = []
+        sample_indices: list[int] = []
+        position_ids: list[int] = []
+        cursor = 0
+        for context_length, chunk_length in zip(contexts, chunks):
+            starts.append(cursor)
+            sample_indices.append(cursor + chunk_length - 1)
+            position_ids.extend(range(context_length, context_length + chunk_length))
+            cursor += chunk_length
+
+        self._paged_request_ids = request_ids
+        self.atten_info.b_req_idx = torch.tensor(
+            request_ids, dtype=torch.int32, device=self.device
+        )
+        total_lengths = tuple(
+            context_length + chunk_length
+            for context_length, chunk_length in zip(contexts, chunks)
+        )
+        self.atten_info.b_seq_len = torch.tensor(
+            total_lengths, dtype=torch.long, device=self.device
+        )
+        self.atten_info.cur_select_index = torch.cat(
+            [
+                self.req_tokens_manager.get_token_indices(req_idx, total_length)[
+                    context_length:total_length
+                ]
+                for req_idx, context_length, total_length in zip(
+                    request_ids, contexts, total_lengths
+                )
+            ]
+        ).to(torch.int32)
+        self.atten_info.b_start_loc = torch.tensor(
+            starts, dtype=torch.int32, device=self.device
+        )
+        self.atten_info.max_actual_seq_len = max(total_lengths)
+        self.atten_info.max_actual_q_seq_len = max(chunks)
+        self.atten_info.chunk_context_len = torch.tensor(
+            contexts, dtype=torch.long, device=self.device
+        )
+        self.atten_info.chunk_q_seq_len = torch.tensor(
+            chunks, dtype=torch.long, device=self.device
+        )
+        self.atten_info.is_paged_chunk_prefill = True
+
+        return (
+            torch.tensor(position_ids, dtype=torch.long, device=self.device),
+            torch.tensor(sample_indices, dtype=torch.long, device=self.device),
+        )
+
     def activate_paged_decode_batch(
         self, request_ids: tuple[int, ...]
     ) -> None:
         """Rebuild AttentionInfo for the current dynamic decode batch."""
+        self._reset_paged_chunk_prefill_metadata()
         req_ids, seq_lens, last_indices = (
             self.req_tokens_manager.batch_metadata(list(request_ids))
         )
@@ -539,8 +905,19 @@ class ModelExecutor:
         """Allocate the KV position consumed by the next decode input."""
         for req_idx in request_ids:
             if not self.req_tokens_manager.extend_req(req_idx, 1):
+                current_tokens = self.req_tokens_manager.req_token_count.get(
+                    req_idx, "unknown"
+                )
+                max_seq_len = getattr(
+                    self.req_tokens_manager, "max_seq_len", "unknown"
+                )
+                free_pages = getattr(
+                    self.req_tokens_manager.page_mgr, "num_free_pages", "unknown"
+                )
                 raise RuntimeError(
-                    f"Paged KV allocation failed for request {req_idx}"
+                    "Paged KV allocation failed for request "
+                    f"{req_idx}: current_tokens={current_tokens}, "
+                    f"max_seq_len={max_seq_len}, free_pages={free_pages}"
                 )
         self.activate_paged_decode_batch(request_ids)
 

@@ -5,6 +5,7 @@ from .executor.model_executor import ModelExecutor
 from .utils.device import get_device
 from .utils.file_interface import get_model_name_from_path
 from .kernels.softmax_split import softmax_split
+from .sampling import sample_next_token
 
 from transformers import AutoTokenizer
 
@@ -172,19 +173,12 @@ class GenerateStreamText:
             decode_select_index = self.model_executor.decode_alloc_kv_cache(bsz)
             all_select_index_list.append(decode_select_index)
 
-            if temperature > 0:
-                # NOTE: logits[:, -1] 表示选择的是最后一个位置（seq_len 维度的最后一项）对应的 logits。
-                # NOTE: 在生成模型中的 prefill 阶段，我们只关心当前生成的最后一个 token 的分布。
-                probs = softmax_split(logits[:, -1] / temperature)
-                # NOTE: 使用核采样方法，从高概率的候选 token 中选择下一个 token 索引. top_p 控制采样范围（候选 token 的概率累积值）。
-                next_token = sample_top_p(probs, top_p)
-            else:
-                next_token = torch.argmax(logits[:, -1], dim=-1)
-
-            # TP: broadcast sampled token from rank 0 to all ranks
-            # (sampling may diverge across ranks due to unsynchronized RNG)
-            if torch.distributed.is_initialized():
-                torch.distributed.broadcast(next_token, src=0)
+            next_token = sample_next_token(
+                logits,
+                temperature=temperature,
+                top_p=top_p,
+                vocab_parallel=self.model_executor.logits_are_sharded,
+            )
 
             input_ids = next_token  # [batch_size, 1]
 
