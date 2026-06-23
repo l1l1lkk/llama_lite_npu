@@ -944,5 +944,17 @@ class ContinuousBatchModelBackendTest(unittest.TestCase):
         self.assertEqual(executor.cache, {})
 
 
+class ContinuousBatchingHotPathContractTest(unittest.TestCase):
+    def test_worker_return_host_false_paths_do_not_store_prefix_via_cpu_sampled_tokens(self):
+        source = MODULE_PATH.read_text(encoding="utf-8")
+
+        self.assertNotIn("else sampled.detach().cpu().tolist()", source)
+        self.assertIn("if not self.return_host_tokens:\n            return None", source)
+        self.assertIn(
+            'self.return_host_tokens and hasattr(\n                self.executor, "store_paged_request_prefix"',
+            source,
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -93,6 +93,22 @@ class ServerContinuousBatchingContractTest(unittest.TestCase):
         self.assertIn("expected_seq_lens", worker_source)
         self.assertIn("TP worker decode_state mismatch", worker_source)
 
+    def test_tp_worker_decode_state_host_validation_is_debug_gated(self):
+        worker_start = self.source.index("def _tp_continuous_worker_loop")
+        worker_source = self.source[worker_start:]
+
+        self.assertIn("LLAMA_LITE_NPU_VALIDATE_TP_DECODE_STATE", worker_source)
+        self.assertIn(
+            'if command.operation == "decode_state" and validate_decode_state:',
+            worker_source,
+        )
+        guarded_start = worker_source.index(
+            'if command.operation == "decode_state" and validate_decode_state:'
+        )
+        guarded_end = worker_source.index("backend.decode(worker_requests)")
+        guarded_source = worker_source[guarded_start:guarded_end]
+        self.assertIn(".cpu()", guarded_source)
+
 
 if __name__ == "__main__":
     unittest.main()

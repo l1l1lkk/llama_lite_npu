@@ -22,6 +22,7 @@ import asyncio
 import base64
 import io
 import json
+import os
 import threading
 import time
 import uuid
@@ -327,6 +328,9 @@ def _tp_continuous_worker_loop():
     )
     channel = StoreCommandChannel()
     requests_by_id = {}
+    validate_decode_state = os.environ.get(
+        "LLAMA_LITE_NPU_VALIDATE_TP_DECODE_STATE", ""
+    ).lower() in ("1", "true", "yes", "on")
     while True:
         sequence, command = channel.receive_with_sequence()
         if command.operation == "shutdown":
@@ -368,7 +372,7 @@ def _tp_continuous_worker_loop():
             elif command.operation == "prefill_chunk":
                 backend.prefill_chunk(worker_requests, command.chunk_size)
             elif command.operation in ("decode", "decode_state"):
-                if command.operation == "decode_state":
+                if command.operation == "decode_state" and validate_decode_state:
                     for request, expected_seq_len in zip(
                         worker_requests, command.expected_seq_lens
                     ):

@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.0.10rc1] - 2026-06-23
+
+Decode hot-path cleanup release before merging the 0.0.10 line toward the main branch.
+
+### Changed
+
+- Removed the default per-token TP worker decode-state host synchronization.
+- Added `LLAMA_LITE_NPU_VALIDATE_TP_DECODE_STATE=1` as an explicit debug switch for the previous worker-side host validation.
+- Skipped prefix-cache host-token storage on worker ranks when `return_host_tokens=False`; rank 0 behavior remains unchanged.
+- Avoided a chunked-prefill incremental fallback host copy on worker ranks when host tokens are not needed.
+
+### Notes
+
+- Chunked Prefill remains available, but it is not the recommended path for the current short/mid prompt Qwen3-32B benchmark shape.
+- The main optimized path for current testing is packed prefill plus Decode NPU Graph.
+
+### Tests
+
+- Added regression coverage for debug-gated TP decode-state validation.
+- Added regression coverage that worker `return_host_tokens=False` paths do not perform prefix-cache host copies.
+
+### Docs
+
+- [v0.0.10rc1 release report](docs/releases/v0.0.10rc1.md)
+
 ## [0.0.9rc5] - 2026-06-23
 
 Bugfix/performance release for paged chunk FlashAttention tile selection.

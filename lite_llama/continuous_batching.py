@@ -843,13 +843,10 @@ class ContinuousBatchModelBackend:
                     indexed_requests, group_tokens
                 ):
                     results[original_index] = token_id
-            if hasattr(self.executor, "store_paged_request_prefix"):
-                host_tokens = (
-                    group_tokens
-                    if self.return_host_tokens
-                    else sampled.detach().cpu().tolist()
-                )
-                for request, token_id in zip(group_requests, host_tokens):
+            if self.return_host_tokens and hasattr(
+                self.executor, "store_paged_request_prefix"
+            ):
+                for request, token_id in zip(group_requests, group_tokens):
                     if request.temperature == 0:
                         self.executor.store_paged_request_prefix(
                             request.model_context_tokens,
@@ -893,13 +890,10 @@ class ContinuousBatchModelBackend:
                     grouped_indexed_requests, group_tokens
                 ):
                     results[original_index] = token_id
-            if hasattr(self.executor, "store_paged_request_prefix"):
-                host_tokens = (
-                    group_tokens
-                    if self.return_host_tokens
-                    else sampled.detach().cpu().tolist()
-                )
-                for request, token_id in zip(group_requests, host_tokens):
+            if self.return_host_tokens and hasattr(
+                self.executor, "store_paged_request_prefix"
+            ):
+                for request, token_id in zip(group_requests, group_tokens):
                     if request.temperature == 0:
                         self.executor.store_paged_request_prefix(
                             request.model_context_tokens,
@@ -1009,13 +1003,15 @@ class ContinuousBatchModelBackend:
             initial_positions=[len(context_tokens)],
         )
         self.executor.extend_paged_requests((req_idx,))
+        if not self.return_host_tokens:
+            return None
         host_tokens = self._tokens_to_host(sampled)
-        token_id = (
-            int(sampled.detach().cpu().tolist()[0])
-            if not self.return_host_tokens
-            else int(host_tokens[0])
-        )
-        if hasattr(self.executor, "store_paged_request_prefix") and request.temperature == 0:
+        token_id = int(host_tokens[0])
+        if (
+            self.return_host_tokens
+            and hasattr(self.executor, "store_paged_request_prefix")
+            and request.temperature == 0
+        ):
             self.executor.store_paged_request_prefix(
                 context_tokens,
                 req_idx,
@@ -1115,10 +1111,6 @@ class ContinuousBatchModelBackend:
                 )
                 self.executor.extend_paged_requests(completed_ids)
                 host_tokens = self._tokens_to_host(sampled)
-                if not self.return_host_tokens and hasattr(
-                    self.executor, "store_paged_request_prefix"
-                ):
-                    host_tokens = sampled.detach().cpu().tolist()
                 for list_index, request, token_id in zip(
                     completed_indices, completed_requests, host_tokens
                 ):
@@ -1256,10 +1248,6 @@ class ContinuousBatchModelBackend:
             )
             self.executor.extend_paged_requests(completed_ids)
             host_tokens = self._tokens_to_host(sampled)
-            if not self.return_host_tokens and hasattr(
-                self.executor, "store_paged_request_prefix"
-            ):
-                host_tokens = sampled.detach().cpu().tolist()
             for list_index, request, token_id in zip(
                 completed_indices, completed_requests, host_tokens
             ):
@@ -1386,10 +1374,6 @@ class ContinuousBatchModelBackend:
             )
             self.executor.extend_paged_requests(completed_ids)
             host_tokens = self._tokens_to_host(sampled)
-            if not self.return_host_tokens and hasattr(
-                self.executor, "store_paged_request_prefix"
-            ):
-                host_tokens = sampled.detach().cpu().tolist()
             for list_index, request, token_id in zip(
                 completed_indices, completed_requests, host_tokens
             ):
