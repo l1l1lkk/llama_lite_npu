@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.0.9rc4] - 2026-06-23
+
+Bugfix release for paged chunk FlashAttention Triton Ascend compilation failure.
+
+### Fixed
+
+- Reduced the `paged_chunk_flash_attention` Triton tile from the original 64x64 shape to a conservative 16x32 shape to avoid 910B3 BiShengIR UB overflow during Chunked Prefill.
+- Added a one-shot safe torch attention fallback when the paged chunk Triton kernel fails to compile or launch, so the service does not crash on unsupported compiler shapes.
+- Kept the default Chunked Prefill behavior unchanged: later chunks still try `paged_chunk_flash_attention` first, then fall back only on failure.
+
+### Tests
+
+- Added source contract coverage for the paged chunk FA tile size and fallback path.
+
+### Docs
+
+- [v0.0.9rc4 release report](docs/releases/v0.0.9rc4.md)
+
 ## [0.0.9rc3] - 2026-06-23
 
 Bugfix release for TP Chunked Prefill rank desynchronization.

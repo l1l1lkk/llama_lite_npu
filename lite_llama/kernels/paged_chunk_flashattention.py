@@ -1,7 +1,13 @@
+import logging
+
 import torch
 import triton
 import triton.language as tl
 from torch.cuda.amp import custom_fwd
+
+
+logger = logging.getLogger(__name__)
+_paged_chunk_fa_fallback_warned = False
 
 
 @triton.jit
@@ -125,6 +131,52 @@ def _paged_chunk_flash_attention_kernel(
     tl.store(O + o_offs, acc, mask=offs_m[:, None] < q_len)
 
 
+def _paged_chunk_attention_torch_fallback(
+    q: torch.Tensor,
+    k_cache: torch.Tensor,
+    v_cache: torch.Tensor,
+    sm_scale,
+    req_token_table: torch.Tensor,
+    req_ids: torch.Tensor,
+    q_start_loc: torch.Tensor,
+    context_lens: torch.Tensor,
+    q_seq_lens: torch.Tensor,
+):
+    outputs = torch.empty_like(q)
+    n_heads = q.shape[1]
+    num_kv_groups = max(1, q.shape[1] // k_cache.shape[1])
+    for batch_idx in range(int(q_seq_lens.shape[0])):
+        req_id = int(req_ids[batch_idx].detach().cpu().item())
+        q_start = int(q_start_loc[batch_idx].detach().cpu().item())
+        context_len = int(context_lens[batch_idx].detach().cpu().item())
+        q_len = int(q_seq_lens[batch_idx].detach().cpu().item())
+        if q_len <= 0:
+            continue
+        kv_len = context_len + q_len
+        physical = req_token_table[req_id, :kv_len].to(dtype=torch.long)
+        q_slice = q[q_start : q_start + q_len]
+        logical_q_pos = torch.arange(
+            context_len,
+            context_len + q_len,
+            device=q.device,
+            dtype=torch.long,
+        )
+        key_pos = torch.arange(kv_len, device=q.device, dtype=torch.long)
+        causal_mask = logical_q_pos[:, None] >= key_pos[None, :]
+        for head_idx in range(n_heads):
+            kv_head_idx = head_idx // num_kv_groups
+            k = k_cache[physical, kv_head_idx, :]
+            v = v_cache[physical, kv_head_idx, :]
+            scores = torch.matmul(
+                q_slice[:, head_idx, :].float(),
+                k.transpose(0, 1).float(),
+            ) * float(sm_scale)
+            scores = scores.masked_fill(~causal_mask, -1.0e8)
+            probs = torch.softmax(scores, dim=-1).to(v.dtype)
+            outputs[q_start : q_start + q_len, head_idx, :] = torch.matmul(probs, v)
+    return outputs
+
+
 @torch.no_grad()
 @custom_fwd(cast_inputs=torch.float16)
 def paged_chunk_flash_attention(
@@ -145,39 +197,63 @@ def paged_chunk_flash_attention(
 
     n_heads, head_dim = q.shape[1], q.shape[2]
     batch_size = q_seq_lens.shape[0]
-    block_size = 64
+    # 910B3 BiShengIR has a tight UB budget for this kernel. 64x64 overflows UB
+    # on observed chunked-prefill shapes, so keep this conservative by default.
+    block_m_size = 16
+    block_n_size = 32
     num_kv_groups = q.shape[1] // k_cache.shape[1]
-    grid = (triton.cdiv(int(max_q_len), block_size), batch_size * n_heads, 1)
+    grid = (triton.cdiv(int(max_q_len), block_m_size), batch_size * n_heads, 1)
 
-    _paged_chunk_flash_attention_kernel[grid](
-        q,
-        k_cache,
-        v_cache,
-        output,
-        req_token_table,
-        req_ids,
-        q_start_loc,
-        context_lens,
-        q_seq_lens,
-        sm_scale,
-        n_heads,
-        num_kv_groups,
-        q.stride(0),
-        q.stride(1),
-        q.stride(2),
-        k_cache.stride(0),
-        k_cache.stride(1),
-        k_cache.stride(2),
-        v_cache.stride(0),
-        v_cache.stride(1),
-        v_cache.stride(2),
-        output.stride(0),
-        output.stride(1),
-        output.stride(2),
-        req_token_table.stride(0),
-        req_token_table.stride(1),
-        HEAD_DIM=head_dim,
-        BLOCK_M_SIZE=block_size,
-        BLOCK_N_SIZE=block_size,
-    )
-    return output
+    global _paged_chunk_fa_fallback_warned
+    try:
+        _paged_chunk_flash_attention_kernel[grid](
+            q,
+            k_cache,
+            v_cache,
+            output,
+            req_token_table,
+            req_ids,
+            q_start_loc,
+            context_lens,
+            q_seq_lens,
+            sm_scale,
+            n_heads,
+            num_kv_groups,
+            q.stride(0),
+            q.stride(1),
+            q.stride(2),
+            k_cache.stride(0),
+            k_cache.stride(1),
+            k_cache.stride(2),
+            v_cache.stride(0),
+            v_cache.stride(1),
+            v_cache.stride(2),
+            output.stride(0),
+            output.stride(1),
+            output.stride(2),
+            req_token_table.stride(0),
+            req_token_table.stride(1),
+            HEAD_DIM=head_dim,
+            BLOCK_M_SIZE=block_m_size,
+            BLOCK_N_SIZE=block_n_size,
+        )
+        return output
+    except Exception as error:
+        if not _paged_chunk_fa_fallback_warned:
+            logger.warning(
+                "paged_chunk_flash_attention Triton path failed; "
+                "falling back to torch attention for this process: %s",
+                error,
+            )
+            _paged_chunk_fa_fallback_warned = True
+        return _paged_chunk_attention_torch_fallback(
+            q,
+            k_cache,
+            v_cache,
+            sm_scale,
+            req_token_table,
+            req_ids,
+            q_start_loc,
+            context_lens,
+            q_seq_lens,
+        )

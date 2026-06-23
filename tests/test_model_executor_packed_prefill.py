@@ -41,5 +41,21 @@ class ModelExecutorPackedPrefillContractTest(unittest.TestCase):
         self.assertGreater(helper_index, request_manager_index)
 
 
+class PagedChunkFlashAttentionContractTest(unittest.TestCase):
+    def test_paged_chunk_flash_attention_uses_910b3_safe_tiles_and_fallback(self):
+        source = (
+            Path(__file__).resolve().parents[1]
+            / "lite_llama"
+            / "kernels"
+            / "paged_chunk_flashattention.py"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("block_m_size = 16", source)
+        self.assertIn("block_n_size = 32", source)
+        self.assertIn("_paged_chunk_attention_torch_fallback", source)
+        self.assertIn("except Exception as error", source)
+        self.assertIn("falling back to torch attention", source)
+
+
 if __name__ == "__main__":
     unittest.main()
