@@ -8,6 +8,51 @@ from torch.cuda.amp import custom_fwd
 
 logger = logging.getLogger(__name__)
 _paged_chunk_fa_fallback_warned = False
+_paged_chunk_fa_tile_cache: dict[tuple, tuple[int, int]] = {}
+_paged_chunk_fa_bad_tiles: set[tuple] = set()
+_PAGED_CHUNK_FA_TILE_CANDIDATES: tuple[tuple[int, int], ...] = (
+    (64, 64),
+    (32, 64),
+    (32, 32),
+    (16, 32),
+    (16, 16),
+)
+
+
+def _tile_cache_key(
+    q: torch.Tensor,
+    k_cache: torch.Tensor,
+    batch_size: int,
+    head_dim: int,
+    max_q_len: int,
+) -> tuple:
+    return (
+        str(q.device),
+        str(q.dtype),
+        str(k_cache.dtype),
+        int(batch_size),
+        int(head_dim),
+        int(max_q_len),
+    )
+
+
+def _short_error(error: Exception) -> str:
+    message = str(error).splitlines()
+    for line in message:
+        if "ub overflow" in line or "MLIRCompilationError" in line:
+            return line.strip()[:240]
+    return (message[0].strip() if message else error.__class__.__name__)[:240]
+
+
+def _ordered_tile_candidates(cache_key: tuple) -> list[tuple[int, int]]:
+    cached = _paged_chunk_fa_tile_cache.get(cache_key)
+    candidates = []
+    if cached is not None:
+        candidates.append(cached)
+    for candidate in _PAGED_CHUNK_FA_TILE_CANDIDATES:
+        if candidate != cached:
+            candidates.append(candidate)
+    return candidates
 
 
 @triton.jit
@@ -196,64 +241,87 @@ def paged_chunk_flash_attention(
         return output
 
     n_heads, head_dim = q.shape[1], q.shape[2]
-    batch_size = q_seq_lens.shape[0]
-    # 910B3 BiShengIR has a tight UB budget for this kernel. 64x64 overflows UB
-    # on observed chunked-prefill shapes, so keep this conservative by default.
-    block_m_size = 16
-    block_n_size = 32
+    batch_size = int(q_seq_lens.shape[0])
     num_kv_groups = q.shape[1] // k_cache.shape[1]
-    grid = (triton.cdiv(int(max_q_len), block_m_size), batch_size * n_heads, 1)
+    max_q_len = int(max_q_len)
+    cache_key = _tile_cache_key(q, k_cache, batch_size, head_dim, max_q_len)
+
+    for block_m_size, block_n_size in _ordered_tile_candidates(cache_key):
+        bad_key = (cache_key, block_m_size, block_n_size)
+        if bad_key in _paged_chunk_fa_bad_tiles:
+            continue
+
+        grid = (triton.cdiv(max_q_len, block_m_size), batch_size * n_heads, 1)
+        try:
+            _paged_chunk_flash_attention_kernel[grid](
+                q,
+                k_cache,
+                v_cache,
+                output,
+                req_token_table,
+                req_ids,
+                q_start_loc,
+                context_lens,
+                q_seq_lens,
+                sm_scale,
+                n_heads,
+                num_kv_groups,
+                q.stride(0),
+                q.stride(1),
+                q.stride(2),
+                k_cache.stride(0),
+                k_cache.stride(1),
+                k_cache.stride(2),
+                v_cache.stride(0),
+                v_cache.stride(1),
+                v_cache.stride(2),
+                output.stride(0),
+                output.stride(1),
+                output.stride(2),
+                req_token_table.stride(0),
+                req_token_table.stride(1),
+                HEAD_DIM=head_dim,
+                BLOCK_M_SIZE=block_m_size,
+                BLOCK_N_SIZE=block_n_size,
+            )
+            if _paged_chunk_fa_tile_cache.get(cache_key) != (block_m_size, block_n_size):
+                logger.info(
+                    "paged_chunk_flash_attention selected tile=%sx%s for batch=%s max_q_len=%s head_dim=%s",
+                    block_m_size,
+                    block_n_size,
+                    batch_size,
+                    max_q_len,
+                    head_dim,
+                )
+            _paged_chunk_fa_tile_cache[cache_key] = (block_m_size, block_n_size)
+            return output
+        except Exception as error:
+            _paged_chunk_fa_bad_tiles.add(bad_key)
+            logger.warning(
+                "paged_chunk_flash_attention tile=%sx%s failed for batch=%s max_q_len=%s head_dim=%s; trying smaller tile: %s",
+                block_m_size,
+                block_n_size,
+                batch_size,
+                max_q_len,
+                head_dim,
+                _short_error(error),
+            )
 
     global _paged_chunk_fa_fallback_warned
-    try:
-        _paged_chunk_flash_attention_kernel[grid](
-            q,
-            k_cache,
-            v_cache,
-            output,
-            req_token_table,
-            req_ids,
-            q_start_loc,
-            context_lens,
-            q_seq_lens,
-            sm_scale,
-            n_heads,
-            num_kv_groups,
-            q.stride(0),
-            q.stride(1),
-            q.stride(2),
-            k_cache.stride(0),
-            k_cache.stride(1),
-            k_cache.stride(2),
-            v_cache.stride(0),
-            v_cache.stride(1),
-            v_cache.stride(2),
-            output.stride(0),
-            output.stride(1),
-            output.stride(2),
-            req_token_table.stride(0),
-            req_token_table.stride(1),
-            HEAD_DIM=head_dim,
-            BLOCK_M_SIZE=block_m_size,
-            BLOCK_N_SIZE=block_n_size,
+    if not _paged_chunk_fa_fallback_warned:
+        logger.warning(
+            "paged_chunk_flash_attention all Triton tile candidates failed; "
+            "falling back to torch attention for this process"
         )
-        return output
-    except Exception as error:
-        if not _paged_chunk_fa_fallback_warned:
-            logger.warning(
-                "paged_chunk_flash_attention Triton path failed; "
-                "falling back to torch attention for this process: %s",
-                error,
-            )
-            _paged_chunk_fa_fallback_warned = True
-        return _paged_chunk_attention_torch_fallback(
-            q,
-            k_cache,
-            v_cache,
-            sm_scale,
-            req_token_table,
-            req_ids,
-            q_start_loc,
-            context_lens,
-            q_seq_lens,
-        )
+        _paged_chunk_fa_fallback_warned = True
+    return _paged_chunk_attention_torch_fallback(
+        q,
+        k_cache,
+        v_cache,
+        sm_scale,
+        req_token_table,
+        req_ids,
+        q_start_loc,
+        context_lens,
+        q_seq_lens,
+    )

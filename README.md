@@ -9,7 +9,7 @@
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.7-orange)
 ![Ascend](https://img.shields.io/badge/Ascend-910B3-red)
-![Version](https://img.shields.io/badge/version-0.0.9rc4-blue)
+![Version](https://img.shields.io/badge/version-0.0.9rc5-blue)
 ![Status](https://img.shields.io/badge/status-active_development-yellow)
 
 </div>
@@ -29,8 +29,9 @@ Lite Llama NPU 的目标不是封装 Transformers，而是实现一条可以观�
 
 ## 最新版本
 
-Current version: **0.0.9rc4** (2026-06-23)
+Current version: **0.0.9rc5** (2026-06-23)
 
+- [v0.0.9rc5 release report](docs/releases/v0.0.9rc5.md)
 - [v0.0.9rc4 release report](docs/releases/v0.0.9rc4.md)
 - [v0.0.9rc3 release report](docs/releases/v0.0.9rc3.md)
 - [v0.0.9rc2 release report](docs/releases/v0.0.9rc2.md)
@@ -41,7 +42,7 @@ Current version: **0.0.9rc4** (2026-06-23)
 - [推理性能历史记录](docs/inference_performance_history.md)
 - [文档索引](docs/README.md)
 
-`v0.0.9rc4` fixes a Triton Ascend compile failure in the later-chunk `paged_chunk_flash_attention` path by using a 910B3-safe tile and a one-shot fallback. `v0.0.9rc3` fixes TP Chunked Prefill rank synchronization and keeps the `paged_chunk_flash_attention` path for later Chunked Prefill chunks. First chunks still use packed prefill / `flash_attention2_no_pad`; later chunks now attend to historical paged KV plus current chunk KV through the paged chunk kernel, with safe incremental fallback if unavailable. Exact Prefix Cache remains enabled by default; page-aligned partial Prefix Cache remains explicit via `--partial_prefix_cache`.
+`v0.0.9rc5` adds runtime tile selection for later-chunk `paged_chunk_flash_attention`, trying larger tiles first and caching the first working tile per process/shape. `v0.0.9rc4` fixes a Triton Ascend compile failure in the later-chunk `paged_chunk_flash_attention` path by using a 910B3-safe tile and a one-shot fallback. `v0.0.9rc3` fixes TP Chunked Prefill rank synchronization and keeps the `paged_chunk_flash_attention` path for later Chunked Prefill chunks. First chunks still use packed prefill / `flash_attention2_no_pad`; later chunks now attend to historical paged KV plus current chunk KV through the paged chunk kernel, with safe incremental fallback if unavailable. Exact Prefix Cache remains enabled by default; page-aligned partial Prefix Cache remains explicit via `--partial_prefix_cache`.
 
 ## 主要能力
 

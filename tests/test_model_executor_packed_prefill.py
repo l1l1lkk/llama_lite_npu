@@ -42,7 +42,7 @@ class ModelExecutorPackedPrefillContractTest(unittest.TestCase):
 
 
 class PagedChunkFlashAttentionContractTest(unittest.TestCase):
-    def test_paged_chunk_flash_attention_uses_910b3_safe_tiles_and_fallback(self):
+    def test_paged_chunk_flash_attention_uses_tile_candidates_cache_and_fallback(self):
         source = (
             Path(__file__).resolve().parents[1]
             / "lite_llama"
@@ -50,10 +50,15 @@ class PagedChunkFlashAttentionContractTest(unittest.TestCase):
             / "paged_chunk_flashattention.py"
         ).read_text(encoding="utf-8")
 
-        self.assertIn("block_m_size = 16", source)
-        self.assertIn("block_n_size = 32", source)
+        self.assertIn("_PAGED_CHUNK_FA_TILE_CANDIDATES", source)
+        self.assertIn("(64, 64)", source)
+        self.assertIn("(32, 64)", source)
+        self.assertIn("(16, 32)", source)
+        self.assertIn("_paged_chunk_fa_tile_cache", source)
+        self.assertIn("_paged_chunk_fa_bad_tiles", source)
         self.assertIn("_paged_chunk_attention_torch_fallback", source)
         self.assertIn("except Exception as error", source)
+        self.assertIn("trying smaller tile", source)
         self.assertIn("falling back to torch attention", source)
 
 

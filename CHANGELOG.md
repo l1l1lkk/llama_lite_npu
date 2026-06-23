@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.0.9rc5] - 2026-06-23
+
+Bugfix/performance release for paged chunk FlashAttention tile selection.
+
+### Changed
+
+- Replaced the fixed 16x32 paged chunk FA tile with runtime tile selection.
+- The kernel now tries larger tiles first: 64x64, 32x64, 32x32, 16x32, 16x16.
+- Successful tile choices are cached per process/shape; failed tile choices are remembered and skipped on later calls.
+- Error logging now reports a short compiler summary instead of dumping the full Triton compiler trace repeatedly.
+
+### Notes
+
+- The later-chunk input path already projects only current chunk tokens; `max_q_len` is the chunk length, not the full context length.
+- The fallback remains correctness-first and is only used when all Triton tile candidates fail.
+
+### Docs
+
+- [v0.0.9rc5 release report](docs/releases/v0.0.9rc5.md)
+
 ## [0.0.9rc4] - 2026-06-23
 
 Bugfix release for paged chunk FlashAttention Triton Ascend compilation failure.

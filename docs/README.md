@@ -8,6 +8,7 @@
 - [??????](performance_optimization.md)????????????
 - [Qwen3-VL ????](qwen3vl_support_plan.md)????????????
 - [`v0.0.7rc2` ????](releases/v0.0.7rc2.md)???? KV ????????
+- [`v0.0.9rc5` Release Report](releases/v0.0.9rc5.md) - Paged chunk FA runtime tile selection.
 - [`v0.0.9rc4` Release Report](releases/v0.0.9rc4.md) - Paged chunk FA 910B3 compile fallback.
 - [`v0.0.9rc3` Release Report](releases/v0.0.9rc3.md) - TP Chunked Prefill rank synchronization fix.
 - [`v0.0.9rc2` Release Report](releases/v0.0.9rc2.md) - Chunked Prefill paged chunk FlashAttention.
