@@ -1423,7 +1423,15 @@ class ContinuousBatchModelBackend:
             context_tokens = request.model_context_tokens
             if not context_tokens:
                 raise RuntimeError("empty prompts are not supported by chunked prefill")
-            self._ensure_incremental_request(request)
+            # Do not allocate a new model_request_id here.  In TP mode this
+            # method runs only on rank 0 before the command is sent to workers.
+            # Mutating first-chunk requests here makes rank 0 treat them as
+            # later chunks while worker ranks still treat them as first chunks,
+            # which desynchronizes HCCL collectives.  First-chunk allocation is
+            # performed inside prefill_chunk() on every rank.  Only existing
+            # paged requests can be safely capacity-checked here.
+            if request.model_request_id is None:
+                continue
             target_end = min(
                 len(context_tokens), request.prefill_cursor + int(chunk_size)
             )

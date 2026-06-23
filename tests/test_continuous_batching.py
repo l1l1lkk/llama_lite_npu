@@ -834,6 +834,22 @@ class ContinuousBatchModelBackendTest(unittest.TestCase):
         self.assertEqual(executor.forward_inputs[0][0].tolist(), [[1, 2, 5, 6]])
         self.assertEqual(executor.forward_inputs[0][1].tolist(), [[0, 1, 0, 1]])
 
+    def test_prepare_prefill_chunk_does_not_mutate_first_chunk_requests(self):
+        module = load_batching_module()
+        executor = FakeExecutor()
+        generator = SimpleNamespace(
+            model_executor=executor,
+            tokenizer=SimpleNamespace(eos_token_id=99),
+        )
+        backend = module.ContinuousBatchModelBackend(generator)
+        request = module.BatchRequest("first", [1, 2, 3, 4], 4, 0.0, 1.0)
+
+        backend.prepare_prefill_chunk([request], chunk_size=2)
+
+        self.assertIsNone(request.model_request_id)
+        self.assertEqual(request.prefill_cursor, 0)
+        self.assertEqual(executor.reserved_lengths, [])
+
     def test_prefill_chunk_later_chunk_uses_paged_chunk_fast_path_when_available(self):
         module = load_batching_module()
 

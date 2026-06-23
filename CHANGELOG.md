@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.0.9rc3] - 2026-06-23
+
+Bugfix release for TP Chunked Prefill rank desynchronization.
+
+### Fixed
+
+- Fixed a TP path split in Chunked Prefill where rank 0 preflight capacity preparation allocated `model_request_id` for first-chunk requests before worker ranks saw the command.
+- Rank 0 and worker ranks now keep first-chunk request state unchanged until `prefill_chunk()` executes on every rank, so both sides enter the same packed prefill / FlashAttention path.
+- Existing later-chunk requests still receive rank-0 capacity checks before the command is mirrored.
+
+### Tests
+
+- Added regression coverage that `prepare_prefill_chunk()` does not mutate first-chunk requests.
+
+### Docs
+
+- [v0.0.9rc3 release report](docs/releases/v0.0.9rc3.md)
+
 ## [0.0.9rc2] - 2026-06-23
 
 Feature release for paged chunk FlashAttention in Chunked Prefill.

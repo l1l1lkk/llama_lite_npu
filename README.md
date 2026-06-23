@@ -9,7 +9,7 @@
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.7-orange)
 ![Ascend](https://img.shields.io/badge/Ascend-910B3-red)
-![Version](https://img.shields.io/badge/version-0.0.9rc2-blue)
+![Version](https://img.shields.io/badge/version-0.0.9rc3-blue)
 ![Status](https://img.shields.io/badge/status-active_development-yellow)
 
 </div>
@@ -29,8 +29,9 @@ Lite Llama NPU 的目标不是封装 Transformers，而是实现一条可以观�
 
 ## 最新版本
 
-Current version: **0.0.9rc2** (2026-06-23)
+Current version: **0.0.9rc3** (2026-06-23)
 
+- [v0.0.9rc3 release report](docs/releases/v0.0.9rc3.md)
 - [v0.0.9rc2 release report](docs/releases/v0.0.9rc2.md)
 - [v0.0.9rc1 release report](docs/releases/v0.0.9rc1.md)
 - [v0.0.8rc9 release report](docs/releases/v0.0.8rc9.md)
@@ -39,7 +40,7 @@ Current version: **0.0.9rc2** (2026-06-23)
 - [推理性能历史记录](docs/inference_performance_history.md)
 - [文档索引](docs/README.md)
 
-`v0.0.9rc2` adds a Triton `paged_chunk_flash_attention` path for later Chunked Prefill chunks. First chunks still use packed prefill / `flash_attention2_no_pad`; later chunks now attend to historical paged KV plus current chunk KV through the paged chunk kernel, with safe incremental fallback if unavailable. Exact Prefix Cache remains enabled by default; page-aligned partial Prefix Cache remains explicit via `--partial_prefix_cache`.
+`v0.0.9rc3` fixes TP Chunked Prefill rank synchronization and keeps the `paged_chunk_flash_attention` path for later Chunked Prefill chunks. First chunks still use packed prefill / `flash_attention2_no_pad`; later chunks now attend to historical paged KV plus current chunk KV through the paged chunk kernel, with safe incremental fallback if unavailable. Exact Prefix Cache remains enabled by default; page-aligned partial Prefix Cache remains explicit via `--partial_prefix_cache`.
 
 ## 主要能力
 
@@ -152,7 +153,7 @@ Qwen3-32B、TP=2 时，每个 Decode Token 的主要 Linear 路径为：
 
 ## 最新实测性能
 
-`v0.0.9rc2` has not been re-benchmarked on Atlas yet. The table below keeps the latest reproducible measured baselines and is not a new-version performance claim:
+`v0.0.9rc3` has not been re-benchmarked on Atlas yet. The table below keeps the latest reproducible measured baselines and is not a new-version performance claim:
 
 
 1. Qwen3-30B-A3B使用项目Benchmark观察MoE TP/EP执行路径；
