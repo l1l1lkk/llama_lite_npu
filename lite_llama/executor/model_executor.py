@@ -527,6 +527,12 @@ class ModelExecutor:
                 f"Paged KV capacity reservation failed for request {req_idx}"
             )
 
+    def _reset_paged_chunk_prefill_metadata(self) -> None:
+        self.atten_info.is_paged_chunk_prefill = False
+        self.atten_info.chunk_context_len = None
+        self.atten_info.chunk_q_seq_len = None
+        self.atten_info.max_actual_q_seq_len = None
+
     def share_paged_request_from_cache(
         self, prompt_tokens: list[int] | tuple[int, ...]
     ) -> tuple[int, int] | None:
@@ -669,6 +675,7 @@ class ModelExecutor:
         self, request_ids: tuple[int, ...], prompt_length: int
     ) -> None:
         """Select an equal-length request group for one prefill forward."""
+        self._reset_paged_chunk_prefill_metadata()
         if not request_ids:
             raise ValueError("request_ids must not be empty")
         for req_idx in request_ids:
@@ -718,6 +725,7 @@ class ModelExecutor:
         position ids and the flat logits indices that correspond to the last
         prompt token of each logical request.
         """
+        self._reset_paged_chunk_prefill_metadata()
         if not request_ids:
             raise ValueError("request_ids must not be empty")
         if len(request_ids) != len(prompt_lengths):
@@ -768,10 +776,114 @@ class ModelExecutor:
             torch.tensor(sample_indices, dtype=torch.long, device=self.device),
         )
 
+    def activate_paged_chunk_prefill_batch(
+        self,
+        request_ids: tuple[int, ...],
+        context_lengths: list[int] | tuple[int, ...],
+        chunk_lengths: list[int] | tuple[int, ...],
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Select later chunked-prefill requests for paged chunk attention.
+
+        The model receives a flattened current-Q chunk.  K/V for the chunk are
+        written to the paged KV cache first, then attention reads
+        historical-paged KV plus current chunk KV through the request token
+        table.  ``context_lengths`` are the existing logical lengths before
+        this chunk; ``chunk_lengths`` are the number of new prompt tokens.
+        """
+        if not request_ids:
+            raise ValueError("request_ids must not be empty")
+        if len(request_ids) != len(context_lengths) or len(request_ids) != len(chunk_lengths):
+            raise ValueError(
+                "request_ids, context_lengths and chunk_lengths must have same length"
+            )
+
+        request_ids = tuple(int(req_idx) for req_idx in request_ids)
+        contexts = tuple(int(length) for length in context_lengths)
+        chunks = tuple(int(length) for length in chunk_lengths)
+        if any(length < 0 for length in contexts):
+            raise ValueError("context_lengths must be non-negative")
+        if any(length <= 0 for length in chunks):
+            raise ValueError("chunk_lengths must be positive")
+
+        for req_idx, context_length, chunk_length in zip(request_ids, contexts, chunks):
+            actual_length = self.req_tokens_manager.req_token_count[int(req_idx)]
+            if actual_length != context_length:
+                raise ValueError(
+                    "paged chunk prefill context length mismatch: "
+                    f"request={req_idx}, expected={context_length}, "
+                    f"actual={actual_length}"
+                )
+            if not self.req_tokens_manager.extend_req(req_idx, chunk_length):
+                current_tokens = self.req_tokens_manager.req_token_count.get(
+                    req_idx, "unknown"
+                )
+                max_seq_len = getattr(
+                    self.req_tokens_manager, "max_seq_len", "unknown"
+                )
+                free_pages = getattr(
+                    self.req_tokens_manager.page_mgr, "num_free_pages", "unknown"
+                )
+                raise RuntimeError(
+                    "Paged KV allocation failed for chunked prefill request "
+                    f"{req_idx}: context_tokens={context_length}, "
+                    f"chunk_tokens={chunk_length}, current_tokens={current_tokens}, "
+                    f"max_seq_len={max_seq_len}, free_pages={free_pages}"
+                )
+
+        starts: list[int] = []
+        sample_indices: list[int] = []
+        position_ids: list[int] = []
+        cursor = 0
+        for context_length, chunk_length in zip(contexts, chunks):
+            starts.append(cursor)
+            sample_indices.append(cursor + chunk_length - 1)
+            position_ids.extend(range(context_length, context_length + chunk_length))
+            cursor += chunk_length
+
+        self._paged_request_ids = request_ids
+        self.atten_info.b_req_idx = torch.tensor(
+            request_ids, dtype=torch.int32, device=self.device
+        )
+        total_lengths = tuple(
+            context_length + chunk_length
+            for context_length, chunk_length in zip(contexts, chunks)
+        )
+        self.atten_info.b_seq_len = torch.tensor(
+            total_lengths, dtype=torch.long, device=self.device
+        )
+        self.atten_info.cur_select_index = torch.cat(
+            [
+                self.req_tokens_manager.get_token_indices(req_idx, total_length)[
+                    context_length:total_length
+                ]
+                for req_idx, context_length, total_length in zip(
+                    request_ids, contexts, total_lengths
+                )
+            ]
+        ).to(torch.int32)
+        self.atten_info.b_start_loc = torch.tensor(
+            starts, dtype=torch.int32, device=self.device
+        )
+        self.atten_info.max_actual_seq_len = max(total_lengths)
+        self.atten_info.max_actual_q_seq_len = max(chunks)
+        self.atten_info.chunk_context_len = torch.tensor(
+            contexts, dtype=torch.long, device=self.device
+        )
+        self.atten_info.chunk_q_seq_len = torch.tensor(
+            chunks, dtype=torch.long, device=self.device
+        )
+        self.atten_info.is_paged_chunk_prefill = True
+
+        return (
+            torch.tensor(position_ids, dtype=torch.long, device=self.device),
+            torch.tensor(sample_indices, dtype=torch.long, device=self.device),
+        )
+
     def activate_paged_decode_batch(
         self, request_ids: tuple[int, ...]
     ) -> None:
         """Rebuild AttentionInfo for the current dynamic decode batch."""
+        self._reset_paged_chunk_prefill_metadata()
         req_ids, seq_lens, last_indices = (
             self.req_tokens_manager.batch_metadata(list(request_ids))
         )

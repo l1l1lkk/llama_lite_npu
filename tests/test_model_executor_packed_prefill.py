@@ -21,6 +21,15 @@ class ModelExecutorPackedPrefillContractTest(unittest.TestCase):
         self.assertIn("sample_indices", source)
         self.assertIn("position_ids", source)
 
+    def test_model_executor_exposes_paged_chunk_prefill_metadata_path(self):
+        source = MODULE_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("def activate_paged_chunk_prefill_batch", source)
+        self.assertIn("is_paged_chunk_prefill", source)
+        self.assertIn("chunk_context_len", source)
+        self.assertIn("chunk_q_seq_len", source)
+        self.assertIn("max_actual_q_seq_len", source)
+
     def test_safe_prefill_helper_does_not_split_constructor_initialization(self):
         source = MODULE_PATH.read_text(encoding="utf-8")
 

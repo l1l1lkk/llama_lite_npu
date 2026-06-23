@@ -9,7 +9,7 @@
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.7-orange)
 ![Ascend](https://img.shields.io/badge/Ascend-910B3-red)
-![Version](https://img.shields.io/badge/version-0.0.9rc1-blue)
+![Version](https://img.shields.io/badge/version-0.0.9rc2-blue)
 ![Status](https://img.shields.io/badge/status-active_development-yellow)
 
 </div>
@@ -29,8 +29,9 @@ Lite Llama NPU 的目标不是封装 Transformers，而是实现一条可以观�
 
 ## 最新版本
 
-Current version: **0.0.9rc1** (2026-06-23)
+Current version: **0.0.9rc2** (2026-06-23)
 
+- [v0.0.9rc2 release report](docs/releases/v0.0.9rc2.md)
 - [v0.0.9rc1 release report](docs/releases/v0.0.9rc1.md)
 - [v0.0.8rc9 release report](docs/releases/v0.0.8rc9.md)
 - [完整CHANGELOG](CHANGELOG.md)
@@ -38,7 +39,7 @@ Current version: **0.0.9rc1** (2026-06-23)
 - [推理性能历史记录](docs/inference_performance_history.md)
 - [文档索引](docs/README.md)
 
-`v0.0.9rc1` routes the first chunk of Chunked Prefill through the existing packed-prefill / `flash_attention2_no_pad` path. Later Chunked Prefill chunks still use the safe incremental fallback until a dedicated paged chunk FlashAttention kernel is implemented. Exact Prefix Cache remains enabled by default; page-aligned partial Prefix Cache remains explicit via `--partial_prefix_cache`.
+`v0.0.9rc2` adds a Triton `paged_chunk_flash_attention` path for later Chunked Prefill chunks. First chunks still use packed prefill / `flash_attention2_no_pad`; later chunks now attend to historical paged KV plus current chunk KV through the paged chunk kernel, with safe incremental fallback if unavailable. Exact Prefix Cache remains enabled by default; page-aligned partial Prefix Cache remains explicit via `--partial_prefix_cache`.
 
 ## 主要能力
 
@@ -113,7 +114,7 @@ Current version: **0.0.9rc1** (2026-06-23)
   - Exact Prefix Cache remains enabled by default for greedy repeated prompts;
   - Page-aligned partial Prefix Cache reuse can share cached KV pages and replay only the uncached suffix when `--partial_prefix_cache` is enabled; the partial lookup uses block-level complete-page cache keys instead of full-prompt scanning;
   - Mixed-length packed prefill is wired into live Continuous Batching cache-miss execution, reducing equal-length grouping overhead;
-  - Chunked Prefill can process long prompts across scheduler ticks; the first chunk now uses packed prefill and `flash_attention2_no_pad`, while later chunks keep the safe incremental fallback until paged chunk FlashAttention is available.
+  - Chunked Prefill can process long prompts across scheduler ticks; the first chunk uses packed prefill and `flash_attention2_no_pad`, while later chunks use Triton `paged_chunk_flash_attention` to attend to historical paged KV plus current chunk KV, with safe fallback if the path is unavailable.
   - Ascend PyTorch Profiler；
   - CPU、CANN、NPU 算子、HBM 和 HCCL 通信数据；
   - MindStudio Insight Timeline、算子、内存和集群分析。
@@ -151,7 +152,7 @@ Qwen3-32B、TP=2 时，每个 Decode Token 的主要 Linear 路径为：
 
 ## 最新实测性能
 
-`v0.0.9rc1` has not been re-benchmarked on Atlas yet. The table below keeps the latest reproducible measured baselines and is not a new-version performance claim:
+`v0.0.9rc2` has not been re-benchmarked on Atlas yet. The table below keeps the latest reproducible measured baselines and is not a new-version performance claim:
 
 
 1. Qwen3-30B-A3B使用项目Benchmark观察MoE TP/EP执行路径；
@@ -553,7 +554,7 @@ Profiler 数据通常包含：
 - Q+KV、Gate+Up 尚未融合；
 - Prefix Cache defaults to exact repeated greedy prompts only; page-aligned partial prefix reuse is opt-in through `--partial_prefix_cache`;
 - Top-P Vocab Parallel Sampling在候选集无法覆盖精确nucleus时会回退完整Logits Gather；
-- Rank 0 in Continuous Batching still performs one batched token D2H per step for HTTP streaming; a dedicated paged chunk/suffix-prefill attention kernel is not implemented yet, so only the first Chunked Prefill chunk uses FlashAttention.
+- Rank 0 in Continuous Batching still performs one batched token D2H per step for HTTP streaming; paged chunk FlashAttention is implemented as a first Triton path for Chunked Prefill later chunks, but remains experimental until Atlas profiler validation and long-prompt correctness sweeps are complete.
 - Qwen3 MoE TP Graph兼容性取决于CANN、torch_npu、GMM、Triton和HCCL版本；不兼容时按Bucket回退Eager；
 - Qwen3 MoE Expert Parallel首版复用现有TP组，通过本地专家计算加AllReduce合并输出，并非Token All-to-All；
 - Qwen3 MoE EP包含动态`NonZero` assignment压缩，因此自动禁用Decode NPU Graph；
@@ -580,7 +581,7 @@ Profiler 数据通常包含：
 - [x] Qwen3 MoE Decode Host同步清理；
 - [x] Qwen3 MoE NPU Graph能力探测与安全回退；
 - [x] Mixed-length packed prefill live execution for Continuous Batching;
-- [ ] Dedicated suffix-prefill attention kernel for higher Chunked Prefill throughput;
+- [x] Dedicated paged chunk prefill attention kernel for higher Chunked Prefill throughput;
 - [ ] Q+KV 融合；
 - [ ] Gate+Up 融合；
 - [x] Vocab Parallel Sampling，Greedy避免完整Logits AllGather，Top-P保留精确回退；

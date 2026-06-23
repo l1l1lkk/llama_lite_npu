@@ -704,9 +704,10 @@ class ContinuousBatchModelBackend:
         if self._logged_chunked_prefill_fallback:
             return
         logger.warning(
-            "chunked prefill later chunks use incremental replay fallback; "
-            "existing flash_attention2_no_pad is only valid for first/full "
-            "context chunks and cannot attend to historical paged KV."
+            "chunked prefill is using incremental replay fallback for a path "
+            "that cannot use paged_chunk_flash_attention; existing "
+            "flash_attention2_no_pad is only valid for first/full context "
+            "chunks and cannot attend to historical paged KV."
         )
         self._logged_chunked_prefill_fallback = True
 
@@ -1135,6 +1136,147 @@ class ContinuousBatchModelBackend:
 
         return results
 
+    def _run_prefill_chunk_paged_batch(
+        self,
+        requests: Sequence[BatchRequest],
+        chunk_size: int,
+    ) -> list[int | None] | None:
+        """Run later chunked-prefill chunks with paged chunk attention.
+
+        The first chunk can use the existing no-pad full prefill path because
+        there is no historical KV.  Later chunks need a kernel that lets the
+        current Q chunk attend to both historical paged KV and current chunk
+        KV.  When the executor does not provide that metadata path, callers
+        must fall back to incremental replay.
+        """
+        import torch
+
+        if not requests:
+            return []
+        if not hasattr(self.executor, "activate_paged_chunk_prefill_batch"):
+            self._log_chunked_prefill_fallback_once()
+            return None
+        if any(
+            request.model_request_id is None or request.prefill_cursor <= 0
+            for request in requests
+        ):
+            self._log_chunked_prefill_fallback_once()
+            return None
+
+        request_ids: list[int] = []
+        active_requests: list[BatchRequest] = []
+        context_lengths: list[int] = []
+        chunk_lengths: list[int] = []
+        flat_tokens: list[int] = []
+        sample_indices: list[int] = []
+        completed_requests: list[BatchRequest] = []
+        completed_indices: list[int] = []
+        cursor = 0
+
+        for index, request in enumerate(requests):
+            context_tokens = request.model_context_tokens
+            if not context_tokens:
+                raise RuntimeError("empty prompts are not supported by chunked prefill")
+            start = int(request.prefill_cursor)
+            end = min(len(context_tokens), start + int(chunk_size))
+            if end <= start:
+                continue
+            self._ensure_chunk_capacity(request, end + 1)
+            active_requests.append(request)
+            request_ids.append(int(request.model_request_id))
+            context_lengths.append(start)
+            chunk_length = end - start
+            chunk_lengths.append(chunk_length)
+            flat_tokens.extend(int(token_id) for token_id in context_tokens[start:end])
+            sample_indices.append(cursor + chunk_length - 1)
+            cursor += chunk_length
+            if end >= len(context_tokens):
+                completed_requests.append(request)
+                completed_indices.append(index)
+
+        results: list[int | None] = [None] * len(requests)
+        if not request_ids:
+            return results
+
+        flat_position_ids, executor_sample_indices = (
+            self.executor.activate_paged_chunk_prefill_batch(
+                tuple(request_ids),
+                tuple(context_lengths),
+                tuple(chunk_lengths),
+            )
+        )
+        input_ids = torch.tensor(
+            [flat_tokens],
+            dtype=torch.long,
+            device=self.executor.device,
+        )
+        logits = self.executor.forward(
+            input_ids,
+            flat_position_ids.reshape(1, -1),
+        )
+
+        for request, context_length, chunk_length in zip(
+            active_requests, context_lengths, chunk_lengths
+        ):
+            request.prefill_cursor = int(context_length) + int(chunk_length)
+
+        if completed_requests:
+            completed_sample_indices = []
+            completed_id_set = {
+                int(request.model_request_id) for request in completed_requests
+            }
+            for req_idx, sample_index in zip(request_ids, sample_indices):
+                if int(req_idx) in completed_id_set:
+                    completed_sample_indices.append(int(sample_index))
+            if len(completed_sample_indices) != len(completed_requests):
+                completed_sample_indices = [
+                    int(executor_sample_indices[request_ids.index(int(request.model_request_id))])
+                    for request in completed_requests
+                ]
+            selected_logits = logits[
+                0,
+                torch.tensor(
+                    completed_sample_indices,
+                    dtype=torch.long,
+                    device=logits.device,
+                ),
+                :,
+            ]
+            sampled = self._sample_device(selected_logits, completed_requests)
+            self._remember_sampled_tokens(
+                completed_requests,
+                sampled,
+                initial_positions=[
+                    len(request.model_context_tokens)
+                    for request in completed_requests
+                ],
+            )
+            completed_ids = tuple(
+                int(request.model_request_id) for request in completed_requests
+            )
+            self.executor.extend_paged_requests(completed_ids)
+            host_tokens = self._tokens_to_host(sampled)
+            if not self.return_host_tokens and hasattr(
+                self.executor, "store_paged_request_prefix"
+            ):
+                host_tokens = sampled.detach().cpu().tolist()
+            for list_index, request, token_id in zip(
+                completed_indices, completed_requests, host_tokens
+            ):
+                if self.return_host_tokens:
+                    results[list_index] = int(token_id)
+                if (
+                    hasattr(self.executor, "store_paged_request_prefix")
+                    and request.temperature == 0
+                ):
+                    self.executor.store_paged_request_prefix(
+                        request.model_context_tokens,
+                        int(request.model_request_id),
+                        int(token_id),
+                    )
+
+        return results
+
     def _run_prefill_first_chunk_packed(
         self,
         requests: Sequence[BatchRequest],
@@ -1142,9 +1284,10 @@ class ContinuousBatchModelBackend:
     ) -> list[int | None] | None:
         """Run the first chunk with packed prefill so attention uses no-pad FA.
 
-        This is intentionally restricted to the first chunk.  Later chunks need
-        a paged prefill attention kernel that can attend to historical paged KV;
-        reusing the existing full-context no-pad FA there would be incorrect.
+        This is intentionally restricted to the first chunk.  Later chunks use
+        _run_prefill_chunk_paged_batch when available because they must attend
+        to historical paged KV; reusing full-context no-pad FA there would be
+        incorrect.
         """
         import torch
 
@@ -1420,11 +1563,14 @@ class ContinuousBatchModelBackend:
             for index, token_id in zip(first_chunk_indices, fast_results):
                 results[index] = token_id
 
-        if replay_requests:
-            self._log_chunked_prefill_fallback_once()
-        replay_results = self._run_prefill_chunk_incremental_batch(
+        replay_results = self._run_prefill_chunk_paged_batch(
             replay_requests, int(chunk_size)
         )
+        if replay_results is None:
+            self._log_chunked_prefill_fallback_once()
+            replay_results = self._run_prefill_chunk_incremental_batch(
+                replay_requests, int(chunk_size)
+            )
         for index, token_id in zip(replay_indices, replay_results):
             results[index] = token_id
         return results

@@ -30,10 +30,24 @@ class Attention(nn.Module):
         update_kv_buffer(
             combined_kv, atten_info.cur_select_index, atten_info.kv_buffer[layer_index]
         )
-        output = flash_attention2_no_pad(
-            xq, xk, xv, qk_scale,
-            atten_info.b_start_loc, atten_info.b_seq_len, atten_info.max_actual_seq_len,
-        )
+        if getattr(atten_info, "is_paged_chunk_prefill", False):
+            output = paged_chunk_flash_attention(
+                xq,
+                atten_info.kv_buffer[layer_index][:, : self.num_kv_heads, :],
+                atten_info.kv_buffer[layer_index][:, self.num_kv_heads :, :],
+                qk_scale,
+                atten_info.b_req_tokens_table,
+                atten_info.b_req_idx,
+                atten_info.b_start_loc,
+                atten_info.chunk_context_len,
+                atten_info.chunk_q_seq_len,
+                atten_info.max_actual_q_seq_len,
+            )
+        else:
+            output = flash_attention2_no_pad(
+                xq, xk, xv, qk_scale,
+                atten_info.b_start_loc, atten_info.b_seq_len, atten_info.max_actual_seq_len,
+            )
         return output
 
     def token_forward(

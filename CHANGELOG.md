@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.0.9rc2] - 2026-06-23
+
+Feature release for paged chunk FlashAttention in Chunked Prefill.
+
+### Added
+
+- Added a Triton `paged_chunk_flash_attention` kernel for later Chunked Prefill chunks.
+- Added executor metadata setup for paged chunk prefill: context lengths, chunk lengths, flat Q start locations, and current-chunk KV write indices.
+- Routed Qwen3, Qwen2, and Llama text prefill attention through the paged chunk kernel when `atten_info.is_paged_chunk_prefill` is active.
+
+### Changed
+
+- Chunked Prefill now uses:
+  - full prefill: `flash_attention2_no_pad`
+  - packed/mixed prefill: `flash_attention2_no_pad`
+  - first chunk: packed prefill / `flash_attention2_no_pad`
+  - later chunks: Triton `paged_chunk_flash_attention` with safe incremental fallback
+
+### Tests
+
+- Added regression coverage that later chunked-prefill chunks use the paged chunk fast path when the executor exposes it.
+- Added ModelExecutor contract coverage for paged chunk prefill metadata.
+
+### Docs
+
+- [v0.0.9rc2 release report](docs/releases/v0.0.9rc2.md)
+
 ## [0.0.9rc1] - 2026-06-23
 
 Feature release for chunked-prefill attention routing.

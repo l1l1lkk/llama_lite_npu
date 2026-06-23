@@ -4,6 +4,7 @@ from .flashattention import flash_attention_v1
 from .flashattention2_nopad import flash_attention2_no_pad
 from .flashattentionv2 import flash_attention_v2
 from .flashdecoding import flash_decoding
+from .paged_chunk_flashattention import paged_chunk_flash_attention
 
 from .skip_rmsnorm import skip_rmsnorm
 from .swiglu import swiglu_forward
