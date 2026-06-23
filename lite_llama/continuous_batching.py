@@ -7,11 +7,15 @@ requests concurrently, while one scheduler thread remains the sole model owner.
 
 from __future__ import annotations
 
+import logging
 from collections import deque
 from dataclasses import dataclass
 from queue import Queue
 from threading import Event, Lock
 from typing import Callable, Protocol, Sequence
+
+
+logger = logging.getLogger(__name__)
 
 
 class KVCacheCapacityError(RuntimeError):
@@ -619,6 +623,8 @@ class ContinuousBatchModelBackend:
         self.enable_partial_prefix_cache = bool(enable_partial_prefix_cache)
         self._device_tokens: dict[int, object] = {}
         self._device_positions: dict[int, object] = {}
+        self._logged_prefill_attention_paths = False
+        self._logged_chunked_prefill_fallback = False
         if not self.executor.use_paged_attn:
             raise RuntimeError(
                 "continuous batching requires --page_size greater than zero"
@@ -676,6 +682,33 @@ class ContinuousBatchModelBackend:
         if not self.return_host_tokens:
             return []
         return sampled.detach().cpu().tolist()
+
+    def _log_prefill_attention_paths_once(self) -> None:
+        if self._logged_prefill_attention_paths:
+            return
+        later_chunk_path = (
+            "paged_chunk_flash_attention"
+            if hasattr(self.executor, "activate_paged_chunk_prefill_batch")
+            else "fallback incremental"
+        )
+        logger.info(
+            "Prefill attention paths: full_prefill=flash_attention2_no_pad, "
+            "packed_prefill=flash_attention2_no_pad, "
+            "chunked_prefill_first_chunk=flash_attention2_no_pad, "
+            "chunked_prefill_later_chunk=%s",
+            later_chunk_path,
+        )
+        self._logged_prefill_attention_paths = True
+
+    def _log_chunked_prefill_fallback_once(self) -> None:
+        if self._logged_chunked_prefill_fallback:
+            return
+        logger.warning(
+            "chunked prefill later chunks use incremental replay fallback; "
+            "existing flash_attention2_no_pad is only valid for first/full "
+            "context chunks and cannot attend to historical paged KV."
+        )
+        self._logged_chunked_prefill_fallback = True
 
     def _sample_prefill_logits(
         self,
@@ -1102,6 +1135,135 @@ class ContinuousBatchModelBackend:
 
         return results
 
+    def _run_prefill_first_chunk_packed(
+        self,
+        requests: Sequence[BatchRequest],
+        chunk_size: int,
+    ) -> list[int | None] | None:
+        """Run the first chunk with packed prefill so attention uses no-pad FA.
+
+        This is intentionally restricted to the first chunk.  Later chunks need
+        a paged prefill attention kernel that can attend to historical paged KV;
+        reusing the existing full-context no-pad FA there would be incorrect.
+        """
+        import torch
+
+        if not requests:
+            return []
+        if not hasattr(self.executor, "activate_paged_packed_prefill_batch"):
+            self._log_chunked_prefill_fallback_once()
+            return None
+        if any(
+            request.model_request_id is not None or request.prefill_cursor != 0
+            for request in requests
+        ):
+            self._log_chunked_prefill_fallback_once()
+            return None
+
+        chunk_lengths: list[int] = []
+        reserved_lengths: list[int] = []
+        flat_tokens: list[int] = []
+        sample_positions: list[int] = []
+        cursor = 0
+        for request in requests:
+            context_tokens = request.model_context_tokens
+            if not context_tokens:
+                raise RuntimeError("empty prompts are not supported by chunked prefill")
+            chunk_length = min(len(context_tokens), int(chunk_size))
+            chunk_lengths.append(chunk_length)
+            reserved_lengths.append(len(context_tokens) + 1)
+            flat_tokens.extend(int(token_id) for token_id in context_tokens[:chunk_length])
+            sample_positions.append(cursor + chunk_length - 1)
+            cursor += chunk_length
+
+        request_ids = self.executor.reserve_paged_requests(
+            chunk_lengths,
+            reserved_lengths=reserved_lengths,
+        )
+        for request, req_idx in zip(requests, request_ids):
+            request.model_request_id = int(req_idx)
+
+        try:
+            flat_position_ids, _ = (
+                self.executor.activate_paged_packed_prefill_batch(
+                    tuple(int(req_idx) for req_idx in request_ids),
+                    chunk_lengths,
+                )
+            )
+            input_ids = torch.tensor(
+                [flat_tokens],
+                dtype=torch.long,
+                device=self.executor.device,
+            )
+            logits = self.executor.forward(
+                input_ids,
+                flat_position_ids.reshape(1, -1),
+            )
+        except BaseException:
+            self.executor.release_paged_request_ids(request_ids)
+            for request in requests:
+                request.model_request_id = None
+                request.prefill_cursor = 0
+            raise
+
+        results: list[int | None] = [None] * len(requests)
+        completed_requests: list[BatchRequest] = []
+        completed_indices: list[int] = []
+        completed_sample_indices: list[int] = []
+        for index, (request, chunk_length, sample_index) in enumerate(
+            zip(requests, chunk_lengths, sample_positions)
+        ):
+            request.prefill_cursor = int(chunk_length)
+            if request.prefill_cursor >= len(request.model_context_tokens):
+                completed_requests.append(request)
+                completed_indices.append(index)
+                completed_sample_indices.append(int(sample_index))
+
+        if completed_requests:
+            selected_logits = logits[
+                0,
+                torch.tensor(
+                    completed_sample_indices,
+                    dtype=torch.long,
+                    device=logits.device,
+                ),
+                :,
+            ]
+            sampled = self._sample_device(selected_logits, completed_requests)
+            self._remember_sampled_tokens(
+                completed_requests,
+                sampled,
+                initial_positions=[
+                    len(request.model_context_tokens)
+                    for request in completed_requests
+                ],
+            )
+            completed_ids = tuple(
+                int(request.model_request_id) for request in completed_requests
+            )
+            self.executor.extend_paged_requests(completed_ids)
+            host_tokens = self._tokens_to_host(sampled)
+            if not self.return_host_tokens and hasattr(
+                self.executor, "store_paged_request_prefix"
+            ):
+                host_tokens = sampled.detach().cpu().tolist()
+            for list_index, request, token_id in zip(
+                completed_indices, completed_requests, host_tokens
+            ):
+                if self.return_host_tokens:
+                    results[list_index] = int(token_id)
+                if (
+                    hasattr(self.executor, "store_paged_request_prefix")
+                    and request.temperature == 0
+                ):
+                    self.executor.store_paged_request_prefix(
+                        request.model_context_tokens,
+                        int(request.model_request_id),
+                        int(token_id),
+                    )
+
+        return results
+
     def prepare_prefill_chunk(
         self,
         requests: Sequence[BatchRequest],
@@ -1208,7 +1370,10 @@ class ContinuousBatchModelBackend:
         requests: Sequence[BatchRequest],
         chunk_size: int,
     ) -> Sequence[int | None]:
+        self._log_prefill_attention_paths_once()
         results: list[int | None] = [None] * len(requests)
+        first_chunk_requests: list[BatchRequest] = []
+        first_chunk_indices: list[int] = []
         replay_requests: list[BatchRequest] = []
         replay_indices: list[int] = []
         for index, request in enumerate(requests):
@@ -1238,8 +1403,25 @@ class ContinuousBatchModelBackend:
                     )
                     results[index] = int(token_id) if self.return_host_tokens else None
                     continue
+            if request.model_request_id is None and request.prefill_cursor == 0:
+                first_chunk_requests.append(request)
+                first_chunk_indices.append(index)
+                continue
             replay_requests.append(request)
             replay_indices.append(index)
+
+        fast_results = self._run_prefill_first_chunk_packed(
+            first_chunk_requests, int(chunk_size)
+        )
+        if fast_results is None:
+            replay_requests = [*first_chunk_requests, *replay_requests]
+            replay_indices = [*first_chunk_indices, *replay_indices]
+        else:
+            for index, token_id in zip(first_chunk_indices, fast_results):
+                results[index] = token_id
+
+        if replay_requests:
+            self._log_chunked_prefill_fallback_once()
         replay_results = self._run_prefill_chunk_incremental_batch(
             replay_requests, int(chunk_size)
         )

@@ -781,7 +781,7 @@ class ContinuousBatchModelBackendTest(unittest.TestCase):
         self.assertEqual(forwarded_token_ids, [5, 6])
         self.assertEqual(forwarded_positions, [4, 5])
 
-    def test_prefill_chunk_replays_multiple_requests_as_decode_micro_batches(self):
+    def test_prefill_chunk_replays_later_chunks_as_decode_micro_batches(self):
         module = load_batching_module()
         executor = FakeExecutor()
         generator = SimpleNamespace(
@@ -789,25 +789,50 @@ class ContinuousBatchModelBackendTest(unittest.TestCase):
             tokenizer=SimpleNamespace(eos_token_id=99),
         )
         backend = module.ContinuousBatchModelBackend(generator)
-        request_a = module.BatchRequest("a", [1, 2, 3], 4, 0.0, 1.0)
-        request_b = module.BatchRequest("b", [4, 5], 4, 0.0, 1.0)
+        request_a = module.BatchRequest("a", [1, 2, 3, 4], 4, 0.0, 1.0)
+        request_b = module.BatchRequest("b", [5, 6, 7], 4, 0.0, 1.0)
+        request_a.model_request_id = 0
+        request_b.model_request_id = 1
+        request_a.prefill_cursor = 2
+        request_b.prefill_cursor = 2
+        executor.lengths[0] = 2
+        executor.lengths[1] = 2
 
         first = backend.prefill_chunk([request_a, request_b], chunk_size=2)
 
-        self.assertEqual(first, [None, 41])
+        self.assertEqual(first, [40, 41])
+        self.assertEqual(request_a.prefill_cursor, 4)
+        self.assertEqual(request_b.prefill_cursor, 3)
+        self.assertEqual(executor.packed_prefill_batches, [])
+        self.assertEqual(executor.forward_inputs[0][0].tolist(), [[3], [7]])
+        self.assertEqual(executor.forward_inputs[0][1].tolist(), [[2], [2]])
+        self.assertEqual(executor.forward_inputs[1][0].tolist(), [[4]])
+        self.assertEqual(executor.forward_inputs[1][1].tolist(), [[3]])
+
+    def test_prefill_chunk_first_chunk_uses_packed_prefill_fast_path(self):
+        module = load_batching_module()
+        executor = FakeExecutor()
+        generator = SimpleNamespace(
+            model_executor=executor,
+            tokenizer=SimpleNamespace(eos_token_id=99),
+        )
+        backend = module.ContinuousBatchModelBackend(generator)
+        request_a = module.BatchRequest("a", [1, 2, 3, 4], 4, 0.0, 1.0)
+        request_b = module.BatchRequest("b", [5, 6, 7], 4, 0.0, 1.0)
+
+        first = backend.prefill_chunk([request_a, request_b], chunk_size=2)
+
+        self.assertEqual(first, [None, None])
         self.assertEqual(request_a.prefill_cursor, 2)
         self.assertEqual(request_b.prefill_cursor, 2)
-        self.assertEqual(executor.forward_inputs[0][0].tolist(), [[1], [4]])
-        self.assertEqual(executor.forward_inputs[0][1].tolist(), [[0], [0]])
-        self.assertEqual(executor.forward_inputs[1][0].tolist(), [[2], [5]])
-        self.assertEqual(executor.forward_inputs[1][1].tolist(), [[1], [1]])
-
-        second = backend.prefill_chunk([request_a], chunk_size=2)
-
-        self.assertEqual(second, [40])
-        self.assertEqual(request_a.prefill_cursor, 3)
-        self.assertEqual(executor.forward_inputs[-1][0].tolist(), [[3]])
-        self.assertEqual(executor.forward_inputs[-1][1].tolist(), [[2]])
+        self.assertEqual(
+            executor.packed_prefill_batches,
+            [((0, 1), (2, 2), (0, 2))],
+        )
+        self.assertEqual(executor.decode_batches, [])
+        self.assertEqual(len(executor.forward_inputs), 1)
+        self.assertEqual(executor.forward_inputs[0][0].tolist(), [[1, 2, 5, 6]])
+        self.assertEqual(executor.forward_inputs[0][1].tolist(), [[0, 1, 0, 1]])
 
     def test_exact_prefix_cache_is_disabled_for_sampling_requests(self):
         module = load_batching_module()

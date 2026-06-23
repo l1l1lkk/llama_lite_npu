@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.0.9rc1] - 2026-06-23
+
+Feature release for chunked-prefill attention routing.
+
+### Changed
+
+- Added a chunked-prefill first-chunk fast path that uses packed prefill, therefore reusing the existing `flash_attention2_no_pad` prefill attention path.
+- Kept later chunked-prefill chunks on the existing incremental replay fallback because the current no-pad full-context FlashAttention kernel cannot attend to historical paged KV.
+- Added one-shot startup/runtime logging that reports the effective prefill attention paths:
+  - full prefill: `flash_attention2_no_pad`
+  - packed prefill: `flash_attention2_no_pad`
+  - chunked first chunk: `flash_attention2_no_pad`
+  - chunked later chunks: paged chunk FA if available, otherwise incremental fallback
+
+### Tests
+
+- Added regression coverage that the first chunk of chunked prefill uses packed prefill instead of decode micro-batch replay.
+- Updated later-chunk coverage to ensure non-first chunks still use the safe incremental replay fallback.
+
+### Docs
+
+- [v0.0.9rc1 release report](docs/releases/v0.0.9rc1.md)
+
 ## [0.0.8rc9] - 2026-06-22
 
 Bugfix release for a `v0.0.8rc8` `ModelExecutor` initialization regression.
