@@ -1,8 +1,12 @@
-"""Request state and scheduling primitives for continuous batching.
+"""Request lifecycle and scheduling primitives for continuous batching.
 
 The scheduler is deliberately model-agnostic. A backend owns the model and KV
-cache and exposes prefill/decode/release operations. HTTP handlers may submit
-requests concurrently, while one scheduler thread remains the sole model owner.
+cache and exposes Prefill, Decode, preemption, and release operations. HTTP
+handlers may submit requests concurrently, while one scheduler thread remains
+the sole model owner and enforces batch capacity and token budgets.
+
+In TP mode, rank 0 is the scheduling authority. Worker ranks must execute the
+same request order and shape metadata before any collective operation.
 """
 
 from __future__ import annotations

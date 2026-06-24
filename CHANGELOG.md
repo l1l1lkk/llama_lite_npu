@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.0.10rc2] - 2026-06-24
+
+GitHub presentation and repository documentation release.
+
+### Changed
+
+- Replaced the root README with an English GitHub landing page.
+- Added a synchronized Chinese README at `README_CN.md`.
+- Added an ASCII architecture overview, Quick Start, benchmark tables, and a
+  capability matrix.
+- Published selected EvalScope measurements from
+  `docs/inference_performance_history.md` in both README files.
+- Added concise module-level documentation to the scheduler, model executor,
+  NPU Graph, Paged KV, and Qwen3 MoE modules.
+
+### Tests
+
+- Added repository documentation contract tests for README structure, release
+  version synchronization, benchmark values, and core module docstrings.
+
+### Docs
+
+- [v0.0.10rc2 release report](docs/releases/v0.0.10rc2.md)
+
 ## [0.0.10rc1] - 2026-06-23
 
 Decode hot-path cleanup release before merging the 0.0.10 line toward the main branch.

@@ -1,4 +1,13 @@
-"""Qwen3 MoE model built on the existing Qwen3 execution path."""
+"""Qwen3 Mixture-of-Experts model for the lite_llama execution path.
+
+The implementation reuses Qwen3 attention, RoPE, normalization, KV-cache, and
+sampling contracts while replacing dense MLP blocks with router-driven expert
+execution. Experts can run through ``torch_npu`` grouped matrix multiplication
+or routed small-batch kernels, followed by weighted token combination.
+
+TP and EP modes must preserve expert weight layout, routing order, and output
+aggregation semantics across ranks.
+"""
 
 from __future__ import annotations
 

@@ -14,6 +14,7 @@
 
 ## 发布文档
 
+- [v0.0.10rc2 发布记录](releases/v0.0.10rc2.md)：GitHub 首页、中英文 README、性能表与核心模块说明。
 - [v0.0.10rc1 发布记录](releases/v0.0.10rc1.md)：Decode 热路径清理。
 - [v0.0.9rc5 发布记录](releases/v0.0.9rc5.md)：Paged Chunk FlashAttention 运行时 Tile 选择。
 - [v0.0.9rc4 发布记录](releases/v0.0.9rc4.md)：Paged Chunk FlashAttention 在 910B3 上的编译回退。

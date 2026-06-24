@@ -1,3 +1,14 @@
+"""Model loading and execution orchestration for lite_llama.
+
+``ModelExecutor`` owns model construction, tensor-parallel weight sharding,
+KV-cache allocation, request-to-page metadata, Prefill/Decode activation, and
+optional NPU Graph replay. The executor is the boundary between model-agnostic
+scheduling and model-specific forward implementations.
+
+Correctness depends on keeping request token counts, page-table state, and TP
+rank execution order identical across all workers.
+"""
+
 import torch
 import torch.nn as nn
 

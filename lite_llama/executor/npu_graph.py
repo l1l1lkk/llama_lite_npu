@@ -1,8 +1,12 @@
-"""NPU Graph support for fixed-shape decode replay.
+"""Fixed-shape NPU Graph capture and replay for Decode execution.
 
-FlashDecoding launches work in 128-token partitions. Decode graphs are cached
-per ``(batch_size, sequence_bucket)`` so all sequence lengths inside the same
-partition bucket can reuse one graph while the real lengths remain dynamic.
+FlashDecoding launches work in 128-token partitions. Graphs are cached by model
+type, batch size, and sequence bucket so nearby context lengths can reuse one
+captured execution while real lengths remain runtime metadata.
+
+Capture is correctness-sensitive in TP mode: all ranks must enter the same
+collectives with identical shapes and no outstanding HCCL work. Unsupported
+shapes are remembered and safely fall back to eager execution.
 """
 
 from __future__ import annotations
