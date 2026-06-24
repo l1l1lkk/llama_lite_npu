@@ -34,6 +34,18 @@ class ServerContinuousBatchingContractTest(unittest.TestCase):
         self.assertIn("_stream_continuous_chat", self.source)
         self.assertIn("_wait_continuous_chat", self.source)
 
+    def test_server_exposes_prometheus_and_debug_metrics(self):
+        self.assertIn('app.get("/metrics")', self.source)
+        self.assertIn('app.get("/debug/stats")', self.source)
+        self.assertIn("_metrics.render()", self.source)
+        self.assertIn("_metrics.snapshot()", self.source)
+
+    def test_server_injects_metrics_and_request_endpoint(self):
+        self.assertIn("metrics=_metrics", self.source)
+        self.assertIn('endpoint="chat"', self.source)
+        self.assertIn('endpoint="completion"', self.source)
+        self.assertIn("_sync_runtime_metrics", self.source)
+
     def test_server_exposes_expert_parallel_mode(self):
         self.assertIn("--moe_parallel_mode", self.source)
         self.assertIn(

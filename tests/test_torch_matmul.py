@@ -2,6 +2,7 @@ import torch
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import itertools
+import io
 from torch.utils.benchmark import Timer
 
 # 是否使用GPU进行测试（如果没有GPU则设为False）
@@ -70,4 +71,6 @@ plt.title(
 )
 plt.legend()
 plt.grid(True)
-plt.savefig("./result.png")
+image_buffer = io.BytesIO()
+plt.savefig(image_buffer, format="png")
+plt.close()

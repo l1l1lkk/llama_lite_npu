@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.0.10rc3] - 2026-06-24
+
+Prometheus observability release for the Continuous Batching serving path.
+
+### Added
+
+- Added `GET /metrics` with Prometheus text exposition.
+- Added `GET /debug/stats` with scheduler, KV cache, NPU Graph, request, and
+  failure snapshots.
+- Added request counters and histograms for latency, queue wait, TTFT, ITL,
+  prompt tokens, and generated tokens.
+- Added queue-depth, active-request, Prefill, KV-page, preemption, and NPU Graph
+  metrics.
+- Added stable failure categories without high-cardinality exception labels.
+- Added `prometheus-client==0.24.0`.
+
+### Changed
+
+- Continuous Batching requests now carry an endpoint type for metric labels.
+- Scheduler lifecycle events update metrics without changing behavior when no
+  metrics observer is configured.
+- Non-streaming Continuous Batching submissions return HTTP 429 when the
+  waiting queue is full.
+
+### Tests
+
+- Added metric lifecycle, failure attribution, scheduler integration, runtime
+  snapshot, and Server endpoint contract coverage.
+
+### Docs
+
+- [Observability guide](docs/observability.md)
+- [v0.0.10rc3 release report](docs/releases/v0.0.10rc3.md)
+
 ## [0.0.10rc2] - 2026-06-24
 
 GitHub presentation and repository documentation release.

@@ -17,6 +17,7 @@ class RepositoryDocumentationTests(unittest.TestCase):
             "## Quick Start",
             "## Benchmarks",
             "## Capability Matrix",
+            "## Observability",
         ):
             self.assertIn(heading, english)
         for heading in (
@@ -24,6 +25,7 @@ class RepositoryDocumentationTests(unittest.TestCase):
             "## 快速开始",
             "## 性能数据",
             "## 能力矩阵",
+            "## 可观测性",
         ):
             self.assertIn(heading, chinese)
 
@@ -40,10 +42,11 @@ class RepositoryDocumentationTests(unittest.TestCase):
         english = (ROOT / "README.md").read_text(encoding="utf-8")
         chinese = (ROOT / "README_CN.md").read_text(encoding="utf-8")
 
-        self.assertEqual(version, "0.0.10rc2")
-        self.assertIn("0.0.10rc2", english)
-        self.assertIn("0.0.10rc2", chinese)
-        self.assertTrue((ROOT / "docs/releases/v0.0.10rc2.md").exists())
+        self.assertEqual(version, "0.0.10rc3")
+        self.assertIn("0.0.10rc3", english)
+        self.assertIn("0.0.10rc3", chinese)
+        self.assertTrue((ROOT / "docs/releases/v0.0.10rc3.md").exists())
+        self.assertTrue((ROOT / "docs/observability.md").exists())
 
     def test_core_modules_have_module_docstrings(self):
         modules = (
@@ -52,6 +55,7 @@ class RepositoryDocumentationTests(unittest.TestCase):
             "lite_llama/executor/npu_graph.py",
             "lite_llama/executor/paged_attention.py",
             "lite_llama/models/qwen3_moe.py",
+            "lite_llama/observability.py",
         )
         for relative_path in modules:
             source = (ROOT / relative_path).read_text(encoding="utf-8")

@@ -9,9 +9,29 @@ lite_llama_module = types.ModuleType("lite_llama")
 utils_module = types.ModuleType("lite_llama.utils")
 device_module = types.ModuleType("lite_llama.utils.device")
 device_module.get_device = lambda device=None: device or "cpu"
+observability_module = types.ModuleType("lite_llama.observability")
+
+
+class _FakeInferenceMetrics:
+    def sync_runtime(self, executor):
+        return None
+
+    def render(self):
+        return b""
+
+    @property
+    def content_type(self):
+        return "text/plain"
+
+    def snapshot(self):
+        return {}
+
+
+observability_module.InferenceMetrics = _FakeInferenceMetrics
 sys.modules.setdefault("lite_llama", lite_llama_module)
 sys.modules.setdefault("lite_llama.utils", utils_module)
 sys.modules.setdefault("lite_llama.utils.device", device_module)
+sys.modules.setdefault("lite_llama.observability", observability_module)
 
 import server
 

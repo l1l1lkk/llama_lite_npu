@@ -12,7 +12,7 @@
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.7-orange)
 ![Ascend](https://img.shields.io/badge/Ascend-910B3-red)
-![Version](https://img.shields.io/badge/version-0.0.10rc2-blue)
+![Version](https://img.shields.io/badge/version-0.0.10rc3-blue)
 
 </div>
 
@@ -82,6 +82,7 @@ MindIE 的生产替代品。
 | MoE | `torch_npu` GMM | 已支持 |
 | MoE | Routed GEMV 与 Triton Gather/Scatter | 已支持 |
 | 分析 | Ascend Profiler / MindStudio Insight | 已支持 |
+| 可观测性 | Prometheus 指标与运行时调试快照 | 已支持 |
 | 测试 | EvalScope | 已支持 |
 | 精度 | FP16 | 当前主要验证路径 |
 | 精度 | BF16 / W8A8 / W4A8 / FP8 | 尚未稳定 |
@@ -148,6 +149,8 @@ python -m torch.distributed.run --nproc_per_node=2 server.py \
 
 ```bash
 curl http://127.0.0.1:8213/health
+curl http://127.0.0.1:8213/metrics
+curl http://127.0.0.1:8213/debug/stats
 ```
 
 ### 发送流式请求
@@ -203,6 +206,15 @@ python -m torch.distributed.run --nproc_per_node=2 examples/benchmark_tp.py \
 
 采集完成后，可以使用 MindStudio Insight 查看算子、通信、内存和时间线数据。
 
+## 可观测性
+
+服务通过 `GET /metrics` 导出 Prometheus 指标，并通过 `GET /debug/stats`
+输出紧凑的 JSON 运行时快照。指标覆盖请求 QPS、稳定失败分类、延迟、TTFT、
+ITL、队列深度、调度状态、Token 吞吐、KV 页使用量、抢占和 NPU Graph 状态。
+
+指标名称、PromQL 示例和 Prometheus 抓取配置见
+[可观测性指南](docs/observability.md)。
+
 ## 代码导航
 
 ```text
@@ -227,7 +239,8 @@ docs/bug_records.md          错误复盘和根因记录
 - [文档索引](docs/README.md)
 - [性能历史记录](docs/inference_performance_history.md)
 - [错误复盘记录](docs/bug_records.md)
-- [v0.0.10rc2 发布记录](docs/releases/v0.0.10rc2.md)
+- [可观测性指南](docs/observability.md)
+- [v0.0.10rc3 发布记录](docs/releases/v0.0.10rc3.md)
 
 ## 当前限制
 

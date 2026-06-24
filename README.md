@@ -12,7 +12,7 @@ the core execution path instead of wrapping a high-level inference library.
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.7-orange)
 ![Ascend](https://img.shields.io/badge/Ascend-910B3-red)
-![Version](https://img.shields.io/badge/version-0.0.10rc2-blue)
+![Version](https://img.shields.io/badge/version-0.0.10rc3-blue)
 
 </div>
 
@@ -84,6 +84,7 @@ It is not positioned as a production replacement for vLLM-Ascend or MindIE.
 | MoE | `torch_npu` GMM | Supported |
 | MoE | Routed GEMV and Triton Gather/Scatter | Supported |
 | Profiling | Ascend Profiler / MindStudio Insight | Supported |
+| Observability | Prometheus metrics and runtime debug snapshot | Supported |
 | Evaluation | EvalScope | Supported |
 | Precision | FP16 | Main validated path |
 | Precision | BF16 / W8A8 / W4A8 / FP8 | Not yet stabilized |
@@ -153,6 +154,8 @@ python -m torch.distributed.run --nproc_per_node=2 server.py \
 
 ```bash
 curl http://127.0.0.1:8213/health
+curl http://127.0.0.1:8213/metrics
+curl http://127.0.0.1:8213/debug/stats
 ```
 
 ### Send a streaming request
@@ -209,6 +212,16 @@ python -m torch.distributed.run --nproc_per_node=2 examples/benchmark_tp.py \
 Open the generated directory with MindStudio Insight to inspect operator,
 communication, memory, and timeline data.
 
+## Observability
+
+The server exports Prometheus metrics at `GET /metrics` and a compact JSON
+runtime snapshot at `GET /debug/stats`. Metrics cover request QPS, failures by
+stable reason, latency, TTFT, ITL, queue depth, scheduler states, token
+throughput, KV page usage, preemption, and NPU Graph activity.
+
+See the [observability guide](docs/observability.md) for metric names, PromQL
+examples, and a Prometheus scrape configuration.
+
 ## Repository Guide
 
 ```text
@@ -233,7 +246,8 @@ docs/bug_records.md          engineering mistakes and root-cause reviews
 - [Documentation index](docs/README.md)
 - [Performance history](docs/inference_performance_history.md)
 - [Engineering bug records](docs/bug_records.md)
-- [v0.0.10rc2 release notes](docs/releases/v0.0.10rc2.md)
+- [Observability guide](docs/observability.md)
+- [v0.0.10rc3 release notes](docs/releases/v0.0.10rc3.md)
 
 ## Current Limitations
 

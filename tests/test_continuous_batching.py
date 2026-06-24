@@ -84,8 +84,40 @@ class FakeBackend:
         self.release(requests)
 
 
+class FakeMetrics:
+    def __init__(self):
+        self.events = []
+        self.scheduler = None
+
+    def on_request_submitted(self, request):
+        self.events.append(("submitted", request.request_id, request.endpoint))
+
+    def on_request_admitted(self, request):
+        self.events.append(("admitted", request.request_id))
+
+    def on_token(self, request):
+        self.events.append(("token", request.request_id))
+
+    def on_request_finished(self, request):
+        self.events.append(
+            ("finished", request.request_id, request.finish_reason)
+        )
+
+    def on_request_failed(self, request, error):
+        self.events.append(("failed", request.request_id, str(error)))
+
+    def on_request_rejected(self, endpoint, error):
+        self.events.append(("rejected", endpoint, str(error)))
+
+    def on_preemption(self):
+        self.events.append(("preempted",))
+
+    def update_scheduler(self, *, waiting, prefilling, running):
+        self.scheduler = (waiting, prefilling, running)
+
+
 class ContinuousBatchSchedulerTest(unittest.TestCase):
-    def _make_scheduler(self, max_batch_size=4):
+    def _make_scheduler(self, max_batch_size=4, metrics=None):
         ContinuousBatchScheduler = (
             load_batching_module().ContinuousBatchScheduler
         )
@@ -98,8 +130,56 @@ class ContinuousBatchSchedulerTest(unittest.TestCase):
             decode_tokens=lambda token_ids: "".join(
                 f"<{token_id}>" for token_id in token_ids
             ),
+            metrics=metrics,
         )
         return scheduler, backend
+
+    def test_metrics_observer_receives_request_lifecycle(self):
+        metrics = FakeMetrics()
+        scheduler, backend = self._make_scheduler(metrics=metrics)
+        backend.prefill_tokens = {"a": [10]}
+        backend.decode_tokens = {"a": [99]}
+
+        scheduler.submit(
+            request_id="a",
+            prompt_tokens=[1, 2],
+            max_new_tokens=4,
+            temperature=0.0,
+            top_p=1.0,
+            endpoint="chat",
+        )
+        scheduler.step()
+        scheduler.step()
+
+        self.assertIn(("submitted", "a", "chat"), metrics.events)
+        self.assertIn(("admitted", "a"), metrics.events)
+        self.assertEqual(
+            [event for event in metrics.events if event[0] == "token"],
+            [("token", "a"), ("token", "a")],
+        )
+        self.assertIn(("finished", "a", "stop"), metrics.events)
+        self.assertEqual(metrics.scheduler, (0, 0, 0))
+
+    def test_metrics_observer_attributes_queue_rejection(self):
+        metrics = FakeMetrics()
+        scheduler, _ = self._make_scheduler(metrics=metrics)
+        scheduler.max_waiting_requests = 0
+
+        with self.assertRaisesRegex(RuntimeError, "waiting queue is full"):
+            scheduler.submit(
+                "rejected", [1], 4, 0.0, 1.0, endpoint="completion"
+            )
+
+        self.assertEqual(
+            metrics.events,
+            [
+                (
+                    "rejected",
+                    "completion",
+                    "continuous batching waiting queue is full",
+                )
+            ],
+        )
 
     def test_new_request_joins_existing_decode_batch(self):
         scheduler, backend = self._make_scheduler()

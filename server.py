@@ -9,10 +9,12 @@ Usage (TP multi-card):
       server.py --checkpoints_dir my_weight/Qwen3-32B/ --port 8000
 
 Endpoints:
-  POST /v1/chat/completions    — OpenAI-compatible chat (with streaming)
-  POST /v1/completions          — OpenAI-compatible text completion
-  GET  /v1/models               — list available models
-  GET  /health                  — health check
+  POST /v1/chat/completions  - OpenAI-compatible chat (with streaming)
+  POST /v1/completions       - OpenAI-compatible text completion
+  GET  /v1/models            - list available models
+  GET  /health               - health check
+  GET  /metrics              - Prometheus metrics
+  GET  /debug/stats          - runtime debug snapshot
 """
 
 from __future__ import annotations
@@ -33,11 +35,12 @@ import torch
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
 from PIL import Image
 
 from lite_llama.utils.device import get_device
+from lite_llama.observability import InferenceMetrics
 
 # ---------------------------------------------------------------------------
 # Pydantic models (OpenAI-compatible schemas)
@@ -98,6 +101,7 @@ _partial_prefix_cache = False
 _scheduler_thread = None
 _scheduler_stop = None
 _scheduler_poll_seconds = 0.001
+_metrics = InferenceMetrics()
 
 
 def load_generator(
@@ -450,6 +454,7 @@ def _start_continuous_scheduler(
         chunked_prefill=chunked_prefill,
         prefill_chunk_size=prefill_chunk_size,
         max_preemptions=max_preemptions,
+        metrics=_metrics,
     )
     _scheduler_poll_seconds = max(0.0001, scheduler_poll_ms / 1000.0)
     _scheduler_stop = threading.Event()
@@ -536,12 +541,24 @@ def _count_tokens(text: str) -> int:
     return len(_generator.tokenizer.encode(text, add_special_tokens=False))
 
 
+def _sync_runtime_metrics() -> None:
+    """Refresh scrape-time KV and NPU Graph metrics from rank-0 state."""
+
+    backend = _continuous_backend
+    local_backend = getattr(backend, "local_backend", backend)
+    executor = getattr(local_backend, "executor", None)
+    if executor is None and _generator is not None:
+        executor = getattr(_generator, "model_executor", None)
+    _metrics.sync_runtime(executor)
+
+
 def _submit_continuous_request(
     request_id: str,
     prompt: str,
     temperature: float,
     top_p: float,
     max_tokens: int,
+    endpoint: str,
 ):
     if _continuous_scheduler is None or _continuous_backend is None:
         raise RuntimeError("continuous batching scheduler is not running")
@@ -553,9 +570,14 @@ def _submit_continuous_request(
             max_new_tokens=max_tokens,
             temperature=temperature,
             top_p=top_p,
+            endpoint=endpoint,
         )
     except ValueError as error:
         raise HTTPException(400, str(error)) from error
+    except RuntimeError as error:
+        if "waiting queue is full" in str(error).lower():
+            raise HTTPException(429, str(error)) from error
+        raise
 
 
 async def _collect_continuous_request(batch_request):
@@ -573,7 +595,12 @@ async def _wait_continuous_chat(
     prompt: str, req: ChatCompletionRequest, rid: str
 ):
     batch_request = _submit_continuous_request(
-        rid, prompt, req.temperature, req.top_p, req.max_tokens
+        rid,
+        prompt,
+        req.temperature,
+        req.top_p,
+        req.max_tokens,
+        endpoint="chat",
     )
     try:
         completion, finish_reason = await _collect_continuous_request(
@@ -606,7 +633,12 @@ async def _wait_continuous_completion(
     prompt: str, req: CompletionRequest, rid: str
 ):
     batch_request = _submit_continuous_request(
-        rid, prompt, req.temperature, req.top_p, req.max_tokens
+        rid,
+        prompt,
+        req.temperature,
+        req.top_p,
+        req.max_tokens,
+        endpoint="completion",
     )
     try:
         completion, finish_reason = await _collect_continuous_request(
@@ -641,6 +673,29 @@ async def _wait_continuous_completion(
 @app.get("/health")
 async def health():
     return {"status": "ok", "model": _model_name, "vl": _is_vl}
+
+
+@app.get("/metrics")
+async def metrics():
+    _sync_runtime_metrics()
+    return Response(
+        content=_metrics.render(),
+        headers={"Content-Type": _metrics.content_type},
+    )
+
+
+@app.get("/debug/stats")
+async def debug_stats():
+    _sync_runtime_metrics()
+    snapshot = _metrics.snapshot()
+    snapshot.update(
+        {
+            "model": _model_name,
+            "continuous_batching": _continuous_batching,
+            "tensor_parallel": _is_tp,
+        }
+    )
+    return snapshot
 
 
 @app.get("/v1/models")
@@ -718,7 +773,12 @@ async def _stream_continuous_chat(
     prompt: str, req: ChatCompletionRequest, rid: str
 ) -> AsyncGenerator[str, None]:
     batch_request = _submit_continuous_request(
-        rid, prompt, req.temperature, req.top_p, req.max_tokens
+        rid,
+        prompt,
+        req.temperature,
+        req.top_p,
+        req.max_tokens,
+        endpoint="chat",
     )
     completion = ""
     finish_reason = "stop"
@@ -793,7 +853,12 @@ async def _stream_continuous_completion(
     prompt: str, req: CompletionRequest, rid: str
 ) -> AsyncGenerator[str, None]:
     batch_request = _submit_continuous_request(
-        rid, prompt, req.temperature, req.top_p, req.max_tokens
+        rid,
+        prompt,
+        req.temperature,
+        req.top_p,
+        req.max_tokens,
+        endpoint="completion",
     )
     try:
         while True:
@@ -1220,6 +1285,8 @@ def main():
         print(f"  POST /v1/completions")
         print(f"  GET  /v1/models")
         print(f"  GET  /health")
+        print(f"  GET  /metrics")
+        print(f"  GET  /debug/stats")
         if _continuous_batching:
             effective_max_prefill_tokens = getattr(
                 _continuous_scheduler, "max_prefill_tokens", args.max_prefill_tokens

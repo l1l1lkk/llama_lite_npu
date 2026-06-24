@@ -83,11 +83,13 @@ class BatchRequest:
         temperature: float,
         top_p: float,
         control_id: int | None = None,
+        endpoint: str = "unknown",
     ) -> None:
         if max_new_tokens < 1:
             raise ValueError("max_new_tokens must be positive")
         self.request_id = request_id
         self.control_id = control_id
+        self.endpoint = str(endpoint or "unknown")
         self.prompt_tokens = list(prompt_tokens)
         self.max_new_tokens = max_new_tokens
         self.temperature = temperature
@@ -104,6 +106,7 @@ class BatchRequest:
         self.outputs: Queue[BatchOutput] = Queue()
         self.done = Event()
         self._incremental_decoder: IncrementalTokenDecoder | None = None
+        self._metrics_finalized = False
 
     @property
     def last_token_id(self) -> int:
@@ -206,6 +209,7 @@ class ContinuousBatchScheduler:
         chunked_prefill: bool = False,
         prefill_chunk_size: int | None = None,
         max_preemptions: int = 1,
+        metrics=None,
     ) -> None:
         if max_batch_size < 1:
             raise ValueError("max_batch_size must be positive")
@@ -245,6 +249,41 @@ class ContinuousBatchScheduler:
         self._active: list[BatchRequest] = []
         self._lock = Lock()
         self._next_control_id = 0
+        self.metrics = metrics
+        self._sync_metrics()
+
+    def _emit_metrics(self, method: str, *args, **kwargs) -> None:
+        if self.metrics is None:
+            return
+        callback = getattr(self.metrics, method, None)
+        if callback is None:
+            return
+        try:
+            callback(*args, **kwargs)
+        except Exception:
+            logger.exception("observability callback failed: %s", method)
+
+    def _sync_metrics(self) -> None:
+        self._emit_metrics(
+            "update_scheduler",
+            waiting=len(self._pending),
+            prefilling=len(self._prefilling),
+            running=len(self._active),
+        )
+
+    def _record_finished(self, request: BatchRequest) -> None:
+        if request._metrics_finalized:
+            return
+        request._metrics_finalized = True
+        self._emit_metrics("on_request_finished", request)
+
+    def _record_failed(
+        self, request: BatchRequest, error: BaseException
+    ) -> None:
+        if request._metrics_finalized:
+            return
+        request._metrics_finalized = True
+        self._emit_metrics("on_request_failed", request, error)
 
     @staticmethod
     def _validate_optional_positive(
@@ -277,39 +316,50 @@ class ContinuousBatchScheduler:
         max_new_tokens: int,
         temperature: float,
         top_p: float,
+        endpoint: str = "unknown",
     ) -> BatchRequest:
-        with self._lock:
-            if len(self._pending) >= self.max_waiting_requests:
-                raise RuntimeError("continuous batching waiting queue is full")
-            if self.max_context_tokens is not None:
-                prompt_length = len(prompt_tokens)
-                if prompt_length >= self.max_context_tokens:
-                    raise ValueError(
-                        "prompt length exceeds model context capacity: "
-                        f"prompt_tokens={prompt_length}, "
-                        f"max_seq_len={self.max_context_tokens}. "
-                        "Increase --max_seq_len or reduce prompt length."
+        try:
+            with self._lock:
+                if len(self._pending) >= self.max_waiting_requests:
+                    raise RuntimeError(
+                        "continuous batching waiting queue is full"
                     )
-                requested_total = prompt_length + int(max_new_tokens)
-                if requested_total > self.max_context_tokens:
-                    raise ValueError(
-                        "requested prompt plus generation exceeds model context "
-                        "capacity: "
-                        f"prompt_tokens={prompt_length}, "
-                        f"max_tokens={int(max_new_tokens)}, "
-                        f"max_seq_len={self.max_context_tokens}. "
-                        "Increase --max_seq_len or reduce --max-tokens."
-                    )
-            request = BatchRequest(
-                request_id=request_id,
-                prompt_tokens=prompt_tokens,
-                max_new_tokens=max_new_tokens,
-                temperature=temperature,
-                top_p=top_p,
-                control_id=self._next_control_id,
-            )
-            self._next_control_id += 1
-            self._pending.append(request)
+                if self.max_context_tokens is not None:
+                    prompt_length = len(prompt_tokens)
+                    if prompt_length >= self.max_context_tokens:
+                        raise ValueError(
+                            "prompt length exceeds model context capacity: "
+                            f"prompt_tokens={prompt_length}, "
+                            f"max_seq_len={self.max_context_tokens}. "
+                            "Increase --max_seq_len or reduce prompt length."
+                        )
+                    requested_total = prompt_length + int(max_new_tokens)
+                    if requested_total > self.max_context_tokens:
+                        raise ValueError(
+                            "requested prompt plus generation exceeds model "
+                            "context capacity: "
+                            f"prompt_tokens={prompt_length}, "
+                            f"max_tokens={int(max_new_tokens)}, "
+                            f"max_seq_len={self.max_context_tokens}. "
+                            "Increase --max_seq_len or reduce --max-tokens."
+                        )
+                request = BatchRequest(
+                    request_id=request_id,
+                    prompt_tokens=prompt_tokens,
+                    max_new_tokens=max_new_tokens,
+                    temperature=temperature,
+                    top_p=top_p,
+                    control_id=self._next_control_id,
+                    endpoint=endpoint,
+                )
+                self._next_control_id += 1
+                self._pending.append(request)
+        except (ValueError, RuntimeError) as error:
+            self._emit_metrics("on_request_rejected", endpoint, error)
+            self._sync_metrics()
+            raise
+        self._emit_metrics("on_request_submitted", request)
+        self._sync_metrics()
         return request
 
     def _admit(self, capacity: int) -> list[BatchRequest]:
@@ -324,6 +374,7 @@ class ContinuousBatchScheduler:
                 if request.cancelled:
                     self._pending.popleft()
                     request.finish("cancelled")
+                    self._record_finished(request)
                     continue
 
                 prompt_tokens = len(request.model_context_tokens)
@@ -342,6 +393,8 @@ class ContinuousBatchScheduler:
                 capacity -= 1
                 if remaining_prefill_tokens == 0:
                     break
+        for request in admitted:
+            self._emit_metrics("on_request_admitted", request)
         return admitted
 
     def _admit_chunked(self, capacity: int) -> list[BatchRequest]:
@@ -355,6 +408,7 @@ class ContinuousBatchScheduler:
                 if request.cancelled:
                     self._pending.popleft()
                     request.finish("cancelled")
+                    self._record_finished(request)
                     continue
 
                 remaining_tokens = max(
@@ -374,6 +428,8 @@ class ContinuousBatchScheduler:
                 capacity -= 1
                 if remaining_prefill_tokens == 0:
                     break
+        for request in admitted:
+            self._emit_metrics("on_request_admitted", request)
         return admitted
 
     def _select_prefill_chunk_requests(
@@ -438,6 +494,7 @@ class ContinuousBatchScheduler:
                 eos_token_id=self.eos_token_id,
                 decode_tokens=self.decode_tokens,
             )
+            self._emit_metrics("on_token", request)
 
     def _release_finished(
         self, requests: Sequence[BatchRequest]
@@ -452,6 +509,7 @@ class ContinuousBatchScheduler:
             for request in finished:
                 if request.cancelled and not request.finished:
                     request.finish("cancelled")
+                self._record_finished(request)
         return [
             request
             for request in requests
@@ -500,11 +558,19 @@ class ContinuousBatchScheduler:
         else:
             self.backend.release([victim])
         victim.mark_preempted()
+        self._emit_metrics("on_preemption")
         self._requeue_front([victim])
         return victim
 
     def step(self) -> bool:
         """Run one scheduler tick. Return whether any work was performed."""
+        try:
+            return self._step_once()
+        finally:
+            self._sync_metrics()
+
+    def _step_once(self) -> bool:
+        """Execute one scheduler tick without metrics finalization."""
         prior_active = self._release_finished(self._active)
         self._active = prior_active
         decode_active, deferred_active = self._select_decode_requests(
@@ -582,6 +648,7 @@ class ContinuousBatchScheduler:
             affected = list(prior_active) + list(admitted)
             for request in affected:
                 request.fail(error)
+                self._record_failed(request, error)
             if affected:
                 try:
                     self.backend.release(affected)
@@ -599,16 +666,20 @@ class ContinuousBatchScheduler:
             self._pending.clear()
         for request in pending:
             request.finish("cancelled")
+            self._record_finished(request)
         if self._active:
             self.backend.release(self._active)
             for request in self._active:
                 request.finish("cancelled")
+                self._record_finished(request)
             self._active = []
         if self._prefilling:
             self.backend.release(self._prefilling)
             for request in self._prefilling:
                 request.finish("cancelled")
+                self._record_finished(request)
             self._prefilling = []
+        self._sync_metrics()
 
 
 class ContinuousBatchModelBackend:
