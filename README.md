@@ -2,165 +2,146 @@
 
 # Lite Llama NPU
 
-**面向昇腾 NPU 的轻量级大模型推理框架**
+**A learning-oriented LLM inference engine for Huawei Ascend NPUs**
 
-基于 PyTorch、torch_npu 与 Triton Ascend，从模型结构、KV Cache、Attention、算子融合、张量并行、连续批处理和性能分析等环节探索大模型推理优化。
+Built with PyTorch, `torch_npu`, Triton Ascend, and HCCL. The project implements
+the core execution path instead of wrapping a high-level inference library.
+
+[English](README.md) | [中文](README_CN.md)
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.7-orange)
 ![Ascend](https://img.shields.io/badge/Ascend-910B3-red)
-![Version](https://img.shields.io/badge/version-0.0.10rc1-blue)
+![Version](https://img.shields.io/badge/version-0.0.10rc2-blue)
 
 </div>
 
-## 项目简介
+## Why This Project
 
-Lite Llama NPU 的目标不是封装 Transformers，而是实现一条可以观察、修改、验证和复盘的昇腾大模型推理链路。项目当前重点围绕 **Qwen3 Dense、Qwen3 MoE 与 Qwen3-VL 在 Atlas 910B3 上的多卡推理** 展开。
+Lite Llama NPU is a compact inference engine for studying how production-style
+LLM systems work on Ascend hardware. It exposes the model executor, KV cache,
+attention kernels, tensor parallel communication, continuous batching,
+sampling, graph replay, and profiling paths as readable Python and Triton code.
 
-当前项目适合用于：
+The current development focus is multi-card inference for **Qwen3 Dense** and
+**Qwen3 MoE** on Atlas 910B3.
 
-- 学习大模型推理框架内部结构；
-- 理解 Prefill、Decode、KV Cache、PagedAttention 和 Continuous Batching；
-- 验证 Tensor Parallel、Expert Parallel、NPU Graph 和算子融合；
-- 使用 EvalScope、Ascend Profiler 与 MindStudio Insight 分析性能瓶颈；
-- 记录框架设计中的错误和修复过程。
+This repository is intended for learning, profiling, and systems experiments.
+It is not positioned as a production replacement for vLLM-Ascend or MindIE.
 
-项目仍处于持续开发阶段，不建议直接作为生产服务使用。
-
-## 最新版本
-
-当前版本：**0.0.10rc1**，发布日期：**2026-06-23**。
-
-本版本重点清理 Decode 热路径，为后续合并主分支做准备：
-
-- 默认关闭 TP worker 每 token 的 Decode 状态 Host 校验；
-- Worker 侧 Decode 默认不再返回 Host token 列表；
-- 跳过 Worker-only Prefix Cache host copy；
-- 保留调试开关 `LLAMA_LITE_NPU_VALIDATE_TP_DECODE_STATE=1`；
-- 完成文档索引和错误复盘记录清理。
-
-相关文档：
-
-- [v0.0.10rc1 发布记录](docs/releases/v0.0.10rc1.md)
-- [更新日志](CHANGELOG.md)
-- [版本管理与发布规范](docs/versioning.md)
-- [推理性能历史记录](docs/inference_performance_history.md)
-- [文档索引](docs/README.md)
-- [错误复盘记录](docs/bug_records.md)
-
-## 当前支持能力
-
-### 模型
-
-| 模型 | 状态 | 说明 |
-|---|---|---|
-| Qwen3-32B | 已支持 | 当前 Dense 主测试模型 |
-| Qwen3-30B-A3B | 已支持 | MoE 主测试模型 |
-| Qwen3-VL | 已支持 | 多模态路径保留 |
-| Llama / Qwen2 / Llava | 历史继承 | 来自上游 lite_llama，当前不是主要优化目标 |
-
-### 推理框架特性
-
-- FP16 权重加载与推理；
-- Tensor Parallel；
-- Qwen3 MoE Tensor Parallel；
-- 单机 Expert Parallel 实验路径；
-- Continuous Batching；
-- Paged KV Cache；
-- PagedAttention；
-- Prefix Cache；
-- Decode NPU Graph；
-- FlashAttention2 no-pad Prefill；
-- Flash Decoding；
-- MoE GMM；
-- MoE Routed GEMV；
-- Triton Gather / Scatter；
-- OpenAI Chat Completions 兼容接口；
-- EvalScope 性能测试；
-- Ascend Profiler 采集；
-- MindStudio Insight 可视化分析。
-
-## 当前架构
+## Architecture
 
 ```text
-用户请求
-  ↓
-OpenAI 兼容 Server
-  ↓
-Continuous Batching 调度器
-  ↓
-Prefill / Decode 执行路径
-  ↓
-ModelExecutor
-  ↓
-Qwen3 Dense / Qwen3 MoE / Qwen3-VL
-  ↓
-Paged KV Cache + PagedAttention
-  ↓
-torch_npu / Triton Ascend / HCCL
+                   OpenAI-compatible HTTP API
+                              |
+                              v
+                 +--------------------------+
+                 | Continuous Batch Scheduler|
+                 | token budget / admission |
+                 +-------------+------------+
+                               |
+                     Prefill   |   Decode
+                               v
+                 +--------------------------+
+                 |      ModelExecutor       |
+                 | request state / sampling |
+                 +------+------------+------+
+                        |            |
+              +---------+--+      +--+----------------+
+              | Qwen3 Dense|      | Qwen3 MoE         |
+              | TP layers  |      | GMM / Routed GEMV |
+              +---------+--+      +--+----------------+
+                        |            |
+                        +------+-----+
+                               |
+                 +-------------v------------+
+                 | Paged KV + PagedAttention|
+                 | FlashAttention / Decode  |
+                 +-------------+------------+
+                               |
+                 +-------------v------------+
+                 | NPU Graph / HCCL / NPU   |
+                 +--------------------------+
 ```
 
-## 性能摘要
+## Capability Matrix
 
-完整历史数据见：[推理性能历史记录](docs/inference_performance_history.md)。
+| Area | Capability | Status |
+|---|---|---|
+| Models | Qwen3-32B Dense | Supported |
+| Models | Qwen3-30B-A3B MoE | Supported |
+| Models | Qwen3-VL | Supported |
+| Parallelism | Tensor Parallel | Supported |
+| Parallelism | Single-node Expert Parallel | Experimental |
+| Serving | OpenAI Chat/Completions API | Supported |
+| Scheduling | Continuous Batching | Supported |
+| Scheduling | Token-budget admission | Supported |
+| KV cache | Paged KV Cache / PagedAttention | Supported |
+| KV cache | Exact block-level Prefix Cache | Supported |
+| Attention | FlashAttention2 no-pad Prefill | Supported |
+| Attention | Flash Decoding | Supported |
+| Graph execution | Decode NPU Graph | Supported for stable Dense shapes |
+| MoE | `torch_npu` GMM | Supported |
+| MoE | Routed GEMV and Triton Gather/Scatter | Supported |
+| Profiling | Ascend Profiler / MindStudio Insight | Supported |
+| Evaluation | EvalScope | Supported |
+| Precision | FP16 | Main validated path |
+| Precision | BF16 / W8A8 / W4A8 / FP8 | Not yet stabilized |
+| Distributed | Multi-node TP/EP | Not yet supported |
 
-### Qwen3-32B 与 vLLM-Ascend 对比基线
+## Benchmarks
 
-测试条件：2 × Atlas 910B3，TP=2，并发 1，EvalScope，Qwen3-32B。
+All numbers below were measured on **2 × Atlas 910B3** with Qwen3-32B and
+`TP=2`. They are selected from
+[`docs/inference_performance_history.md`](docs/inference_performance_history.md).
 
-| 指标 | Lite Llama NPU | vLLM-Ascend 0.8.4rc2 | 对比 |
-|---|---:|---:|---:|
-| Output Throughput | 24.0606 tok/s | 7.6409 tok/s | 约 3.15 倍 |
-| Total Throughput | 26.9575 tok/s | 7.8122 tok/s | 约 3.45 倍 |
-| TPOT | 40.6 ms | 131.1 ms | 降低约 69.0% |
-| TTFT | 261.2 ms | 392.7 ms | 降低约 33.5% |
+### EvalScope service benchmarks
 
-说明：外部 vLLM-Ascend 数据来自第三方公开测试结果，测试脚本、版本、Prompt 分布和采样参数可能存在差异，因此该表只作为阶段性参考。
+| Workload | Version | Concurrency | Avg input / output | Output throughput | Total throughput | TTFT | TPOT | ITL |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| Fixed-length Greedy | v0.0.8rc1 | 1 | 184 / 256 | **24.7089 tok/s** | 42.4685 tok/s | 702.7 ms | 37.9 ms | 37.7 ms |
+| Fixed-length Greedy | v0.0.7rc1 | 4 | 155.975 / 254.125 | **63.3523 tok/s** | 102.2360 tok/s | 2.2958 s | 53.0 ms | 52.9 ms |
+| Fixed-length Top-P | v0.0.7rc1 | 4 | 156 / 231.325 | **57.7176 tok/s** | 96.6409 tok/s | 1.4861 s | 62.9 ms | 61.6 ms |
+| Mixed-length Greedy | v0.0.8rc1 | 4 | 285.475 / 245.7 | **50.1580 tok/s** | 108.436 tok/s | 5.1176 s | 57.8 ms | 57.1 ms |
 
-### Qwen3-30B-A3B MoE 双卡测试
+### MoE kernel and graph evolution
 
-测试条件：2 × Atlas 910B3，FP16，TP=2，Batch=4，Prompt 约 128 tokens，生成 256 tokens。
+Qwen3-30B-A3B, FP16, Batch 4, prompt approximately 128 tokens, output 256
+tokens:
 
-| 版本与路径 | NPU Graph | 单序列吞吐 | Batch 吞吐 | 单 token 耗时 |
+| Execution path | NPU Graph | Per-sequence throughput | Batch throughput | Time per token |
 |---|---:|---:|---:|---:|
-| v0.0.4rc1 TP Graph | 开启 | 31.7 tok/s | 126.9 tok/s | 31.53 ms |
-| v0.0.5rc2 EP Eager | 关闭 | 5.5 tok/s | 22.1 tok/s | 181.09 ms |
+| v0.0.4rc1 TP + GMM + graph replay | Enabled | **31.7 tok/s** | **126.9 tok/s** | 31.53 ms |
+| v0.0.5rc2 EP eager | Disabled | 5.5 tok/s | 22.1 tok/s | 181.09 ms |
 
-MoE 的性能高度依赖专家路由、专家并行、GMM、NPU Graph 和调度路径。当前 EP 路径主要用于验证架构，不代表最终 MoE 性能上限。
+> Benchmark caution: rows with different versions, prompt distributions,
+> sampling modes, or output lengths are not strict apples-to-apples comparisons.
+> The history document keeps the original test context and known limitations.
 
-## 环境要求
+## Quick Start
 
-推荐环境：
+### Requirements
 
-- Python 3.10；
-- PyTorch 2.7；
-- torch_npu 2.7；
-- CANN 与 Ascend Toolkit；
-- Atlas 910B3；
-- 已执行 Ascend 环境变量脚本。
-
-示例：
+- Python 3.10
+- PyTorch 2.7
+- `torch_npu` 2.7
+- CANN / Ascend Toolkit
+- Atlas 910B3
 
 ```bash
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
-```
-
-安装 Python 依赖：
-
-```bash
 pip install -r requirement.txt
+export MODEL_DIR=/data/models/Qwen3-32B
 ```
 
-## 快速启动
-
-### Qwen3-32B OpenAI 兼容服务
+### Start the Qwen3-32B server on two cards
 
 ```bash
 cd /data/liuke/llama_lite_npu
 
 ASCEND_RT_VISIBLE_DEVICES=6,7 \
 python -m torch.distributed.run --nproc_per_node=2 server.py \
-  --checkpoints_dir /data/liuke/llama_lite_npu/my_weight/Qwen3-32B/ \
+  --checkpoints_dir "$MODEL_DIR" \
   --host 0.0.0.0 \
   --port 8213 \
   --page_size 16 \
@@ -170,69 +151,32 @@ python -m torch.distributed.run --nproc_per_node=2 server.py \
   --max_batch_size 32
 ```
 
-健康检查：
-
 ```bash
 curl http://127.0.0.1:8213/health
 ```
 
-### Qwen3-32B CLI 推理
+### Send a streaming request
 
 ```bash
-ASCEND_RT_VISIBLE_DEVICES=6,7 \
-python -m torch.distributed.run --nproc_per_node=2 cli_qwen3_tp.py \
-  --checkpoints_dir /data/liuke/llama_lite_npu/my_weight/Qwen3-32B/ \
-  --page_size 16 \
-  --max_seq_len 4096 \
-  --max_gen_len 1024 \
-  --compiled_model \
-  --disable_thinking
+curl -N http://127.0.0.1:8213/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "Qwen3-32B",
+    "messages": [{"role": "user", "content": "Explain PagedAttention."}],
+    "max_tokens": 128,
+    "temperature": 0,
+    "stream": true
+  }'
 ```
 
-### Qwen3-30B-A3B MoE CLI 推理
-
-```bash
-ASCEND_RT_VISIBLE_DEVICES=6,7 \
-python -m torch.distributed.run --nproc_per_node=2 cli_qwen3_moe_tp.py \
-  --checkpoints_dir /data/liuke/llama_lite_npu/my_weight/Qwen3-30B-A3B/ \
-  --page_size 16 \
-  --max_seq_len 4096 \
-  --max_gen_len 1024 \
-  --disable_thinking \
-  --no_compiled_model
-```
-
-说明：MoE 路径包含动态专家路由，当前不建议默认开启 Decode NPU Graph。
-
-## EvalScope 测试
-
-### 固定长度 Greedy 单并发
+### Run an EvalScope benchmark
 
 ```bash
 evalscope perf \
   --url http://127.0.0.1:8213/v1/chat/completions \
   --api openai \
   --model Qwen3-32B \
-  --tokenizer-path /data/liuke/llama_lite_npu/my_weight/Qwen3-32B/ \
-  --dataset random \
-  --number 20 \
-  --parallel 1 \
-  --min-prompt-length 184 \
-  --max-prompt-length 184 \
-  --max-tokens 256 \
-  --temperature 0 \
-  --stream \
-  --name lite_llama_npu_greedy_p1
-```
-
-### 混合长度并发测试
-
-```bash
-evalscope perf \
-  --url http://127.0.0.1:8213/v1/chat/completions \
-  --api openai \
-  --model Qwen3-32B \
-  --tokenizer-path /data/liuke/llama_lite_npu/my_weight/Qwen3-32B/ \
+  --tokenizer-path "$MODEL_DIR" \
   --dataset random \
   --number 40 \
   --parallel 4 \
@@ -240,31 +184,17 @@ evalscope perf \
   --max-prompt-length 512 \
   --max-tokens 256 \
   --temperature 0 \
-  --stream \
-  --name lite_llama_npu_mixed_p4
+  --stream
 ```
 
-## Benchmark 脚本
+## Profiling
+
+`examples/benchmark_tp.py` can collect Ascend Profiler traces:
 
 ```bash
 ASCEND_RT_VISIBLE_DEVICES=6,7 \
 python -m torch.distributed.run --nproc_per_node=2 examples/benchmark_tp.py \
-  --checkpoints_dir /data/liuke/llama_lite_npu/my_weight/Qwen3-32B/ \
-  --batch_size 4 \
-  --prompt_len 128 \
-  --max_gen_len 256 \
-  --page_size 16 \
-  --compiled_model \
-  --warmup 2 \
-  --iterations 5
-```
-
-## Ascend Profiler
-
-```bash
-ASCEND_RT_VISIBLE_DEVICES=6,7 \
-python -m torch.distributed.run --nproc_per_node=2 examples/benchmark_tp.py \
-  --checkpoints_dir /data/liuke/llama_lite_npu/my_weight/Qwen3-32B/ \
+  --checkpoints_dir "$MODEL_DIR" \
   --batch_size 4 \
   --prompt_len 128 \
   --max_gen_len 256 \
@@ -273,52 +203,51 @@ python -m torch.distributed.run --nproc_per_node=2 examples/benchmark_tp.py \
   --warmup 2 \
   --iterations 5 \
   --profile \
-  --profile_dir /data/liuke/llama_lite_npu/profiler_output \
-  --profile_level Level1 \
-  --profile_aic_metrics PipeUtilization \
-  --no_profile_data_simplification
+  --profile_dir ./profiler_output
 ```
 
-采集完成后，将 `profiler_output` 下载到本地，用 MindStudio Insight 打开。
+Open the generated directory with MindStudio Insight to inspect operator,
+communication, memory, and timeline data.
 
-## 当前限制
-
-- 当前主要验证 FP16，BF16、W8A8、W4A8、FP8 尚未形成稳定路径；
-- MoE Expert Parallel 仍是单机实验路径，还未实现成熟的多机 All-to-All；
-- Chunked Prefill 已有安全路径，但短 Prompt 场景下通常不如 Packed Prefill；
-- Paged Chunk FlashAttention 仍处于实验阶段；
-- NPU Graph 对动态 shape、动态专家路由和部分 HCCL 场景有限制；
-- 文档中的性能数据必须结合测试工具、并发、Prompt 分布和采样参数理解。
-
-## 文档入口
-
-- [文档索引](docs/README.md)
-- [错误复盘记录](docs/bug_records.md)
-- [推理性能历史记录](docs/inference_performance_history.md)
-- [性能优化记录](docs/performance_optimization.md)
-- [vLLM-Ascend 性能基线](docs/vllm_ascend_benchmark.md)
-
-## 项目结构
+## Repository Guide
 
 ```text
 lite_llama/
-  executor/              # 模型执行、TP 控制、NPU Graph、Paged KV
-  models/                # Qwen3、Qwen3 MoE、Qwen3-VL 等模型结构
-  kernels/               # Triton / torch_npu 自定义算子
-  continuous_batching.py # 连续批处理调度
-examples/
-  benchmark_tp.py        # TP benchmark 与 profiler 采集
-docs/
-  bug_records.md         # 错误复盘
-  releases/              # 版本发布记录
-server.py                # OpenAI 兼容服务入口
-cli_qwen3_tp.py          # Qwen3 Dense CLI
-cli_qwen3_moe_tp.py      # Qwen3 MoE CLI
+  continuous_batching.py     request lifecycle and scheduling
+  executor/
+    model_executor.py        model loading and execution orchestration
+    npu_graph.py             fixed-shape decode graph capture/replay
+    paged_attention.py       paged KV allocation and request page tables
+  kernels/                   Triton Ascend and torch_npu kernels
+  models/
+    qwen3.py                 Dense Qwen3
+    qwen3_moe.py             Qwen3 MoE
+server.py                    OpenAI-compatible server
+examples/benchmark_tp.py     TP benchmark and profiler entry point
+docs/bug_records.md          engineering mistakes and root-cause reviews
 ```
 
-## 致谢
+## Documentation
 
-本项目基于 [harleyszhang/lite_llama](https://github.com/harleyszhang/lite_llama) 学习和改造，重点面向昇腾 NPU 推理链路、Qwen3 系列模型、多卡并行和性能分析进行扩展。
+- [Chinese README](README_CN.md)
+- [Documentation index](docs/README.md)
+- [Performance history](docs/inference_performance_history.md)
+- [Engineering bug records](docs/bug_records.md)
+- [v0.0.10rc2 release notes](docs/releases/v0.0.10rc2.md)
+
+## Current Limitations
+
+- FP16 is the primary validated precision path.
+- Multi-node TP/EP and mature MoE All-to-All are not available.
+- Chunked Prefill is retained as an experimental path and is not recommended for
+  the current short-to-medium prompt benchmark shape.
+- Dynamic MoE routing and some HCCL operations restrict NPU Graph coverage.
+- Performance data should always be interpreted with its exact workload.
+
+## Acknowledgements
+
+This project is based on and extends
+[harleyszhang/lite_llama](https://github.com/harleyszhang/lite_llama).
 
 ## Citation
 

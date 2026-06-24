@@ -1,25 +1,13 @@
-"""PagedAttention: KV cache memory management with page-sized blocks.
+"""Page-based KV-cache allocation and request page-table management.
 
-Like vLLM's PagedAttention, KV cache is allocated in fixed-size pages
-(blocks of tokens) instead of as one contiguous block per request.
-This eliminates fragmentation and enables memory sharing.
+The manager stores KV tensors in fixed-size token pages instead of reserving one
+contiguous region per request. Request page tables map logical token positions
+to physical cache slots, enabling non-contiguous growth, block-level prefix
+sharing, reference counting, and reclamation without moving existing KV data.
 
-The FlashDecoding kernel already uses b_req_tokens_table for indirect
-KV cache indexing — no kernel changes needed!
-
-Architecture:
-  KV cache pool: [P0][P1][P2]...[P_{max_pages}]
-                    each page = PAGE_SIZE tokens × (2*kv_heads*head_dim) × fp16
-  Free list:     [P7, P12, P23, ...]  ← available pages
-  Page table:    req0 → [P0, P1, P2, P5, P8]  ← non-contiguous
-                 req1 → [P3, P4]
-                 req2 → [P6, P7, P9, P10, P11]
-
-Usage:
-  from .paged_attention import PagedKVCacheManager
-  mgr = PagedKVCacheManager(num_layers, num_kv_heads, head_dim, num_pages, page_size)
-  page_indices = mgr.alloc(num_tokens)  # allocates enough pages
-  mgr.free(page_indices)                # returns pages to free pool
+Attention kernels consume the generated request-token table for indirect KV
+lookup. Allocation failures and maximum-sequence-length violations are distinct
+conditions and must remain distinguishable to the scheduler.
 """
 
 from __future__ import annotations
