@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.0.12rc2] - 2026-07-03
+
+Dependency alignment release.
+
+### Fixed
+
+- Aligned `torch==2.7.1` with `torch_npu==2.7.1` in `requirement.txt`.
+- Fixed the container dependency installation path exposed during v0.0.12 validation.
+
+### Docs
+
+- [v0.0.12rc2 release report](docs/releases/v0.0.12rc2.md)
+
 ## [0.0.12rc1] - 2026-07-03
 
 Adaptive Prefill scheduler release.
