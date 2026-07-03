@@ -4,7 +4,7 @@
 
 [English](README.md) | [中文](README_CN.md)
 
-![Version](https://img.shields.io/badge/version-0.0.12rc2-blue)
+![Version](https://img.shields.io/badge/version-0.0.12rc3-blue)
 
 ## 项目定位
 
@@ -48,11 +48,11 @@ OpenAI 兼容 API -> Continuous Batch Scheduler -> ModelExecutor -> Paged KV / A
 | 固定长度 Top-P | v0.0.7rc1 | 4 | 156 / 231.325 | **57.7176 tok/s** | 96.6409 tok/s | 1.4861 s | 62.9 ms | 61.6 ms |
 | 混合长度 Greedy | v0.0.8rc1 | 4 | 285.475 / 245.7 | **50.1580 tok/s** | 108.436 tok/s | 5.1176 s | 57.8 ms | 57.1 ms |
 
-v0.0.11rc1 和 v0.0.12rc2 是采样路径与调度策略更新，新的服务器实测数据会按 release 文档中的命令采集后再更新到性能表。
+v0.0.11rc1 和 v0.0.12rc3 是采样路径与调度策略更新，新的服务器实测数据会按 release 文档中的命令采集后再更新到性能表。
 
 ## 当前版本说明
 
-- [v0.0.12rc2 发布记录](docs/releases/v0.0.12rc2.md)：自适应 Chunked Prefill 与调度策略。
+- [v0.0.12rc3 发布记录](docs/releases/v0.0.12rc3.md)：自适应 Chunked Prefill 与调度策略。
 - [v0.0.11rc1 发布记录](docs/releases/v0.0.11rc1.md)：批量 vocab-parallel Top-P 采样。
 - [v0.0.10rc3 发布记录](docs/releases/v0.0.10rc3.md)：Prometheus 可观测性。
 

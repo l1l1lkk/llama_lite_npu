@@ -175,6 +175,8 @@ def _tp_state():
 
 
 def _all_gather_stack(tensor: torch.Tensor, world_size: int, group):
+    if not tensor.is_contiguous():
+        tensor = tensor.contiguous()
     chunks = [torch.empty_like(tensor) for _ in range(world_size)]
     torch.distributed.all_gather(chunks, tensor, group=group)
     return torch.stack(chunks, dim=0)

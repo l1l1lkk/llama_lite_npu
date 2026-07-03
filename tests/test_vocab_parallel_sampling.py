@@ -39,6 +39,33 @@ class LocalSamplingTest(unittest.TestCase):
 
 
 class VocabularyParallelHelperTest(unittest.TestCase):
+    def test_all_gather_stack_contiguizes_view_tensors(self):
+        module = load_sampling_module()
+        observed = []
+
+        def fake_all_gather(chunks, tensor, group=None):
+            observed.append(tensor.is_contiguous())
+            for chunk in chunks:
+                chunk.copy_(tensor)
+
+        original_all_gather = torch.distributed.all_gather
+        torch.distributed.all_gather = fake_all_gather
+        try:
+            base = torch.arange(6, dtype=torch.float32).reshape(2, 3)
+            non_contiguous = base[:, :2]
+            self.assertFalse(non_contiguous.is_contiguous())
+
+            gathered = module._all_gather_stack(
+                non_contiguous,
+                world_size=2,
+                group=None,
+            )
+        finally:
+            torch.distributed.all_gather = original_all_gather
+
+        self.assertEqual(observed, [True])
+        self.assertEqual(gathered.shape, (2, 2, 2))
+
     def test_greedy_batch_uses_one_candidate_collective(self):
         module = load_sampling_module()
         calls = []

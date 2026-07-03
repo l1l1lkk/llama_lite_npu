@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.0.12rc3] - 2026-07-03
+
+Server validation bugfix release.
+
+### Fixed
+
+- Fixed HCCL `all_gather` failure in the Top-P candidate sampling path by making gathered tensors contiguous at the collective boundary.
+- Added a regression test for non-contiguous candidate tensors.
+
+### Docs
+
+- [v0.0.12rc3 release report](docs/releases/v0.0.12rc3.md)
+
 ## [0.0.12rc2] - 2026-07-03
 
 Dependency alignment release.

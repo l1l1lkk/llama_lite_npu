@@ -42,10 +42,10 @@ class RepositoryDocumentationTests(unittest.TestCase):
         english = (ROOT / "README.md").read_text(encoding="utf-8")
         chinese = (ROOT / "README_CN.md").read_text(encoding="utf-8")
 
-        self.assertEqual(version, "0.0.12rc2")
-        self.assertIn("0.0.12rc2", english)
-        self.assertIn("0.0.12rc2", chinese)
-        self.assertTrue((ROOT / "docs/releases/v0.0.12rc2.md").exists())
+        self.assertEqual(version, "0.0.12rc3")
+        self.assertIn("0.0.12rc3", english)
+        self.assertIn("0.0.12rc3", chinese)
+        self.assertTrue((ROOT / "docs/releases/v0.0.12rc3.md").exists())
         self.assertTrue((ROOT / "docs/releases/v0.0.11rc1.md").exists())
         self.assertTrue((ROOT / "docs/observability.md").exists())
 
