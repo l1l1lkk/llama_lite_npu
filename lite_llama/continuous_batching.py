@@ -208,6 +208,8 @@ class ContinuousBatchScheduler:
         max_decode_tokens: int | None = None,
         chunked_prefill: bool = False,
         prefill_chunk_size: int | None = None,
+        chunked_prefill_policy: str = "adaptive",
+        chunked_prefill_min_tokens: int | None = None,
         max_preemptions: int = 1,
         metrics=None,
     ) -> None:
@@ -237,6 +239,17 @@ class ContinuousBatchScheduler:
             raise ValueError(
                 "prefill_chunk_size must be set when chunked_prefill is enabled"
             )
+        self.chunked_prefill_policy = str(chunked_prefill_policy or "adaptive")
+        if self.chunked_prefill_policy not in ("adaptive", "always"):
+            raise ValueError(
+                "chunked_prefill_policy must be 'adaptive' or 'always'"
+            )
+        default_min_tokens = (
+            2048 if chunked_prefill_min_tokens is None else chunked_prefill_min_tokens
+        )
+        self.chunked_prefill_min_tokens = self._validate_optional_positive(
+            default_min_tokens, "chunked_prefill_min_tokens"
+        )
         self.max_preemptions = int(max_preemptions)
         if self.max_preemptions < 0:
             raise ValueError("max_preemptions must be non-negative")
@@ -397,6 +410,16 @@ class ContinuousBatchScheduler:
             self._emit_metrics("on_request_admitted", request)
         return admitted
 
+    def _request_uses_chunked_prefill(self, request: BatchRequest) -> bool:
+        if not self.chunked_prefill or self.prefill_chunk_size is None:
+            return False
+        if request.prefill_cursor > 0:
+            return True
+        if self.chunked_prefill_policy == "always":
+            return True
+        min_tokens = int(self.chunked_prefill_min_tokens or 1)
+        return len(request.model_context_tokens) >= min_tokens
+
     def _admit_chunked(self, capacity: int) -> list[BatchRequest]:
         admitted: list[BatchRequest] = []
         remaining_prefill_tokens = self.max_prefill_tokens
@@ -411,10 +434,13 @@ class ContinuousBatchScheduler:
                     self._record_finished(request)
                     continue
 
-                remaining_tokens = max(
-                    0, len(request.model_context_tokens) - request.prefill_cursor
-                )
-                token_cost = min(remaining_tokens, self.prefill_chunk_size)
+                if self._request_uses_chunked_prefill(request):
+                    remaining_tokens = max(
+                        0, len(request.model_context_tokens) - request.prefill_cursor
+                    )
+                    token_cost = min(remaining_tokens, self.prefill_chunk_size)
+                else:
+                    token_cost = len(request.model_context_tokens)
                 if remaining_prefill_tokens is not None:
                     if token_cost > remaining_prefill_tokens:
                         if admitted:
@@ -437,27 +463,30 @@ class ContinuousBatchScheduler:
     ) -> tuple[list[BatchRequest], list[BatchRequest]]:
         if not self.chunked_prefill or self.prefill_chunk_size is None:
             return list(requests), []
+        chunked_requests = [
+            request for request in requests if self._request_uses_chunked_prefill(request)
+        ]
         if self.max_prefill_tokens is None:
-            return list(requests), []
+            return chunked_requests, []
         selected: list[BatchRequest] = []
         deferred: list[BatchRequest] = []
         remaining_budget = self.max_prefill_tokens
-        for index, request in enumerate(requests):
+        for index, request in enumerate(chunked_requests):
             token_cost = min(
                 max(0, len(request.model_context_tokens) - request.prefill_cursor),
                 self.prefill_chunk_size,
             )
             if token_cost > remaining_budget and selected:
-                deferred.extend(requests[index:])
+                deferred.extend(chunked_requests[index:])
                 break
             if token_cost > remaining_budget:
                 selected.append(request)
-                deferred.extend(requests[index + 1:])
+                deferred.extend(chunked_requests[index + 1:])
                 break
             selected.append(request)
             remaining_budget = max(0, remaining_budget - token_cost)
             if remaining_budget == 0:
-                deferred.extend(requests[index + 1:])
+                deferred.extend(chunked_requests[index + 1:])
                 break
         return selected, deferred
 
@@ -580,7 +609,17 @@ class ContinuousBatchScheduler:
         admitted = self._admit(
             self.max_batch_size - len(prior_active) - len(self._prefilling)
         )
-        prefilling_candidates = self._prefilling + admitted
+        packed_admitted = [
+            request
+            for request in admitted
+            if not self._request_uses_chunked_prefill(request)
+        ]
+        chunked_admitted = [
+            request
+            for request in admitted
+            if self._request_uses_chunked_prefill(request)
+        ]
+        prefilling_candidates = self._prefilling + chunked_admitted
         prefill_work: list[BatchRequest] = []
         deferred_prefilling: list[BatchRequest] = []
         if self.chunked_prefill and self.prefill_chunk_size is not None:
@@ -598,6 +637,17 @@ class ContinuousBatchScheduler:
                     decode_tokens = self.backend.decode(decode_active)
                     self._apply_tokens(decode_active, decode_tokens)
                     decode_active = self._release_finished(decode_active)
+
+                packed_completed: list[BatchRequest] = []
+                if packed_admitted:
+                    packed_tokens = self.backend.prefill(packed_admitted)
+                    self._apply_tokens(packed_admitted, packed_tokens)
+                    packed_completed = self._release_finished(packed_admitted)
+                    uncommitted_admitted = [
+                        request
+                        for request in uncommitted_admitted
+                        if request not in packed_admitted
+                    ]
 
                 completed_prefill: list[BatchRequest] = []
                 if prefill_work:
@@ -620,7 +670,12 @@ class ContinuousBatchScheduler:
                     and not request.cancelled
                 ]
                 self._prefilling = deferred_prefilling + incomplete_prefill
-                self._active = deferred_active + decode_active + completed_prefill
+                self._active = (
+                    deferred_active
+                    + decode_active
+                    + packed_completed
+                    + completed_prefill
+                )
                 return did_work
 
             if admitted:
@@ -690,12 +745,16 @@ class ContinuousBatchModelBackend:
         generator,
         return_host_tokens: bool = True,
         enable_partial_prefix_cache: bool = False,
+        sampling_candidate_k: int = 2048,
+        metrics=None,
     ) -> None:
         self.generator = generator
         self.executor = generator.model_executor
         self.tokenizer = generator.tokenizer
         self.return_host_tokens = bool(return_host_tokens)
         self.enable_partial_prefix_cache = bool(enable_partial_prefix_cache)
+        self.sampling_candidate_k = max(1, int(sampling_candidate_k))
+        self.metrics = metrics
         self._device_tokens: dict[int, object] = {}
         self._device_positions: dict[int, object] = {}
         self._logged_prefill_attention_paths = False
@@ -725,14 +784,22 @@ class ContinuousBatchModelBackend:
     def _sample_device(self, logits, requests: Sequence[BatchRequest]):
         from lite_llama.sampling import sample_next_token
 
-        return sample_next_token(
+        result = sample_next_token(
             logits,
             temperature=[request.temperature for request in requests],
             top_p=[request.top_p for request in requests],
             vocab_parallel=bool(
                 getattr(self.executor, "logits_are_sharded", False)
             ),
+            candidate_k=self.sampling_candidate_k,
+            return_stats=self.metrics is not None,
         )
+        if self.metrics is not None and hasattr(result, "stats"):
+            callback = getattr(self.metrics, "on_sampling_stats", None)
+            if callback is not None:
+                callback(result.stats)
+            return result.tokens
+        return result
 
     def _remember_sampled_tokens(
         self,

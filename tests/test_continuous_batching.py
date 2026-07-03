@@ -363,6 +363,7 @@ class ContinuousBatchSchedulerTest(unittest.TestCase):
             max_prefill_tokens=4,
             chunked_prefill=True,
             prefill_chunk_size=4,
+            chunked_prefill_policy="always",
         )
         backend.prefill_chunk_tokens = {"long": [10], "short": [20]}
 
@@ -388,6 +389,7 @@ class ContinuousBatchSchedulerTest(unittest.TestCase):
             max_prefill_tokens=2,
             chunked_prefill=True,
             prefill_chunk_size=2,
+            chunked_prefill_policy="always",
         )
         backend.prefill_chunk_tokens = {"long": [10]}
 
@@ -408,6 +410,58 @@ class ContinuousBatchSchedulerTest(unittest.TestCase):
             backend.prefill_chunk_calls,
             [[("long", 0, 2)], [("long", 2, 2)], [("long", 4, 2)]],
         )
+
+
+    def test_adaptive_chunked_prefill_keeps_short_prompt_on_packed_path(self):
+        module = load_batching_module()
+        backend = FakeBackend()
+        scheduler = module.ContinuousBatchScheduler(
+            backend=backend,
+            max_batch_size=2,
+            eos_token_id=99,
+            decode_tokens=lambda token_ids: "".join(
+                f"<{token_id}>" for token_id in token_ids
+            ),
+            max_prefill_tokens=16,
+            chunked_prefill=True,
+            prefill_chunk_size=4,
+            chunked_prefill_policy="adaptive",
+            chunked_prefill_min_tokens=8,
+        )
+        backend.prefill_tokens = {"short": [10]}
+
+        request = scheduler.submit("short", [1, 2, 3], 4, 0.0, 1.0)
+        scheduler.step()
+
+        self.assertEqual(request.generated_token_ids, [10])
+        self.assertEqual(backend.prefill_calls, [["short"]])
+        self.assertEqual(backend.prefill_chunk_calls, [])
+
+    def test_adaptive_chunked_prefill_chunks_prompt_above_threshold(self):
+        module = load_batching_module()
+        backend = FakeBackend()
+        scheduler = module.ContinuousBatchScheduler(
+            backend=backend,
+            max_batch_size=2,
+            eos_token_id=99,
+            decode_tokens=lambda token_ids: "".join(
+                f"<{token_id}>" for token_id in token_ids
+            ),
+            max_prefill_tokens=4,
+            chunked_prefill=True,
+            prefill_chunk_size=4,
+            chunked_prefill_policy="adaptive",
+            chunked_prefill_min_tokens=8,
+        )
+        backend.prefill_chunk_tokens = {"long": [10]}
+
+        request = scheduler.submit("long", list(range(10)), 4, 0.0, 1.0)
+        scheduler.step()
+
+        self.assertEqual(request.generated_token_ids, [])
+        self.assertEqual(backend.prefill_calls, [])
+        self.assertEqual(backend.prefill_chunk_calls, [[("long", 0, 4)]])
+        self.assertEqual(scheduler.prefilling_count, 1)
 
     def test_decode_token_budget_limits_active_decode_rows(self):
         scheduler, backend = self._make_scheduler(max_batch_size=4)

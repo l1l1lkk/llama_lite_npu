@@ -267,6 +267,21 @@ class InferenceMetrics:
             "NPU Graph calls that fell back to eager execution.",
             registry=self.registry,
         )
+        self.sampling_candidate_rows_total = Counter(
+            "lite_llama_sampling_candidate_rows_total",
+            "Rows sampled through the vocabulary-parallel candidate path.",
+            registry=self.registry,
+        )
+        self.sampling_fallback_rows_total = Counter(
+            "lite_llama_sampling_fallback_rows_total",
+            "Rows that fell back to full-logit gather for exact sampling.",
+            registry=self.registry,
+        )
+        self.sampling_full_logit_gather_batches_total = Counter(
+            "lite_llama_sampling_full_logit_gather_batches_total",
+            "Batches that required a full vocabulary gather during sampling.",
+            registry=self.registry,
+        )
 
     @staticmethod
     def _normalize_endpoint(endpoint: Any) -> str:
@@ -370,6 +385,19 @@ class InferenceMetrics:
 
     def on_preemption(self) -> None:
         self.preemptions_total.inc()
+
+    def on_sampling_stats(self, stats: Any) -> None:
+        candidate_rows = int(getattr(stats, "candidate_rows", 0) or 0)
+        fallback_rows = int(getattr(stats, "fallback_rows", 0) or 0)
+        gather_batches = int(
+            getattr(stats, "full_logit_gather_batches", 0) or 0
+        )
+        if candidate_rows > 0:
+            self.sampling_candidate_rows_total.inc(candidate_rows)
+        if fallback_rows > 0:
+            self.sampling_fallback_rows_total.inc(fallback_rows)
+        if gather_batches > 0:
+            self.sampling_full_logit_gather_batches_total.inc(gather_batches)
 
     def update_scheduler(
         self, *, waiting: int, prefilling: int, running: int

@@ -137,6 +137,113 @@ class VocabularyParallelHelperTest(unittest.TestCase):
 
         self.assertFalse(complete)
 
+
+    def test_vocab_parallel_top_p_batch_uses_batched_candidate_collectives(self):
+        module = load_sampling_module()
+        gather_shapes = []
+        reduced = []
+        broadcasts = []
+
+        def fake_all_reduce(tensor, op, group):
+            reduced.append(tuple(tensor.shape))
+            return tensor.clone()
+
+        def fake_all_gather(tensor, world_size, group):
+            gather_shapes.append(tuple(tensor.shape))
+            if tensor.ndim == 2:
+                remote = torch.full_like(tensor, -100.0)
+                return torch.stack([tensor, remote], dim=0)
+            if tensor.ndim == 1:
+                remote = torch.full_like(tensor, -100.0)
+                return torch.stack([tensor, remote], dim=0)
+            raise AssertionError(f"unexpected gather shape: {tensor.shape}")
+
+        def fake_multinomial(probabilities, num_samples):
+            return torch.zeros(num_samples, dtype=torch.long, device=probabilities.device)
+
+        def fake_broadcast(tensor, src, group=None):
+            broadcasts.append(tensor.clone())
+            return None
+
+        original_multinomial = torch.multinomial
+        original_broadcast = torch.distributed.broadcast
+        module._all_reduce_clone = fake_all_reduce
+        module._all_gather_stack = fake_all_gather
+        torch.multinomial = fake_multinomial
+        torch.distributed.broadcast = fake_broadcast
+        try:
+            logits = torch.tensor(
+                [[10.0, 0.0, -1.0], [9.0, 1.0, 0.0]],
+                dtype=torch.float32,
+            )
+            sampled, stats = module._sample_vocab_parallel_top_p_batch(
+                logits,
+                temperatures=[1.0, 1.0],
+                top_ps=[0.5, 0.5],
+                candidate_k=2,
+                config=SimpleNamespace(rank=0, world_size=2),
+                group=None,
+                return_stats=True,
+            )
+        finally:
+            torch.multinomial = original_multinomial
+            torch.distributed.broadcast = original_broadcast
+
+        self.assertEqual(sampled.tolist(), [0, 0])
+        self.assertEqual(stats.candidate_rows, 2)
+        self.assertEqual(stats.fallback_rows, 0)
+        self.assertIn((2, 2), gather_shapes)
+        self.assertEqual(broadcasts[-1].shape, (2,))
+        self.assertIn((2,), reduced)
+
+    def test_vocab_parallel_top_p_batch_counts_full_logit_fallback_once(self):
+        module = load_sampling_module()
+        gathered_full = []
+
+        def fake_all_reduce(tensor, op, group):
+            return tensor.clone()
+
+        def fake_all_gather(tensor, world_size, group):
+            if tensor.ndim == 2 and tensor.shape[1] == 3:
+                gathered_full.append(tuple(tensor.shape))
+                return torch.stack([tensor, torch.full_like(tensor, -100.0)], dim=0)
+            if tensor.ndim == 2:
+                remote = torch.full_like(tensor, -100.0)
+                return torch.stack([tensor, remote], dim=0)
+            if tensor.ndim == 1:
+                return torch.stack([tensor, torch.full_like(tensor, 100.0)], dim=0)
+            raise AssertionError(f"unexpected gather shape: {tensor.shape}")
+
+        def fake_sample_top_p_row(logits, temperature, top_p):
+            return torch.tensor(0, dtype=torch.long, device=logits.device)
+
+        def fake_broadcast(tensor, src, group=None):
+            return None
+
+        original_broadcast = torch.distributed.broadcast
+        module._all_reduce_clone = fake_all_reduce
+        module._all_gather_stack = fake_all_gather
+        module._sample_top_p_row = fake_sample_top_p_row
+        torch.distributed.broadcast = fake_broadcast
+        try:
+            logits = torch.tensor([[10.0, 0.0, -1.0]], dtype=torch.float32)
+            sampled, stats = module._sample_vocab_parallel_top_p_batch(
+                logits,
+                temperatures=[1.0],
+                top_ps=[0.9],
+                candidate_k=1,
+                config=SimpleNamespace(rank=0, world_size=2),
+                group=None,
+                return_stats=True,
+            )
+        finally:
+            torch.distributed.broadcast = original_broadcast
+
+        self.assertEqual(sampled.tolist(), [0])
+        self.assertEqual(stats.fallback_rows, 1)
+        self.assertEqual(stats.full_logit_gather_batches, 1)
+        self.assertEqual(gathered_full, [(1, 3)])
+
     def test_top_p_label_is_inactive_for_greedy(self):
         module = load_sampling_module()
 

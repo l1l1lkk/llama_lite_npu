@@ -21,8 +21,8 @@ class RepositoryDocumentationTests(unittest.TestCase):
         ):
             self.assertIn(heading, english)
         for heading in (
-            "## 系统架构",
-            "## 快速开始",
+            "## 架构概览",
+            "## 快速启动",
             "## 性能数据",
             "## 能力矩阵",
             "## 可观测性",
@@ -42,10 +42,11 @@ class RepositoryDocumentationTests(unittest.TestCase):
         english = (ROOT / "README.md").read_text(encoding="utf-8")
         chinese = (ROOT / "README_CN.md").read_text(encoding="utf-8")
 
-        self.assertEqual(version, "0.0.10rc3")
-        self.assertIn("0.0.10rc3", english)
-        self.assertIn("0.0.10rc3", chinese)
-        self.assertTrue((ROOT / "docs/releases/v0.0.10rc3.md").exists())
+        self.assertEqual(version, "0.0.12rc1")
+        self.assertIn("0.0.12rc1", english)
+        self.assertIn("0.0.12rc1", chinese)
+        self.assertTrue((ROOT / "docs/releases/v0.0.12rc1.md").exists())
+        self.assertTrue((ROOT / "docs/releases/v0.0.11rc1.md").exists())
         self.assertTrue((ROOT / "docs/observability.md").exists())
 
     def test_core_modules_have_module_docstrings(self):

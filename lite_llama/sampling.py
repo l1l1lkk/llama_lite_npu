@@ -18,6 +18,28 @@ import torch
 NumberOrSequence = Union[float, Sequence[float], torch.Tensor]
 
 
+class SamplingStats:
+    """Low-cardinality counters for distributed sampling decisions."""
+
+    def __init__(
+        self,
+        candidate_rows: int = 0,
+        fallback_rows: int = 0,
+        full_logit_gather_batches: int = 0,
+    ) -> None:
+        self.candidate_rows = int(candidate_rows)
+        self.fallback_rows = int(fallback_rows)
+        self.full_logit_gather_batches = int(full_logit_gather_batches)
+
+
+class SamplingResult:
+    """Device sampled tokens plus optional sampling-path stats."""
+
+    def __init__(self, tokens: torch.Tensor, stats: SamplingStats) -> None:
+        self.tokens = tokens
+        self.stats = stats
+
+
 def format_top_p_setting(temperature: float, top_p: float) -> str:
     """Describe whether Top-P participates in the selected sampling mode."""
     if float(temperature) <= 0:
@@ -207,6 +229,136 @@ def _sample_vocab_parallel_greedy(
     )
 
 
+
+def _sample_vocab_parallel_top_p_batch(
+    local_logits: torch.Tensor,
+    *,
+    temperatures: Sequence[float],
+    top_ps: Sequence[float],
+    candidate_k: int,
+    config,
+    group,
+    return_stats: bool = False,
+):
+    """Sample a Top-P batch with batched candidate exchange.
+
+    The exact path exchanges only the top ``candidate_k`` logits from each
+    vocabulary shard.  If those candidates cannot prove that they contain the
+    exact global nucleus for any row, all ranks perform one full-logit gather
+    for the batch and rank 0 samples only the fallback rows.
+    """
+
+    batch_size, local_vocab_size = local_logits.shape
+    device = local_logits.device
+    vocab_offset = int(config.rank) * local_vocab_size
+    temperature_tensor = torch.tensor(
+        [float(value) for value in temperatures],
+        dtype=torch.float32,
+        device=device,
+    ).reshape(batch_size, 1)
+    scaled = local_logits.float() / temperature_tensor
+
+    global_max = _all_reduce_clone(
+        torch.max(scaled, dim=-1).values,
+        torch.distributed.ReduceOp.MAX,
+        group,
+    )
+    local_exp_sum = torch.exp(scaled - global_max.reshape(-1, 1)).sum(dim=-1)
+    global_exp_sum = _all_reduce_clone(
+        local_exp_sum,
+        torch.distributed.ReduceOp.SUM,
+        group,
+    )
+
+    k = min(max(1, int(candidate_k)), local_vocab_size)
+    top_count = min(k + 1, local_vocab_size)
+    local_top_logits, local_top_ids = torch.topk(scaled, top_count, dim=-1)
+    if top_count > k:
+        max_excluded = local_top_logits[:, k]
+        local_top_logits = local_top_logits[:, :k]
+        local_top_ids = local_top_ids[:, :k]
+    else:
+        max_excluded = torch.full(
+            (batch_size,),
+            float("-inf"),
+            device=device,
+            dtype=scaled.dtype,
+        )
+
+    gathered_logits = _all_gather_stack(
+        local_top_logits, int(config.world_size), group
+    )
+    gathered_ids = _all_gather_stack(
+        local_top_ids.to(torch.long) + vocab_offset,
+        int(config.world_size),
+        group,
+    )
+    gathered_excluded = _all_gather_stack(
+        max_excluded, int(config.world_size), group
+    )
+
+    tokens = torch.zeros((batch_size,), dtype=torch.long, device=device)
+    fallback_rows: list[int] = []
+    row_candidates: list[tuple[torch.Tensor, torch.Tensor, torch.Tensor]] = []
+    for row in range(batch_size):
+        row_logits = gathered_logits[:, row, :].reshape(-1)
+        row_ids = gathered_ids[:, row, :].reshape(-1)
+        sorted_logits, order = torch.sort(row_logits, descending=True)
+        sorted_ids = row_ids[order]
+        exact_probabilities = torch.exp(
+            sorted_logits - global_max[row]
+        ) / global_exp_sum[row]
+        complete = candidate_nucleus_is_complete(
+            sorted_logits=sorted_logits,
+            exact_probabilities=exact_probabilities,
+            top_p=float(top_ps[row]),
+            max_excluded_logit=torch.max(gathered_excluded[:, row]),
+        )
+        row_candidates.append((sorted_logits, sorted_ids, exact_probabilities))
+        if not complete:
+            fallback_rows.append(row)
+
+    full_logits = None
+    full_logit_gather_batches = 0
+    if fallback_rows:
+        full_logits = torch.cat(
+            list(_all_gather_stack(local_logits, int(config.world_size), group)),
+            dim=-1,
+        )
+        full_logit_gather_batches = 1
+
+    if int(config.rank) == 0:
+        for row in range(batch_size):
+            if row in fallback_rows:
+                tokens[row] = _sample_top_p_row(
+                    full_logits[row],
+                    float(temperatures[row]),
+                    float(top_ps[row]),
+                ).to(torch.long)
+                continue
+            _, sorted_ids, exact_probabilities = row_candidates[row]
+            cumulative = torch.cumsum(exact_probabilities, dim=-1)
+            remove = cumulative - exact_probabilities > float(top_ps[row])
+            candidate_probabilities = exact_probabilities.masked_fill(remove, 0.0)
+            candidate_probabilities = (
+                candidate_probabilities / candidate_probabilities.sum()
+            )
+            sampled_position = torch.multinomial(
+                candidate_probabilities, num_samples=1
+            )
+            tokens[row] = sorted_ids[sampled_position].reshape(()).to(torch.long)
+
+    torch.distributed.broadcast(tokens, src=0, group=group)
+    stats = SamplingStats(
+        candidate_rows=batch_size,
+        fallback_rows=len(fallback_rows),
+        full_logit_gather_batches=full_logit_gather_batches,
+    )
+    if return_stats:
+        return tokens, stats
+    return tokens
+
+
 def _sample_vocab_parallel_row(
     local_logits: torch.Tensor,
     *,
@@ -320,7 +472,8 @@ def sample_next_token(
     top_p: NumberOrSequence = 1.0,
     vocab_parallel: bool = False,
     candidate_k: int = 2048,
-) -> torch.Tensor:
+    return_stats: bool = False,
+):
     """Sample next-token IDs, preserving a device tensor result."""
     local_logits = _last_token_logits(logits)
     if not vocab_parallel:
@@ -330,30 +483,59 @@ def sample_next_token(
             and torch.distributed.is_initialized()
         ):
             torch.distributed.broadcast(sampled, src=0)
+        if return_stats:
+            return SamplingResult(sampled, SamplingStats())
         return sampled
 
     config, group, distributed = _tp_state()
     if not distributed:
-        return sample_local_logits(local_logits, temperature, top_p)
+        sampled = sample_local_logits(local_logits, temperature, top_p)
+        if return_stats:
+            return SamplingResult(sampled, SamplingStats())
+        return sampled
 
     batch_size = local_logits.shape[0]
     temperatures = _parameter_values(temperature, batch_size)
     top_ps = _parameter_values(top_p, batch_size)
     if all(row_temperature <= 0 for row_temperature in temperatures):
-        return _sample_vocab_parallel_greedy(
+        sampled = _sample_vocab_parallel_greedy(
             local_logits,
             config=config,
             group=group,
         )
-    sampled = [
-        _sample_vocab_parallel_row(
-            local_logits[row],
-            temperature=temperatures[row],
-            top_p=top_ps[row],
-            candidate_k=candidate_k,
-            config=config,
-            group=group,
-        )
-        for row in range(batch_size)
-    ]
-    return torch.stack(sampled).reshape(-1)
+        if return_stats:
+            return SamplingResult(sampled, SamplingStats())
+        return sampled
+
+    if any(row_temperature <= 0 for row_temperature in temperatures):
+        # Mixed greedy/sampling rows are uncommon and are kept on the older
+        # row-wise path for correctness. Homogeneous Top-P batches use the
+        # batched candidate exchange below.
+        sampled = [
+            _sample_vocab_parallel_row(
+                local_logits[row],
+                temperature=temperatures[row],
+                top_p=top_ps[row],
+                candidate_k=candidate_k,
+                config=config,
+                group=group,
+            )
+            for row in range(batch_size)
+        ]
+        tokens = torch.stack(sampled).reshape(-1)
+        if return_stats:
+            return SamplingResult(tokens, SamplingStats(candidate_rows=batch_size))
+        return tokens
+
+    tokens, stats = _sample_vocab_parallel_top_p_batch(
+        local_logits,
+        temperatures=temperatures,
+        top_ps=top_ps,
+        candidate_k=candidate_k,
+        config=config,
+        group=group,
+        return_stats=True,
+    )
+    if return_stats:
+        return SamplingResult(tokens, stats)
+    return tokens

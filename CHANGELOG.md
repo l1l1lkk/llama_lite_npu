@@ -1,5 +1,47 @@
 # Changelog
 
+## [0.0.12rc1] - 2026-07-03
+
+Adaptive Prefill scheduler release.
+
+### Added
+
+- Added `--chunked_prefill_policy {adaptive,always}`.
+- Added `--chunked_prefill_min_tokens`, defaulting to `2048`.
+- Added scheduler tests proving short prompts stay on packed prefill while long prompts enter chunked prefill.
+
+### Changed
+
+- Chunked Prefill can now be enabled safely for mixed workloads: the adaptive policy only chunks long contexts and leaves short/mid prompts on the faster packed prefill path.
+- The scheduler can mix packed prefill and chunked prefill work in the same tick.
+
+### Docs
+
+- [v0.0.12rc1 release report](docs/releases/v0.0.12rc1.md)
+
+## [0.0.11rc1] - 2026-07-03
+
+Decode sampling hot-path cleanup release.
+
+### Added
+
+- Added batched vocabulary-parallel Top-P candidate exchange.
+- Added `--sampling_candidate_k` to control per-rank Top-P candidate count.
+- Added Prometheus counters for candidate sampling rows, fallback rows, and full-logit gather batches.
+
+### Changed
+
+- Top-P sampling now exchanges candidate tensors once per batch instead of running the candidate collectives row by row.
+- Full vocabulary logits are still gathered when exact nucleus completeness cannot be proven, preserving correctness.
+
+### Tests
+
+- Added tests for batched Top-P candidate exchange, fallback accounting, and sampling metrics.
+
+### Docs
+
+- [v0.0.11rc1 release report](docs/releases/v0.0.11rc1.md)
+
 ## [0.0.10rc3] - 2026-06-24
 
 Prometheus observability release for the Continuous Batching serving path.

@@ -150,6 +150,20 @@ class ObservabilityTests(unittest.TestCase):
         )
         self.assertNotIn('endpoint="tenant-12345"', text)
 
+
+    def test_sampling_path_counters_are_exported(self):
+        stats = SimpleNamespace(
+            candidate_rows=4,
+            fallback_rows=1,
+            full_logit_gather_batches=1,
+        )
+        self.metrics.on_sampling_stats(stats)
+
+        text = self._render()
+        self.assertIn('lite_llama_sampling_candidate_rows_total 4.0', text)
+        self.assertIn('lite_llama_sampling_fallback_rows_total 1.0', text)
+        self.assertIn('lite_llama_sampling_full_logit_gather_batches_total 1.0', text)
+
     def test_scheduler_and_runtime_snapshots_are_exported(self):
         self.metrics.update_scheduler(waiting=3, prefilling=2, running=4)
         executor = SimpleNamespace(

@@ -102,6 +102,7 @@ _scheduler_thread = None
 _scheduler_stop = None
 _scheduler_poll_seconds = 0.001
 _metrics = InferenceMetrics()
+_sampling_candidate_k = 2048
 
 
 def load_generator(
@@ -329,6 +330,7 @@ def _tp_continuous_worker_loop():
         _generator,
         return_host_tokens=False,
         enable_partial_prefix_cache=_partial_prefix_cache,
+        sampling_candidate_k=_sampling_candidate_k,
     )
     channel = StoreCommandChannel()
     requests_by_id = {}
@@ -423,8 +425,11 @@ def _start_continuous_scheduler(
     max_decode_tokens: int | None = None,
     chunked_prefill: bool = False,
     prefill_chunk_size: int | None = None,
+    chunked_prefill_policy: str = "adaptive",
+    chunked_prefill_min_tokens: int | None = None,
     max_preemptions: int = 1,
     partial_prefix_cache: bool = False,
+    sampling_candidate_k: int = 2048,
 ) -> None:
     global _continuous_backend, _continuous_scheduler
     global _scheduler_thread, _scheduler_stop, _scheduler_poll_seconds
@@ -437,6 +442,8 @@ def _start_continuous_scheduler(
     local_backend = ContinuousBatchModelBackend(
         _generator,
         enable_partial_prefix_cache=partial_prefix_cache,
+        sampling_candidate_k=sampling_candidate_k,
+        metrics=_metrics,
     )
     _continuous_backend = (
         _TpCoordinatedContinuousBackend(local_backend)
@@ -453,6 +460,8 @@ def _start_continuous_scheduler(
         max_decode_tokens=max_decode_tokens,
         chunked_prefill=chunked_prefill,
         prefill_chunk_size=prefill_chunk_size,
+        chunked_prefill_policy=chunked_prefill_policy,
+        chunked_prefill_min_tokens=chunked_prefill_min_tokens,
         max_preemptions=max_preemptions,
         metrics=_metrics,
     )
@@ -1205,12 +1214,39 @@ def main():
         help="Chunk size used when --chunked_prefill is enabled.",
     )
     parser.add_argument(
+        "--chunked_prefill_policy",
+        choices=("adaptive", "always"),
+        default="adaptive",
+        help=(
+            "Chunked prefill admission policy. 'adaptive' chunks only long "
+            "prompts, while 'always' preserves the force-chunk behavior."
+        ),
+    )
+    parser.add_argument(
+        "--chunked_prefill_min_tokens",
+        type=int,
+        default=2048,
+        help=(
+            "Minimum prompt/context tokens required before adaptive "
+            "chunked prefill is used."
+        ),
+    )
+    parser.add_argument(
         "--max_preemptions",
         type=int,
         default=1,
         help=(
             "Maximum KV-pressure preemptions per request in continuous "
             "batching. Set 0 to fail instead of preempting."
+        ),
+    )
+    parser.add_argument(
+        "--sampling_candidate_k",
+        type=int,
+        default=2048,
+        help=(
+            "Per-rank candidate count used by vocabulary-parallel Top-P "
+            "sampling before exact full-logit fallback."
         ),
     )
     parser.add_argument(
@@ -1228,11 +1264,13 @@ def main():
     # Detect TP
     from lite_llama.executor.tp_utils import detect_tp_env
     global _rank, _is_tp, _continuous_batching, _partial_prefix_cache
+    global _sampling_candidate_k
     tp = detect_tp_env()
     _rank = tp.rank if tp else 0
     _is_tp = tp is not None and tp.enabled
     _continuous_batching = args.continuous_batching
     _partial_prefix_cache = bool(args.partial_prefix_cache)
+    _sampling_candidate_k = max(1, int(args.sampling_candidate_k))
 
     device = f"npu:{_rank}" if _is_tp else get_device(args.device)
     if _rank == 0:
@@ -1243,6 +1281,7 @@ def main():
         print(f"NPU Graph: {'on' if args.compiled_model else 'off'}")
         print(f"MoE parallel mode: {args.moe_parallel_mode.upper()}")
         print(f"Partial Prefix Cache: {'on' if args.partial_prefix_cache else 'off'}")
+        print(f"Sampling candidate_k: {_sampling_candidate_k}")
 
     load_generator(
         args.checkpoints_dir,
@@ -1276,8 +1315,11 @@ def main():
                 max_decode_tokens=args.max_decode_tokens,
                 chunked_prefill=args.chunked_prefill,
                 prefill_chunk_size=args.prefill_chunk_size,
+                chunked_prefill_policy=args.chunked_prefill_policy,
+                chunked_prefill_min_tokens=args.chunked_prefill_min_tokens,
                 max_preemptions=args.max_preemptions,
                 partial_prefix_cache=args.partial_prefix_cache,
+                sampling_candidate_k=_sampling_candidate_k,
             )
         print(f"Server starting on http://{args.host}:{args.port}")
         print(f"Endpoints:")

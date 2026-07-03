@@ -1,4 +1,4 @@
-import ast
+﻿import ast
 import unittest
 from pathlib import Path
 
@@ -121,6 +121,14 @@ class ServerContinuousBatchingContractTest(unittest.TestCase):
         guarded_source = worker_source[guarded_start:guarded_end]
         self.assertIn(".cpu()", guarded_source)
 
+
+
+    def test_server_exposes_adaptive_chunked_prefill_flags(self):
+        server_text = self.source
+        self.assertIn("--chunked_prefill_policy", server_text)
+        self.assertIn("--chunked_prefill_min_tokens", server_text)
+        self.assertIn("chunked_prefill_policy=args.chunked_prefill_policy", server_text)
+        self.assertIn("chunked_prefill_min_tokens=args.chunked_prefill_min_tokens", server_text)
 
 if __name__ == "__main__":
     unittest.main()
