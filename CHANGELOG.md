@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.0.13rc2] - 2026-07-09
+
+Release-validation compatibility bugfix.
+
+### Fixed
+
+- Marked the optional `tests/test_torch_matmul.py` visualization benchmark as skipped when `matplotlib` is not installed, so container release validation does not fail on an optional plotting dependency.
+
+### Docs
+
+- [v0.0.13rc2 release report](docs/releases/v0.0.13rc2.md)
+
 ## [0.0.13rc1] - 2026-07-09
 
 Scheduler stabilization and release-validation release.

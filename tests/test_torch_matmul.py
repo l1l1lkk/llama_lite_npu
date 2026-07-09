@@ -1,6 +1,13 @@
 import torch
 import torch.nn.functional as F
-import matplotlib.pyplot as plt
+try:
+    import matplotlib.pyplot as plt
+except ModuleNotFoundError as exc:
+    import unittest
+
+    raise unittest.SkipTest(
+        "matplotlib is required only for the optional matmul visualization benchmark"
+    ) from exc
 import itertools
 import io
 from torch.utils.benchmark import Timer

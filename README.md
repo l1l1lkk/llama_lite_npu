@@ -12,7 +12,7 @@ the core execution path instead of wrapping a high-level inference library.
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.7-orange)
 ![Ascend](https://img.shields.io/badge/Ascend-910B3-red)
-![Version](https://img.shields.io/badge/version-0.0.13rc1-blue)
+![Version](https://img.shields.io/badge/version-0.0.13rc2-blue)
 
 </div>
 
@@ -106,7 +106,7 @@ All numbers below were measured on **2 × Atlas 910B3** with Qwen3-32B and
 | Fixed-length Top-P | v0.0.7rc1 | 4 | 156 / 231.325 | **57.7176 tok/s** | 96.6409 tok/s | 1.4861 s | 62.9 ms | 61.6 ms |
 | Mixed-length Greedy | v0.0.8rc1 | 4 | 285.475 / 245.7 | **50.1580 tok/s** | 108.436 tok/s | 5.1176 s | 57.8 ms | 57.1 ms |
 
-Current v0.0.13rc1 changes are scheduler and sampling-path changes. The release
+Current v0.0.13rc2 changes are scheduler and sampling-path changes. The release
 reports include the exact commands that should be used for fresh server-side
 measurements before adding new benchmark rows.
 
@@ -126,7 +126,7 @@ tokens:
 
 ## Current Release Notes
 
-- [v0.0.13rc1 Release Report](docs/releases/v0.0.13rc1.md) - adaptive chunked prefill and scheduler policy.
+- [v0.0.13rc2 Release Report](docs/releases/v0.0.13rc2.md) - adaptive chunked prefill and scheduler policy.
 - [v0.0.11rc1 Release Report](docs/releases/v0.0.11rc1.md) - batched vocabulary-parallel Top-P sampling.
 - [v0.0.10rc3 Release Report](docs/releases/v0.0.10rc3.md) - Prometheus observability.
 
