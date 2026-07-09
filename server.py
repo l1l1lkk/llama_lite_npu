@@ -423,6 +423,7 @@ def _start_continuous_scheduler(
     scheduler_poll_ms: float,
     max_prefill_tokens: int | None = None,
     max_decode_tokens: int | None = None,
+    decode_priority: bool = True,
     chunked_prefill: bool = False,
     prefill_chunk_size: int | None = None,
     chunked_prefill_policy: str = "adaptive",
@@ -458,6 +459,7 @@ def _start_continuous_scheduler(
         max_waiting_requests=max_waiting_requests,
         max_prefill_tokens=max_prefill_tokens,
         max_decode_tokens=max_decode_tokens,
+        decode_priority=decode_priority,
         chunked_prefill=chunked_prefill,
         prefill_chunk_size=prefill_chunk_size,
         chunked_prefill_policy=chunked_prefill_policy,
@@ -1190,6 +1192,21 @@ def main():
         ),
     )
     parser.add_argument(
+        "--decode_priority",
+        dest="decode_priority",
+        action="store_true",
+        help=(
+            "Prioritize active decode work over admitting new prefill work in "
+            "the same scheduler tick. This reduces streaming ITL/P99 jitter."
+        ),
+    )
+    parser.add_argument(
+        "--no_decode_priority",
+        dest="decode_priority",
+        action="store_false",
+        help="Allow decode and new prefill admission in the same scheduler tick.",
+    )
+    parser.add_argument(
         "--partial_prefix_cache",
         action="store_true",
         help=(
@@ -1258,7 +1275,7 @@ def main():
         ),
     )
     parser.set_defaults(compiled_model=True)
-    parser.set_defaults(continuous_batching=True)
+    parser.set_defaults(continuous_batching=True, decode_priority=True)
     args = parser.parse_args()
 
     # Detect TP
@@ -1313,6 +1330,7 @@ def main():
                 scheduler_poll_ms=args.scheduler_poll_ms,
                 max_prefill_tokens=args.max_prefill_tokens,
                 max_decode_tokens=args.max_decode_tokens,
+                decode_priority=args.decode_priority,
                 chunked_prefill=args.chunked_prefill,
                 prefill_chunk_size=args.prefill_chunk_size,
                 chunked_prefill_policy=args.chunked_prefill_policy,
@@ -1338,6 +1356,7 @@ def main():
                 f"max_batch_size={args.max_batch_size}, "
                 f"max_prefill_tokens={effective_max_prefill_tokens}, "
                 f"max_decode_tokens={args.max_decode_tokens}, "
+                f"decode_priority={args.decode_priority}, "
                 f"chunked_prefill={args.chunked_prefill}, "
                 f"max_preemptions={args.max_preemptions}]"
             )

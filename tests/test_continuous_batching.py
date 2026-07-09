@@ -183,6 +183,7 @@ class ContinuousBatchSchedulerTest(unittest.TestCase):
 
     def test_new_request_joins_existing_decode_batch(self):
         scheduler, backend = self._make_scheduler()
+        scheduler.decode_priority = False
         backend.prefill_tokens = {"a": [10], "b": [20]}
         backend.decode_tokens = {"a": [11, 99], "b": [21, 99]}
 
@@ -295,6 +296,7 @@ class ContinuousBatchSchedulerTest(unittest.TestCase):
 
     def test_prefill_token_budget_limits_admission(self):
         scheduler, backend = self._make_scheduler(max_batch_size=4)
+        scheduler.decode_priority = False
         scheduler.max_prefill_tokens = 4
         backend.prefill_tokens = {"a": [10], "b": [20], "c": [30]}
         backend.decode_tokens = {"a": [99], "b": [99], "c": [99]}
@@ -478,6 +480,54 @@ class ContinuousBatchSchedulerTest(unittest.TestCase):
         scheduler.step()
         self.assertEqual(backend.decode_calls, [["a"], ["b"]])
 
+    def test_decode_priority_defers_new_prefill_when_decode_is_active(self):
+        scheduler, backend = self._make_scheduler(max_batch_size=2)
+        backend.prefill_tokens = {"a": [10], "b": [20]}
+        backend.decode_tokens = {"a": [11, 99], "b": [21, 99]}
+
+        scheduler.submit("a", [1], 4, 0.0, 1.0)
+        scheduler.step()
+        scheduler.submit("b", [2], 4, 0.0, 1.0)
+
+        scheduler.step()
+
+        self.assertEqual(backend.decode_calls, [["a"]])
+        self.assertEqual(backend.prefill_calls, [["a"]])
+        self.assertEqual(scheduler.pending_count, 1)
+
+        scheduler.step()
+        self.assertEqual(backend.prefill_calls, [["a"]])
+        self.assertIn("a", backend.released)
+        self.assertEqual(scheduler.pending_count, 1)
+
+        scheduler.step()
+        self.assertEqual(backend.prefill_calls, [["a"], ["b"]])
+
+    def test_decode_priority_can_be_disabled_for_prefill_overlap(self):
+        module = load_batching_module()
+        backend = FakeBackend()
+        scheduler = module.ContinuousBatchScheduler(
+            backend=backend,
+            max_batch_size=2,
+            eos_token_id=99,
+            decode_tokens=lambda token_ids: "".join(
+                f"<{token_id}>" for token_id in token_ids
+            ),
+            decode_priority=False,
+        )
+        backend.prefill_tokens = {"a": [10], "b": [20]}
+        backend.decode_tokens = {"a": [11, 99], "b": [21, 99]}
+
+        scheduler.submit("a", [1], 4, 0.0, 1.0)
+        scheduler.step()
+        scheduler.submit("b", [2], 4, 0.0, 1.0)
+
+        scheduler.step()
+
+        self.assertEqual(backend.decode_calls, [["a"]])
+        self.assertEqual(backend.prefill_calls, [["a"], ["b"]])
+        self.assertEqual(scheduler.pending_count, 0)
+
     def test_incremental_decoder_limits_normal_decode_window(self):
         module = load_batching_module()
         request = module.BatchRequest(
@@ -529,6 +579,7 @@ class ContinuousBatchSchedulerTest(unittest.TestCase):
     def test_kv_capacity_error_preempts_active_request_and_requeues_new_request(self):
         module = load_batching_module()
         scheduler, backend = self._make_scheduler(max_batch_size=2)
+        scheduler.decode_priority = False
         backend.prefill_tokens = {"active": [10], "new": [20]}
         backend.decode_tokens = {"active": [11]}
 

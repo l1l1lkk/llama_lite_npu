@@ -206,6 +206,7 @@ class ContinuousBatchScheduler:
         max_waiting_requests: int = 1024,
         max_prefill_tokens: int | None = None,
         max_decode_tokens: int | None = None,
+        decode_priority: bool = True,
         chunked_prefill: bool = False,
         prefill_chunk_size: int | None = None,
         chunked_prefill_policy: str = "adaptive",
@@ -231,6 +232,7 @@ class ContinuousBatchScheduler:
         self.max_decode_tokens = self._validate_optional_positive(
             max_decode_tokens, "max_decode_tokens"
         )
+        self.decode_priority = bool(decode_priority)
         self.chunked_prefill = bool(chunked_prefill)
         self.prefill_chunk_size = self._validate_optional_positive(
             prefill_chunk_size, "prefill_chunk_size"
@@ -606,9 +608,12 @@ class ContinuousBatchScheduler:
             prior_active
         )
         decode_active = self._release_context_full(decode_active)
-        admitted = self._admit(
+        admission_capacity = (
             self.max_batch_size - len(prior_active) - len(self._prefilling)
         )
+        if self.decode_priority and decode_active:
+            admission_capacity = 0
+        admitted = self._admit(admission_capacity)
         packed_admitted = [
             request
             for request in admitted
@@ -623,9 +628,12 @@ class ContinuousBatchScheduler:
         prefill_work: list[BatchRequest] = []
         deferred_prefilling: list[BatchRequest] = []
         if self.chunked_prefill and self.prefill_chunk_size is not None:
-            prefill_work, deferred_prefilling = self._select_prefill_chunk_requests(
-                prefilling_candidates
-            )
+            if self.decode_priority and decode_active:
+                deferred_prefilling = list(prefilling_candidates)
+            else:
+                prefill_work, deferred_prefilling = self._select_prefill_chunk_requests(
+                    prefilling_candidates
+                )
         did_work = bool(
             decode_active or admitted or deferred_active or self._prefilling
         )

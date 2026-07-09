@@ -130,5 +130,12 @@ class ServerContinuousBatchingContractTest(unittest.TestCase):
         self.assertIn("chunked_prefill_policy=args.chunked_prefill_policy", server_text)
         self.assertIn("chunked_prefill_min_tokens=args.chunked_prefill_min_tokens", server_text)
 
+    def test_server_exposes_decode_priority_switch(self):
+        server_text = self.source
+        self.assertIn("--decode_priority", server_text)
+        self.assertIn("--no_decode_priority", server_text)
+        self.assertIn("decode_priority=args.decode_priority", server_text)
+        self.assertIn("decode_priority={args.decode_priority}", server_text)
+
 if __name__ == "__main__":
     unittest.main()

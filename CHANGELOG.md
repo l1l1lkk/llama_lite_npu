@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.0.13rc1] - 2026-07-09
+
+Scheduler stabilization and release-validation release.
+
+### Added
+
+- Added `--decode_priority` / `--no_decode_priority` for Continuous Batching.
+- Added a release validation helper: `scripts/validate_release.py`.
+- Added scheduler tests for decode-priority admission behavior.
+
+### Changed
+
+- Continuous Batching now prioritizes active decode rows by default. When a decode batch is ready, the scheduler defers new prefill admission to the next tick, reducing streaming ITL/P99 jitter under mixed prefill/decode pressure.
+- Existing behavior can still be restored with `--no_decode_priority` for A/B testing.
+
+### Docs
+
+- [v0.0.13rc1 release report](docs/releases/v0.0.13rc1.md)
+
 ## [0.0.12rc3] - 2026-07-03
 
 Server validation bugfix release.
