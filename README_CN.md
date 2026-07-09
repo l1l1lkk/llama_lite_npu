@@ -41,6 +41,17 @@ OpenAI 兼容 API -> Continuous Batch Scheduler -> ModelExecutor -> Paged KV / A
 
 以下结果来自 **2 张 Atlas 910B3、Qwen3-32B、TP=2** 的历史实测。原始上下文见 [`docs/inference_performance_history.md`](docs/inference_performance_history.md)。
 
+### 最新 v0.0.13rc2 调度 A/B
+
+EvalScope random 数据集，Qwen3-32B，TP=2，并发 4，平均输入 178 tokens，Top-P 采样：
+
+| 模式 | 输出吞吐 | 总吞吐 | 平均延迟 | TTFT | TPOT | ITL | 成功率 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `--decode_priority` | **39.00 tok/s** | 66.13 tok/s | 25.88 s | 13.438 s | 48.82 ms | 48.73 ms | 40 / 40 |
+| `--no_decode_priority` | **56.06 tok/s** | 97.42 tok/s | 16.59 s | 1.889 s | 61.66 ms | 61.21 ms | 40 / 40 |
+
+`--decode_priority` 会降低 decode 单步延迟，但会延后新请求的 prefill。在线服务建议默认开启；离线吞吐压测可以关闭。
+
 | 测试场景 | 版本 | 并发 | 平均输入 / 输出 | 输出吞吐 | 总吞吐 | TTFT | TPOT | ITL |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
 | 固定长度 Greedy | v0.0.8rc1 | 1 | 184 / 256 | **24.7089 tok/s** | 42.4685 tok/s | 702.7 ms | 37.9 ms | 37.7 ms |

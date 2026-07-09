@@ -99,6 +99,17 @@ All numbers below were measured on **2 × Atlas 910B3** with Qwen3-32B and
 
 ### EvalScope service benchmarks
 
+Latest v0.0.13rc2 server A/B, EvalScope random dataset, Qwen3-32B, TP=2,
+concurrency 4, average input 178 tokens, Top-P sampling:
+
+| Mode | Output throughput | Total throughput | Avg latency | TTFT | TPOT | ITL | Success |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `--decode_priority` | **39.00 tok/s** | 66.13 tok/s | 25.88 s | 13.438 s | 48.82 ms | 48.73 ms | 40 / 40 |
+| `--no_decode_priority` | **56.06 tok/s** | 97.42 tok/s | 16.59 s | 1.889 s | 61.66 ms | 61.21 ms | 40 / 40 |
+
+`--decode_priority` lowers decode-step latency but delays new prefill. Use it for
+serving stability; use `--no_decode_priority` for offline throughput tests.
+
 | Workload | Version | Concurrency | Avg input / output | Output throughput | Total throughput | TTFT | TPOT | ITL |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
 | Fixed-length Greedy | v0.0.8rc1 | 1 | 184 / 256 | **24.7089 tok/s** | 42.4685 tok/s | 702.7 ms | 37.9 ms | 37.7 ms |

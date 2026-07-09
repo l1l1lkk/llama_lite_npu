@@ -33,7 +33,7 @@ class RepositoryDocumentationTests(unittest.TestCase):
         english = (ROOT / "README.md").read_text(encoding="utf-8")
         chinese = (ROOT / "README_CN.md").read_text(encoding="utf-8")
 
-        for value in ("24.7089", "63.3523", "57.7176", "50.158"):
+        for value in ("24.7089", "63.3523", "57.7176", "50.158", "39.00", "56.06"):
             self.assertIn(value, english)
             self.assertIn(value, chinese)
 

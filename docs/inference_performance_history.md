@@ -13,8 +13,21 @@
 
 ## 核心记录
 
+### 2026-07-09 v0.0.13rc2 Decode Priority A/B
+
+环境：服务器容器 `triton-llama-lite`，NPU 6、7，Qwen3-32B，TP=2，EvalScope random 数据集，40 个请求，并发 4，平均输入 178 tokens，`temperature=0.6`，`top_p=0.9`，流式输出。
+
+| 模式 | 输出吞吐 | 总吞吐 | 平均延迟 | TTFT | TPOT | ITL | 成功 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `--decode_priority` | 39.00 tok/s | 66.13 tok/s | 25.88 s | 13.438 s | 48.82 ms | 48.73 ms | 40 / 40 |
+| `--no_decode_priority` | 56.06 tok/s | 97.42 tok/s | 16.59 s | 1.889 s | 61.66 ms | 61.21 ms | 40 / 40 |
+
+分析：`--decode_priority` 的目标不是提高总吞吐，而是减少活跃 decode 请求被新 prefill 打断。实测 ITL 从 61.21ms 降到 48.73ms，TPOT 从 61.66ms 降到 48.82ms，decode 单步延迟约下降 20%。代价是新请求 prefill 被延后，TTFT 从 1.889s 升到 13.438s，输出吞吐从 56.06 tok/s 降到 39.00 tok/s。在线服务默认开启更稳妥，离线吞吐压测可使用 `--no_decode_priority`。
+
 | 日期 | 项目版本 | 模型 | 测试工具 | TP / Batch或并发 | 输入 / 输出 | NPU Graph | 执行路径 | 核心吞吐 | 单Token指标 | 备注 |
 |---|---|---|---|---|---|---|---|---:|---:|---|
+| 2026-07-09 | 0.0.13rc2 | Qwen3-32B | EvalScope | TP=2 / 并发=4 | 平均178 / 255.9 | 开启 | Continuous Batching；`--decode_priority`；Top-P | Output 39.00 tok/s；Total 66.13 tok/s | TTFT 13.438s；TPOT 48.82ms；ITL 48.73ms | 40/40成功；decode更平稳但prefill延后 |
+| 2026-07-09 | 0.0.13rc2 | Qwen3-32B | EvalScope | TP=2 / 并发=4 | 平均178 / 241.3 | 开启 | Continuous Batching；`--no_decode_priority`；Top-P | Output 56.06 tok/s；Total 97.42 tok/s | TTFT 1.889s；TPOT 61.66ms；ITL 61.21ms | 40/40成功；总吞吐更高但decode单步更慢 |
 | 2026-07-03 | 0.0.12rc3 | Qwen3-32B | EvalScope | TP=2 / concurrency=4 | avg 178 / 256 | enabled | Continuous Batching; Adaptive Chunked Prefill enabled but short prompts stay packed; Top-P candidate sampling | Output 60.51 tok/s; Total 102.58 tok/s | TTFT 2103.7ms; TPOT 58.1ms; ITL 57.9ms | 40 requests; temperature=0.6; top_p=0.9; success 40/40; sampling candidate_rows=10350, fallback_rows=0, full_logit_gather_batches=0 |
 | 2026-07-03 | 0.0.12rc2 | Qwen3-32B | EvalScope | TP=2 / concurrency=1 | avg 206 / 256 | enabled | Continuous Batching; Adaptive Chunked Prefill enabled but short prompts stay packed; Greedy | Output 23.56 tok/s; Total 42.52 tok/s | TTFT 987.2ms; TPOT 38.7ms; ITL 38.6ms | 20 requests; temperature=0; success 20/20; rc3 does not change Greedy path |
 | 2026-06-22 | 0.0.8rc9 | Qwen3-32B | EvalScope | TP=2 / concurrency=4 | avg 574.225 / 128 | enabled | Continuous Batching; Greedy; no chunked prefill; auto max_prefill_tokens=1875; packed prefill micro-batch guard | Output 16.6703 tok/s; Total 91.4556 tok/s | TTFT 14.6301s; TPOT 125.8ms; ITL 125.0ms | 40 requests; long mixed prompts; stable after packed-prefill budget guard |
