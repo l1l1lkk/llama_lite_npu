@@ -177,6 +177,15 @@ def main() -> int:
         [sys.executable, str(Path(__file__).with_name("summarize.py")), str(output)],
         check=True,
     )
+    if (output / "strict-validation.json").is_file():
+        subprocess.run(
+            [
+                sys.executable,
+                str(Path(__file__).with_name("validate_strict_workload.py")),
+                str(output),
+            ],
+            check=True,
+        )
     if (output / "pair-validation.json").is_file():
         subprocess.run(
             [sys.executable, str(Path(__file__).with_name("compare_graph.py")), str(output)],
