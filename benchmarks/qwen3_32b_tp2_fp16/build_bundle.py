@@ -75,11 +75,16 @@ def file_record(path: Path, root: Path) -> dict[str, object]:
     }
 
 
-def copy_relative(source_root: Path, output_root: Path, relative: Path) -> None:
+def copy_relative(
+    source_root: Path,
+    output_root: Path,
+    relative: Path,
+    output_relative: Path | None = None,
+) -> None:
     source = source_root / relative
     if not source.is_file():
         raise FileNotFoundError(source)
-    destination = output_root / relative
+    destination = output_root / (output_relative or relative)
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source, destination)
 
@@ -98,6 +103,7 @@ def main() -> int:
     output.mkdir(parents=True)
 
     selected: set[Path] = set()
+    output_paths: dict[Path, Path] = {}
     run_ids: list[str] = []
     for name in ROOT_FILES:
         selected.add(Path(name))
@@ -136,7 +142,9 @@ def main() -> int:
             candidate = evalscope_root / name
             if not candidate.is_file():
                 raise FileNotFoundError(candidate)
-            selected.add(candidate.relative_to(source))
+            source_relative = candidate.relative_to(source)
+            selected.add(source_relative)
+            output_paths[source_relative] = relative_run / "client/evalscope" / name
         warmup_summaries = list(
             (run_root / "client" / "warmup" / "evalscope").glob(
                 "**/benchmark_summary.json"
@@ -153,14 +161,21 @@ def main() -> int:
                 candidate = warmup_evalscope_root / name
                 if not candidate.is_file():
                     raise FileNotFoundError(candidate)
-                selected.add(candidate.relative_to(source))
+                source_relative = candidate.relative_to(source)
+                selected.add(source_relative)
+                output_paths[source_relative] = (
+                    relative_run / "client/warmup/evalscope" / name
+                )
 
     for relative in sorted(selected):
-        copy_relative(source, output, relative)
+        copy_relative(source, output, relative, output_paths.get(relative))
 
     source_files = sorted(path for path in source.rglob("*") if path.is_file())
     omitted = [file_record(path, source) for path in source_files if path.relative_to(source) not in selected]
-    included = [file_record(output / relative, output) for relative in sorted(selected)]
+    included = [
+        file_record(output / output_paths.get(relative, relative), output)
+        for relative in sorted(selected)
+    ]
     try:
         git_head = subprocess.check_output(
             ["git", "-C", str(source.parent.parent), "rev-parse", "HEAD"],

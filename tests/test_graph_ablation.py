@@ -107,6 +107,7 @@ class GraphAblationScriptContractTest(unittest.TestCase):
             'source / "workload"',
         ):
             self.assertIn(evidence, source)
+        self.assertIn('relative_run / "client/evalscope" / name', source)
 
     def test_frozen_dataset_manifest_hashes_and_counts(self):
         dataset_root = BENCHMARK / "datasets" / "20260712_graph_ablation"

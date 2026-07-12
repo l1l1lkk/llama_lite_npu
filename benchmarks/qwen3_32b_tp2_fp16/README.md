@@ -105,7 +105,7 @@ benchmarks/results/<campaign>/
   <graph-mode>/server/{start-command.txt,start/stop metrics and stats,...}
   <graph-mode>/<case>/run-XX/
     run-metadata.json
-    client/{command.txt,exit-code.txt,evalscope/**/{args,summary,percentile}.json}
+    client/{command.txt,exit-code.txt,evalscope/{benchmark_args,benchmark_summary,benchmark_percentile}.json}
     server/{before/after metrics.prom,before/after stats.json}
   summary.csv
   aggregate.csv
