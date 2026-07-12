@@ -1,4 +1,6 @@
 import importlib.util
+import hashlib
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -84,6 +86,24 @@ class GraphAblationScriptContractTest(unittest.TestCase):
             "workload-fingerprint.json",
         ):
             self.assertIn(evidence, source)
+
+    def test_frozen_dataset_manifest_hashes_and_counts(self):
+        dataset_root = BENCHMARK / "datasets" / "20260712_graph_ablation"
+        manifest = json.loads(
+            (dataset_root / "workload-manifest.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(manifest["pair_count"], 6)
+        self.assertEqual(len(manifest["files"]), 12)
+        for record in manifest["files"]:
+            path = dataset_root / record["dataset_file"]
+            self.assertEqual(path.stat().st_size, record["dataset_size_bytes"])
+            self.assertEqual(
+                hashlib.sha256(path.read_bytes()).hexdigest(),
+                record["dataset_sha256"],
+            )
+            lines = path.read_text(encoding="utf-8").splitlines()
+            self.assertEqual(len(lines), record["request_count"])
+            self.assertTrue(all(isinstance(json.loads(line), list) for line in lines))
 
 
 if __name__ == "__main__":
