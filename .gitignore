@@ -15,4 +15,7 @@ logs
 lite_llama/logs
 profiler_output/
 outputs/
+/benchmark-results/
+!/benchmarks/results/
+!/benchmarks/results/**
 .claude/

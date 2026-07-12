@@ -1,0 +1,1354 @@
+{
+  "schema_version": 1,
+  "manifest_self_excluded_from_hash_index": true,
+  "campaign_id": "20260711_qwen3_32b_tp2_fp16",
+  "generated_at_utc": "2026-07-11T18:18:16.864745+00:00",
+  "source_campaign": "/data/liuke/llama_lite_npu/benchmark-results/20260711_qwen3_32b_tp2_fp16",
+  "git_head": "dafc620e4d46a186ab391dbbe018642c290b5896",
+  "formal_run_count": 15,
+  "run_ids": [
+    "20260711_qwen3_32b_tp2_fp16_on_p128_o256_c1_r1",
+    "20260711_qwen3_32b_tp2_fp16_on_p128_o256_c1_r2",
+    "20260711_qwen3_32b_tp2_fp16_on_p128_o256_c1_r3",
+    "20260711_qwen3_32b_tp2_fp16_on_p128_o256_c4_r1",
+    "20260711_qwen3_32b_tp2_fp16_on_p128_o256_c4_r2",
+    "20260711_qwen3_32b_tp2_fp16_on_p128_o256_c4_r3",
+    "20260711_qwen3_32b_tp2_fp16_on_p128_o256_c8_r1",
+    "20260711_qwen3_32b_tp2_fp16_on_p128_o256_c8_r2",
+    "20260711_qwen3_32b_tp2_fp16_on_p128_o256_c8_r3",
+    "20260711_qwen3_32b_tp2_fp16_off_p128_o256_c1_r1",
+    "20260711_qwen3_32b_tp2_fp16_off_p128_o256_c1_r2",
+    "20260711_qwen3_32b_tp2_fp16_off_p128_o256_c1_r3",
+    "20260711_qwen3_32b_tp2_fp16_off_p128_o256_c4_r1",
+    "20260711_qwen3_32b_tp2_fp16_off_p128_o256_c4_r2",
+    "20260711_qwen3_32b_tp2_fp16_off_p128_o256_c4_r3"
+  ],
+  "included_file_count": 171,
+  "included_size_bytes": 570611,
+  "included_files": [
+    {
+      "path": "aggregate.csv",
+      "size_bytes": 2950,
+      "sha256": "e44c46011dd0c459c8edf91245517d4d5068c99ec5f4f4a91be89d192e441cb9"
+    },
+    {
+      "path": "environment/ascend-env.txt",
+      "size_bytes": 191,
+      "sha256": "51ccf7b2ce3cb42fb527999a94e095421da13dc732f211f366c46d0e3ddc50e8"
+    },
+    {
+      "path": "environment/baseline.env",
+      "size_bytes": 286,
+      "sha256": "ed2ddb76ca0b363506b461761c46ebe3c413115a9084f126093a5208e95059ab"
+    },
+    {
+      "path": "environment/git.txt",
+      "size_bytes": 243,
+      "sha256": "3171f37c7609342514e76f7c3c6ad865027f66863e05e10d6819194b5dd73a84"
+    },
+    {
+      "path": "environment/model-config.json",
+      "size_bytes": 728,
+      "sha256": "97e295b63283935788fac5e4f8860862a56d4089538cafc93f0431f2ebe483bb"
+    },
+    {
+      "path": "environment/model-config.sha256",
+      "size_bytes": 125,
+      "sha256": "87e701f477d114e6aa384f831cf080dfe90fa9189714c3ad1cf41d0be33ecd26"
+    },
+    {
+      "path": "environment/npu-smi.txt",
+      "size_bytes": 5850,
+      "sha256": "b7b1582a528c627ee6b7194973bfa9151f91e2145b08753a52d9827dd9ef20c1"
+    },
+    {
+      "path": "environment/runtime.txt",
+      "size_bytes": 2084,
+      "sha256": "528fe10b374831294edac4377d3f83a2a4baa8345e4f7261cd2f5739150f05a5"
+    },
+    {
+      "path": "off/p128_o256_c1/run-01/client/command.txt",
+      "size_bytes": 609,
+      "sha256": "ba9bb8442801a7c3c56d65742eb71372e0ab25bd92abdb8e3a4f8b032b9e0121"
+    },
+    {
+      "path": "off/p128_o256_c1/run-01/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c1_r1/parallel_1_number_3/benchmark_args.json",
+      "size_bytes": 2147,
+      "sha256": "e110b9c4bcf13b0943dde58bf219d81b99ef5c16bb15c6cce3c4b34e323afec2"
+    },
+    {
+      "path": "off/p128_o256_c1/run-01/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c1_r1/parallel_1_number_3/benchmark_percentile.json",
+      "size_bytes": 2838,
+      "sha256": "693a58290bb61434ca3686f324d0368803749b3e894a621d0e5d0acd6eb55512"
+    },
+    {
+      "path": "off/p128_o256_c1/run-01/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c1_r1/parallel_1_number_3/benchmark_summary.json",
+      "size_bytes": 496,
+      "sha256": "a6713dc34fca50dc43b912ac644d9920ba4779be1a52b486c58dd6eedce65813"
+    },
+    {
+      "path": "off/p128_o256_c1/run-01/client/exit-code.txt",
+      "size_bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "off/p128_o256_c1/run-01/run-metadata.json",
+      "size_bytes": 394,
+      "sha256": "99a64dcf5da70d9180885a65db568e10864c5182b87343887927ac015e2e5b40"
+    },
+    {
+      "path": "off/p128_o256_c1/run-01/server/after-metrics.prom",
+      "size_bytes": 13721,
+      "sha256": "5a59af087c73afeb1454e87707d0c95d6eef502fb109cfd0ae54574a3f3cd4c8"
+    },
+    {
+      "path": "off/p128_o256_c1/run-01/server/after-stats.json",
+      "size_bytes": 290,
+      "sha256": "9387c129c6dd83e3a8f0999728ee1aac8b442fa4209a99234358b3bdb4859629"
+    },
+    {
+      "path": "off/p128_o256_c1/run-01/server/before-metrics.prom",
+      "size_bytes": 6849,
+      "sha256": "c43d4ca32291ec52d7dfaf1fd5ea1b8c09e26f63dcbbf10eef7668f04a280baf"
+    },
+    {
+      "path": "off/p128_o256_c1/run-01/server/before-stats.json",
+      "size_bytes": 273,
+      "sha256": "8240513349a83b96aff3fac3238bfccb5734b48ff3c734b8f6769fe443c1dff4"
+    },
+    {
+      "path": "off/p128_o256_c1/run-02/client/command.txt",
+      "size_bytes": 609,
+      "sha256": "4c0b72893c39e854ada1e31c79e7ffb8003d7f0eaf166370731d545e53d33334"
+    },
+    {
+      "path": "off/p128_o256_c1/run-02/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c1_r2/parallel_1_number_3/benchmark_args.json",
+      "size_bytes": 2147,
+      "sha256": "d34fba7e8942e3e6e1532ebaaa5f8b009bdefabfbcda223c4bcabbca447801de"
+    },
+    {
+      "path": "off/p128_o256_c1/run-02/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c1_r2/parallel_1_number_3/benchmark_percentile.json",
+      "size_bytes": 2844,
+      "sha256": "589f2567465f360dfb30871ba6b9167a9443bc5752e5a96f3d34b0f8c0b458e4"
+    },
+    {
+      "path": "off/p128_o256_c1/run-02/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c1_r2/parallel_1_number_3/benchmark_summary.json",
+      "size_bytes": 496,
+      "sha256": "9e36012fcc10dca5f26ea99856399e8705ad94a3ab8246ee4a1c24f99819fbcb"
+    },
+    {
+      "path": "off/p128_o256_c1/run-02/client/exit-code.txt",
+      "size_bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "off/p128_o256_c1/run-02/run-metadata.json",
+      "size_bytes": 394,
+      "sha256": "82e3acbdaf45ac1ac7c61c00d906298f3132049f831dc9a1b2a6a20404d030b7"
+    },
+    {
+      "path": "off/p128_o256_c1/run-02/server/after-metrics.prom",
+      "size_bytes": 13756,
+      "sha256": "6ce4f4ded79365c36e04a6b1b670a62e031db0ad59abd6d67fbd6772bc7c6a11"
+    },
+    {
+      "path": "off/p128_o256_c1/run-02/server/after-stats.json",
+      "size_bytes": 291,
+      "sha256": "b1242970cf1631eb4c358eef73c4701fe6c49cef33da202fb2721924eb95f9e3"
+    },
+    {
+      "path": "off/p128_o256_c1/run-02/server/before-metrics.prom",
+      "size_bytes": 13721,
+      "sha256": "56997ca710a2dd2a252e258ef92cbb8b0dcc6050e381bfeaf3d269ab4602fa66"
+    },
+    {
+      "path": "off/p128_o256_c1/run-02/server/before-stats.json",
+      "size_bytes": 290,
+      "sha256": "9387c129c6dd83e3a8f0999728ee1aac8b442fa4209a99234358b3bdb4859629"
+    },
+    {
+      "path": "off/p128_o256_c1/run-03/client/command.txt",
+      "size_bytes": 609,
+      "sha256": "22537aab956a343379f70cdb70f2b5a7e4fe3fb81297dff21b341a40d53e42da"
+    },
+    {
+      "path": "off/p128_o256_c1/run-03/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c1_r3/parallel_1_number_3/benchmark_args.json",
+      "size_bytes": 2147,
+      "sha256": "c5cc708e813440343d0a0329cda43d418e0bb95471c1655f6aeb4279c0aaec4f"
+    },
+    {
+      "path": "off/p128_o256_c1/run-03/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c1_r3/parallel_1_number_3/benchmark_percentile.json",
+      "size_bytes": 2842,
+      "sha256": "904ad1cda92ac5dd3b847afcb7f579c12545d0070b57c680eab70297adefbb4d"
+    },
+    {
+      "path": "off/p128_o256_c1/run-03/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c1_r3/parallel_1_number_3/benchmark_summary.json",
+      "size_bytes": 496,
+      "sha256": "4d2eabfa98f0cea3a76c66620d2b8d8502cdb674f140de0ff75f85324248d1de"
+    },
+    {
+      "path": "off/p128_o256_c1/run-03/client/exit-code.txt",
+      "size_bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "off/p128_o256_c1/run-03/run-metadata.json",
+      "size_bytes": 394,
+      "sha256": "8a2da2e40bb216d0695e4c40ac8bb3904f8e6dc1e04133553dc7c0a166274b02"
+    },
+    {
+      "path": "off/p128_o256_c1/run-03/server/after-metrics.prom",
+      "size_bytes": 13757,
+      "sha256": "499a6dcbad814aa98d01515788dda825ab79e37db04b86c3701a5f3b3b5aa62b"
+    },
+    {
+      "path": "off/p128_o256_c1/run-03/server/after-stats.json",
+      "size_bytes": 292,
+      "sha256": "ee6abbf6d9f844414f07c7a8fe300f2a1977694eb95fb3e66e8e971408fc2beb"
+    },
+    {
+      "path": "off/p128_o256_c1/run-03/server/before-metrics.prom",
+      "size_bytes": 13756,
+      "sha256": "6ce4f4ded79365c36e04a6b1b670a62e031db0ad59abd6d67fbd6772bc7c6a11"
+    },
+    {
+      "path": "off/p128_o256_c1/run-03/server/before-stats.json",
+      "size_bytes": 291,
+      "sha256": "b1242970cf1631eb4c358eef73c4701fe6c49cef33da202fb2721924eb95f9e3"
+    },
+    {
+      "path": "off/p128_o256_c4/run-01/client/command.txt",
+      "size_bytes": 609,
+      "sha256": "f0cf650dbc735ca516d232cc8c048964b66e2b3efb08679ffe0ade1b768368a5"
+    },
+    {
+      "path": "off/p128_o256_c4/run-01/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c4_r1/parallel_4_number_8/benchmark_args.json",
+      "size_bytes": 2147,
+      "sha256": "40d0885134e0d6ead671416225adf1b317d5fa244f61439d255986cf6799f606"
+    },
+    {
+      "path": "off/p128_o256_c4/run-01/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c4_r1/parallel_4_number_8/benchmark_percentile.json",
+      "size_bytes": 2853,
+      "sha256": "fd5a2071dfab8c06b47ce715fb7f1609c2a079c912addb8d48632915accb9b3a"
+    },
+    {
+      "path": "off/p128_o256_c4/run-01/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c4_r1/parallel_4_number_8/benchmark_summary.json",
+      "size_bytes": 500,
+      "sha256": "4b2ec0ab01614977de7f2f451e1c7ec1abce0d48a2546cbf3735195ed6e66019"
+    },
+    {
+      "path": "off/p128_o256_c4/run-01/client/exit-code.txt",
+      "size_bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "off/p128_o256_c4/run-01/run-metadata.json",
+      "size_bytes": 394,
+      "sha256": "484abb05befca4761b39a7af29cc1275d30d82633da006b2f9ad1857b7ecd3cb"
+    },
+    {
+      "path": "off/p128_o256_c4/run-01/server/after-metrics.prom",
+      "size_bytes": 13755,
+      "sha256": "6df7f110588dea0783bd10767c5a63396df3f85290fcf900fb1b6f01e91f1abf"
+    },
+    {
+      "path": "off/p128_o256_c4/run-01/server/after-stats.json",
+      "size_bytes": 292,
+      "sha256": "6bcae22355217795fc88f696c61aaed62b54039e2bf9bb5bdef1c47c8e19425d"
+    },
+    {
+      "path": "off/p128_o256_c4/run-01/server/before-metrics.prom",
+      "size_bytes": 13757,
+      "sha256": "fade578d13fbe5a22ac03c7e44f2b71a783ea0594d279fd811116cda216a150f"
+    },
+    {
+      "path": "off/p128_o256_c4/run-01/server/before-stats.json",
+      "size_bytes": 292,
+      "sha256": "ee6abbf6d9f844414f07c7a8fe300f2a1977694eb95fb3e66e8e971408fc2beb"
+    },
+    {
+      "path": "off/p128_o256_c4/run-02/client/command.txt",
+      "size_bytes": 609,
+      "sha256": "47b2683df06f2de32eb2c2354c7d4ce3a1a58c2b126159fa7cd751882ca005c7"
+    },
+    {
+      "path": "off/p128_o256_c4/run-02/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c4_r2/parallel_4_number_8/benchmark_args.json",
+      "size_bytes": 2147,
+      "sha256": "6568625c4a4aea0e7e96d1336dc1298a0fd1dbc4e3b5e54fcb8776d05db69c19"
+    },
+    {
+      "path": "off/p128_o256_c4/run-02/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c4_r2/parallel_4_number_8/benchmark_percentile.json",
+      "size_bytes": 2852,
+      "sha256": "abb039e109fce7212fe32f124a7387888470b2e6b984c5d663e0201523c65644"
+    },
+    {
+      "path": "off/p128_o256_c4/run-02/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c4_r2/parallel_4_number_8/benchmark_summary.json",
+      "size_bytes": 499,
+      "sha256": "33544a65aa90bc618364c5b1764037bd3832a3a44f5de268f11318378012f046"
+    },
+    {
+      "path": "off/p128_o256_c4/run-02/client/exit-code.txt",
+      "size_bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "off/p128_o256_c4/run-02/run-metadata.json",
+      "size_bytes": 394,
+      "sha256": "56ec0610cdf617399d36ed26e0922a2ccc73fd52ad4b74259c4ff4fe07987803"
+    },
+    {
+      "path": "off/p128_o256_c4/run-02/server/after-metrics.prom",
+      "size_bytes": 13765,
+      "sha256": "62a103dacb7858f677156c26c8d854c7de9e1f824edb2ec920503c08014db25d"
+    },
+    {
+      "path": "off/p128_o256_c4/run-02/server/after-stats.json",
+      "size_bytes": 292,
+      "sha256": "177732861c3837a7cc2140e494b5e977e22825f51f2f27d07a20d8a9223ea178"
+    },
+    {
+      "path": "off/p128_o256_c4/run-02/server/before-metrics.prom",
+      "size_bytes": 13755,
+      "sha256": "6df7f110588dea0783bd10767c5a63396df3f85290fcf900fb1b6f01e91f1abf"
+    },
+    {
+      "path": "off/p128_o256_c4/run-02/server/before-stats.json",
+      "size_bytes": 292,
+      "sha256": "6bcae22355217795fc88f696c61aaed62b54039e2bf9bb5bdef1c47c8e19425d"
+    },
+    {
+      "path": "off/p128_o256_c4/run-03/client/command.txt",
+      "size_bytes": 609,
+      "sha256": "4d7d31d8735baafa83bd81142b87adea70e7973e0f5ec4eb80bc7bb7c1e1a73c"
+    },
+    {
+      "path": "off/p128_o256_c4/run-03/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c4_r3/parallel_4_number_8/benchmark_args.json",
+      "size_bytes": 2147,
+      "sha256": "e4bf53f2ebbdec2dcef66c684403f2c6b327feaf758a917d59a1ec66d1e03345"
+    },
+    {
+      "path": "off/p128_o256_c4/run-03/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c4_r3/parallel_4_number_8/benchmark_percentile.json",
+      "size_bytes": 2850,
+      "sha256": "27953da4f259cc31321b27ae1a2e1087c8546d42e274db3013134d66121ffe09"
+    },
+    {
+      "path": "off/p128_o256_c4/run-03/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c4_r3/parallel_4_number_8/benchmark_summary.json",
+      "size_bytes": 499,
+      "sha256": "b7f4de1f502142da9bce2dddeba76a8cc934a02a84d2855d53dd01e037f0c640"
+    },
+    {
+      "path": "off/p128_o256_c4/run-03/client/exit-code.txt",
+      "size_bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "off/p128_o256_c4/run-03/run-metadata.json",
+      "size_bytes": 394,
+      "sha256": "9ba03d9706ca3ee5054583f7df7a7b3eca589dd8e31132cc3d879100fe6b5d66"
+    },
+    {
+      "path": "off/p128_o256_c4/run-03/server/after-metrics.prom",
+      "size_bytes": 13762,
+      "sha256": "bcf616f20354305290c0831c8e2bb52146d394e5265854e3c63d4ef677c8d812"
+    },
+    {
+      "path": "off/p128_o256_c4/run-03/server/after-stats.json",
+      "size_bytes": 292,
+      "sha256": "f424049b3e53b1d7be70a32cb1f16d60295d1dbe20cff461cff22ede1176ab35"
+    },
+    {
+      "path": "off/p128_o256_c4/run-03/server/before-metrics.prom",
+      "size_bytes": 13765,
+      "sha256": "1b90e74e8c82fda99acc05213e960e29f4db9b28c567cbe097a9f8ff664b7d7d"
+    },
+    {
+      "path": "off/p128_o256_c4/run-03/server/before-stats.json",
+      "size_bytes": 292,
+      "sha256": "177732861c3837a7cc2140e494b5e977e22825f51f2f27d07a20d8a9223ea178"
+    },
+    {
+      "path": "off/server/health.json",
+      "size_bytes": 46,
+      "sha256": "a0ca3bdbba9ad899c2e92b2ba988bc2f3fdfd64d5c866fc58291b00c9f2464a9"
+    },
+    {
+      "path": "off/server/start-command.txt",
+      "size_bytes": 343,
+      "sha256": "e18a4a536091bed608ea18525de81a487af95b00a50184f82ee23f93c63e031a"
+    },
+    {
+      "path": "off/server/start-metrics.prom",
+      "size_bytes": 6837,
+      "sha256": "4cc9bb710c76d30d8bcf23cf7c5f1a652d6d453a36eb39352134191bb27cf147"
+    },
+    {
+      "path": "off/server/start-stats.json",
+      "size_bytes": 273,
+      "sha256": "8240513349a83b96aff3fac3238bfccb5734b48ff3c734b8f6769fe443c1dff4"
+    },
+    {
+      "path": "off/server/stop-metrics.prom",
+      "size_bytes": 13762,
+      "sha256": "50395e5a0964d28f6226cac3f8c80bb6307c0688ddfd10bc6ccf91cefa5b0f24"
+    },
+    {
+      "path": "off/server/stop-stats.json",
+      "size_bytes": 292,
+      "sha256": "f424049b3e53b1d7be70a32cb1f16d60295d1dbe20cff461cff22ede1176ab35"
+    },
+    {
+      "path": "on/p128_o256_c1/run-01/client/command.txt",
+      "size_bytes": 608,
+      "sha256": "6507264217efcbd4e667ff66e773b119c0b2765bf264f5048ecec70a524ea4e8"
+    },
+    {
+      "path": "on/p128_o256_c1/run-01/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c1_r1/parallel_1_number_12/benchmark_args.json",
+      "size_bytes": 2146,
+      "sha256": "d712d095e4c17782537e92080b275451748f70fcb81b7294d968253ac638520e"
+    },
+    {
+      "path": "on/p128_o256_c1/run-01/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c1_r1/parallel_1_number_12/benchmark_percentile.json",
+      "size_bytes": 2848,
+      "sha256": "87c0d62116c24329d8d9ca9e5e151b930f626661c501a95430c64b7e7767925f"
+    },
+    {
+      "path": "on/p128_o256_c1/run-01/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c1_r1/parallel_1_number_12/benchmark_summary.json",
+      "size_bytes": 497,
+      "sha256": "6286105450fb5a6720f71def6d56357fca72f196253211aaee124af45f1b9e47"
+    },
+    {
+      "path": "on/p128_o256_c1/run-01/client/exit-code.txt",
+      "size_bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "on/p128_o256_c1/run-01/run-metadata.json",
+      "size_bytes": 393,
+      "sha256": "7f2d94e176c9e73ceb23447b74b799bb170e1b74a5e9d42d1358edf21a3500df"
+    },
+    {
+      "path": "on/p128_o256_c1/run-01/server/after-metrics.prom",
+      "size_bytes": 13774,
+      "sha256": "2c0a13d2125f2398ea28631a3576801ba01e1056fb6adadb25191a8e29808d70"
+    },
+    {
+      "path": "on/p128_o256_c1/run-01/server/after-stats.json",
+      "size_bytes": 295,
+      "sha256": "ecfafb8d020410e3913afc612a75195c2d154c604fff1600410f755c93a7549a"
+    },
+    {
+      "path": "on/p128_o256_c1/run-01/server/before-metrics.prom",
+      "size_bytes": 6840,
+      "sha256": "6802e7b953285d69309b4a1db4d6f6ba2a5a27619cd7f10ee818d40bb3b11ed6"
+    },
+    {
+      "path": "on/p128_o256_c1/run-01/server/before-stats.json",
+      "size_bytes": 273,
+      "sha256": "8240513349a83b96aff3fac3238bfccb5734b48ff3c734b8f6769fe443c1dff4"
+    },
+    {
+      "path": "on/p128_o256_c1/run-02/client/command.txt",
+      "size_bytes": 608,
+      "sha256": "6d8ef7f9522dcbbda09449e2671bfe015676ea5d7b57da8e64cab812c46d7440"
+    },
+    {
+      "path": "on/p128_o256_c1/run-02/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c1_r2/parallel_1_number_12/benchmark_args.json",
+      "size_bytes": 2146,
+      "sha256": "badad9724ee7c0d8c889c48cb4978ee9ff9c04483e89704ed925c3f191597c41"
+    },
+    {
+      "path": "on/p128_o256_c1/run-02/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c1_r2/parallel_1_number_12/benchmark_percentile.json",
+      "size_bytes": 2840,
+      "sha256": "42f558eb342111297bf751fd07c8811ff3226a85facada870799a86614a5ff4e"
+    },
+    {
+      "path": "on/p128_o256_c1/run-02/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c1_r2/parallel_1_number_12/benchmark_summary.json",
+      "size_bytes": 496,
+      "sha256": "03cb0f7910dcffa9faeb7aa5fb596623dfde757bf17d1776e4150d72fc6a7ca9"
+    },
+    {
+      "path": "on/p128_o256_c1/run-02/client/exit-code.txt",
+      "size_bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "on/p128_o256_c1/run-02/run-metadata.json",
+      "size_bytes": 393,
+      "sha256": "020cadca065430725f0ef2d5bfe860f5364ff1b2bcae912e9ccd48ede6e2b575"
+    },
+    {
+      "path": "on/p128_o256_c1/run-02/server/after-metrics.prom",
+      "size_bytes": 13773,
+      "sha256": "bbc3c550102304a867c090d5f703b95957beeca356fc435b4ff2b9e1722ddd73"
+    },
+    {
+      "path": "on/p128_o256_c1/run-02/server/after-stats.json",
+      "size_bytes": 295,
+      "sha256": "4ea1e010f8c30e01444bb3d29cf3c1df5a0c8fd4b8b4f1cc3d1a1ec2bfd5b841"
+    },
+    {
+      "path": "on/p128_o256_c1/run-02/server/before-metrics.prom",
+      "size_bytes": 13774,
+      "sha256": "4e55dd81374de69469b0a867ed7d59d6c857098b27fd94e418e953a2cdaaa35c"
+    },
+    {
+      "path": "on/p128_o256_c1/run-02/server/before-stats.json",
+      "size_bytes": 295,
+      "sha256": "ecfafb8d020410e3913afc612a75195c2d154c604fff1600410f755c93a7549a"
+    },
+    {
+      "path": "on/p128_o256_c1/run-03/client/command.txt",
+      "size_bytes": 608,
+      "sha256": "aed75ef4c4abf8f538d883eef93cc375760b912d67b3df1a56fa5688ee6edb30"
+    },
+    {
+      "path": "on/p128_o256_c1/run-03/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c1_r3/parallel_1_number_12/benchmark_args.json",
+      "size_bytes": 2146,
+      "sha256": "9926d609fa4288d9de750581981736ac95bee4210b87545c2e076784b92d8879"
+    },
+    {
+      "path": "on/p128_o256_c1/run-03/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c1_r3/parallel_1_number_12/benchmark_percentile.json",
+      "size_bytes": 2843,
+      "sha256": "0d287d1a0ecf594fa02d41ad3c6b724ce2cb71be3ab63c56870b1b320568f9ef"
+    },
+    {
+      "path": "on/p128_o256_c1/run-03/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c1_r3/parallel_1_number_12/benchmark_summary.json",
+      "size_bytes": 565,
+      "sha256": "fc8c661994c19ca7fa7530a82789219f0b19e3b31044657caad15300020d4a59"
+    },
+    {
+      "path": "on/p128_o256_c1/run-03/client/exit-code.txt",
+      "size_bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "on/p128_o256_c1/run-03/run-metadata.json",
+      "size_bytes": 393,
+      "sha256": "732a5ed1d1177293cc06f9e5a6b9f6fc1450952e6829418160b353ebc9f3ceee"
+    },
+    {
+      "path": "on/p128_o256_c1/run-03/server/after-metrics.prom",
+      "size_bytes": 13798,
+      "sha256": "51ee2160af91440e4666fecf9bcae5c5a6c6d0dd2f601644f0ecf3d1b341b7a7"
+    },
+    {
+      "path": "on/p128_o256_c1/run-03/server/after-stats.json",
+      "size_bytes": 296,
+      "sha256": "4d9367b6ec31e7691592d5af233457a9d2dfbad6078531a4f81091b63004157f"
+    },
+    {
+      "path": "on/p128_o256_c1/run-03/server/before-metrics.prom",
+      "size_bytes": 13773,
+      "sha256": "3c04b748a3a7a052ed1f6baea0f6ac1c66d1fa79be7333298d167cb6ae28a37e"
+    },
+    {
+      "path": "on/p128_o256_c1/run-03/server/before-stats.json",
+      "size_bytes": 295,
+      "sha256": "4ea1e010f8c30e01444bb3d29cf3c1df5a0c8fd4b8b4f1cc3d1a1ec2bfd5b841"
+    },
+    {
+      "path": "on/p128_o256_c4/run-01/client/command.txt",
+      "size_bytes": 608,
+      "sha256": "a3354e81ba687162c031859fb86bc6dff74aea9fc1eea88d8fe86f7ab3c706e7"
+    },
+    {
+      "path": "on/p128_o256_c4/run-01/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c4_r1/parallel_4_number_24/benchmark_args.json",
+      "size_bytes": 2146,
+      "sha256": "6edbcdda8d9d836465e208d7854068f87032517cb2259f867bd8f95957c5238f"
+    },
+    {
+      "path": "on/p128_o256_c4/run-01/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c4_r1/parallel_4_number_24/benchmark_percentile.json",
+      "size_bytes": 2864,
+      "sha256": "a30169a788db31410f077ea7dd95854c54cbeb84ecfa6b25837e3ac65c745725"
+    },
+    {
+      "path": "on/p128_o256_c4/run-01/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c4_r1/parallel_4_number_24/benchmark_summary.json",
+      "size_bytes": 568,
+      "sha256": "92f62941cb89c5b9358a50b44f8010b93c2e34803c735481d6dd1112c663420e"
+    },
+    {
+      "path": "on/p128_o256_c4/run-01/client/exit-code.txt",
+      "size_bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "on/p128_o256_c4/run-01/run-metadata.json",
+      "size_bytes": 393,
+      "sha256": "bbb9233f1dabe6817b45fa1f4d964bd9d0eac8cdd9ffd4659e36ea9b2b92094a"
+    },
+    {
+      "path": "on/p128_o256_c4/run-01/server/after-metrics.prom",
+      "size_bytes": 13785,
+      "sha256": "193f13a77319dff7eda62849a215c3501ab7ec740e311bcbee46f7804fd7f2b8"
+    },
+    {
+      "path": "on/p128_o256_c4/run-01/server/after-stats.json",
+      "size_bytes": 296,
+      "sha256": "ce6ed78f431fcf04c8021f45d863a075b44103b5abf152925ee9dde5e8ccc3ae"
+    },
+    {
+      "path": "on/p128_o256_c4/run-01/server/before-metrics.prom",
+      "size_bytes": 13786,
+      "sha256": "93e127c55ebbd0e4117bac53aabbe1cae076a0350dad06cbb67df3ef89a078f1"
+    },
+    {
+      "path": "on/p128_o256_c4/run-01/server/before-stats.json",
+      "size_bytes": 296,
+      "sha256": "4d9367b6ec31e7691592d5af233457a9d2dfbad6078531a4f81091b63004157f"
+    },
+    {
+      "path": "on/p128_o256_c4/run-02/client/command.txt",
+      "size_bytes": 608,
+      "sha256": "daf77ae8ca7adb257b8dd85f7691f62a5a036401593b9cbaa71f462312ac4726"
+    },
+    {
+      "path": "on/p128_o256_c4/run-02/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c4_r2/parallel_4_number_24/benchmark_args.json",
+      "size_bytes": 2146,
+      "sha256": "f4180a6bedf9987c9bd2d723d06cf246354de50b47f34ee9ce2452b55d5ae21c"
+    },
+    {
+      "path": "on/p128_o256_c4/run-02/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c4_r2/parallel_4_number_24/benchmark_percentile.json",
+      "size_bytes": 2862,
+      "sha256": "93080285da1d769712f43c5ef7b2d73d495e6912052a20a026a39397c073a3a9"
+    },
+    {
+      "path": "on/p128_o256_c4/run-02/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c4_r2/parallel_4_number_24/benchmark_summary.json",
+      "size_bytes": 567,
+      "sha256": "deb6cd6099cab75de1aa37b5cd9cd80744d455b6da7bc34c408d38085e69d091"
+    },
+    {
+      "path": "on/p128_o256_c4/run-02/client/exit-code.txt",
+      "size_bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "on/p128_o256_c4/run-02/run-metadata.json",
+      "size_bytes": 393,
+      "sha256": "e8da1483a4127e9c2fbcb77dc75d4b2c752843715432ed0e0dbac5b1519022ff"
+    },
+    {
+      "path": "on/p128_o256_c4/run-02/server/after-metrics.prom",
+      "size_bytes": 13803,
+      "sha256": "420c3fcc02a97cb2e412ab354ebbe5d529f9458afddc034f68b6f7c917256663"
+    },
+    {
+      "path": "on/p128_o256_c4/run-02/server/after-stats.json",
+      "size_bytes": 297,
+      "sha256": "9ae7cd047307be4367e29725f9cc5828d5943e339d04af7b8503cfba74f1cfce"
+    },
+    {
+      "path": "on/p128_o256_c4/run-02/server/before-metrics.prom",
+      "size_bytes": 13785,
+      "sha256": "f4599bc4ca9dddae20c14617a63fa073c5418fe68cec9532fec8abbe2389e9a6"
+    },
+    {
+      "path": "on/p128_o256_c4/run-02/server/before-stats.json",
+      "size_bytes": 296,
+      "sha256": "ce6ed78f431fcf04c8021f45d863a075b44103b5abf152925ee9dde5e8ccc3ae"
+    },
+    {
+      "path": "on/p128_o256_c4/run-03/client/command.txt",
+      "size_bytes": 608,
+      "sha256": "4111de8625d5523407abe058ce151e4fcf6623831ec8c44b17d03afaef89f46c"
+    },
+    {
+      "path": "on/p128_o256_c4/run-03/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c4_r3/parallel_4_number_24/benchmark_args.json",
+      "size_bytes": 2146,
+      "sha256": "03b5c6f3efc739f277279aecb129ce5a88724e2ab86aff1e68688f2f3d828ed0"
+    },
+    {
+      "path": "on/p128_o256_c4/run-03/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c4_r3/parallel_4_number_24/benchmark_percentile.json",
+      "size_bytes": 2858,
+      "sha256": "11456cf0c37e2dc259f4416c657b31b8d994e48e3b5b696cd544b22db5e4a9e6"
+    },
+    {
+      "path": "on/p128_o256_c4/run-03/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c4_r3/parallel_4_number_24/benchmark_summary.json",
+      "size_bytes": 568,
+      "sha256": "72ddf1687d476bb40280b51ddd246934e1c2ad35f8fb303eabaa1ff03fb11862"
+    },
+    {
+      "path": "on/p128_o256_c4/run-03/client/exit-code.txt",
+      "size_bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "on/p128_o256_c4/run-03/run-metadata.json",
+      "size_bytes": 393,
+      "sha256": "ca9c3b93e73fd8cf0310f4b78ffa71cafc2bded6e6783b1bafcca77017e4018b"
+    },
+    {
+      "path": "on/p128_o256_c4/run-03/server/after-metrics.prom",
+      "size_bytes": 13815,
+      "sha256": "439d1a2e4bc6e4f7748a62c8ce665cd835ec3d491d0598d1fa9fde1336ad3501"
+    },
+    {
+      "path": "on/p128_o256_c4/run-03/server/after-stats.json",
+      "size_bytes": 297,
+      "sha256": "8264d5629985853c8ec6a86553524b6cc3963e6de488d4009825d0b2ed0d45dc"
+    },
+    {
+      "path": "on/p128_o256_c4/run-03/server/before-metrics.prom",
+      "size_bytes": 13803,
+      "sha256": "740b3ad40c34e456eba9d75e14951cad4c3d493581d63ced9539be99beb6d321"
+    },
+    {
+      "path": "on/p128_o256_c4/run-03/server/before-stats.json",
+      "size_bytes": 297,
+      "sha256": "9ae7cd047307be4367e29725f9cc5828d5943e339d04af7b8503cfba74f1cfce"
+    },
+    {
+      "path": "on/p128_o256_c8/run-01/client/command.txt",
+      "size_bytes": 609,
+      "sha256": "67bb5bf106f0fd3f3baef37bcdd3158b7fba2134c362988b97f0203474c1d7dc"
+    },
+    {
+      "path": "on/p128_o256_c8/run-01/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c8_r1/parallel_8_number_48/benchmark_args.json",
+      "size_bytes": 2147,
+      "sha256": "029abe747c6802c2465942eec0712fea45db1136f17a258b1305057560c09e69"
+    },
+    {
+      "path": "on/p128_o256_c8/run-01/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c8_r1/parallel_8_number_48/benchmark_percentile.json",
+      "size_bytes": 2858,
+      "sha256": "1ff9271eb10f7c7c52adf70149c9896c2ced43f9d0b3b9b521e1ba7257dcf8c1"
+    },
+    {
+      "path": "on/p128_o256_c8/run-01/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c8_r1/parallel_8_number_48/benchmark_summary.json",
+      "size_bytes": 566,
+      "sha256": "ed43fc1227ad3ba86fcf0752aadc11dcb91882faa98c3998badf7cf59a8c2386"
+    },
+    {
+      "path": "on/p128_o256_c8/run-01/client/exit-code.txt",
+      "size_bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "on/p128_o256_c8/run-01/run-metadata.json",
+      "size_bytes": 394,
+      "sha256": "59318110e41adb107aa6e436e72e1f113ca99d9fc905050c2c9e63384d93459c"
+    },
+    {
+      "path": "on/p128_o256_c8/run-01/server/after-metrics.prom",
+      "size_bytes": 13817,
+      "sha256": "536b70d6bad513f55dc739bec43b1f8270010143012c1f16c8546366a2d91ebd"
+    },
+    {
+      "path": "on/p128_o256_c8/run-01/server/after-stats.json",
+      "size_bytes": 297,
+      "sha256": "ff2ec6d46e4fec153cc47323c315d3786360d94ce593f65cf23a9763179b8807"
+    },
+    {
+      "path": "on/p128_o256_c8/run-01/server/before-metrics.prom",
+      "size_bytes": 13803,
+      "sha256": "c940fa08463dfc0061ca130a31b1845e5639cd018889e3a2da621a04f0c032fb"
+    },
+    {
+      "path": "on/p128_o256_c8/run-01/server/before-stats.json",
+      "size_bytes": 297,
+      "sha256": "8264d5629985853c8ec6a86553524b6cc3963e6de488d4009825d0b2ed0d45dc"
+    },
+    {
+      "path": "on/p128_o256_c8/run-02/client/command.txt",
+      "size_bytes": 609,
+      "sha256": "aa06ada2582b403a74e842c13add6f98d4e9926b96b041ec6888ae658b2e6eaf"
+    },
+    {
+      "path": "on/p128_o256_c8/run-02/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c8_r2/parallel_8_number_48/benchmark_args.json",
+      "size_bytes": 2147,
+      "sha256": "395250a232ff7e1f1a86670ee0fae7287d284ba92da1514d1b15d2356a335b2e"
+    },
+    {
+      "path": "on/p128_o256_c8/run-02/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c8_r2/parallel_8_number_48/benchmark_percentile.json",
+      "size_bytes": 2857,
+      "sha256": "aaecc9ffafdf700ef32e2c4646a0b9730beb77595d9c6c3ee729ea7d9f3241f8"
+    },
+    {
+      "path": "on/p128_o256_c8/run-02/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c8_r2/parallel_8_number_48/benchmark_summary.json",
+      "size_bytes": 567,
+      "sha256": "2ccff56ba50aefcf7afb435af63a0196732f6e6d37822fdfbc5560493eb1ccc7"
+    },
+    {
+      "path": "on/p128_o256_c8/run-02/client/exit-code.txt",
+      "size_bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "on/p128_o256_c8/run-02/run-metadata.json",
+      "size_bytes": 394,
+      "sha256": "a9524fbb78a5c6311e41052b5b72098a540de78052e27182febd9cf42d504e93"
+    },
+    {
+      "path": "on/p128_o256_c8/run-02/server/after-metrics.prom",
+      "size_bytes": 13807,
+      "sha256": "84d4e59613ac0e8786cdd988d938ee23c3c07d861c64ae43283a302ada724198"
+    },
+    {
+      "path": "on/p128_o256_c8/run-02/server/after-stats.json",
+      "size_bytes": 297,
+      "sha256": "8354f3b94ea254e24adbe1c954e3fa569966ba3301ec9d7716d7b95bf87bf406"
+    },
+    {
+      "path": "on/p128_o256_c8/run-02/server/before-metrics.prom",
+      "size_bytes": 13817,
+      "sha256": "536b70d6bad513f55dc739bec43b1f8270010143012c1f16c8546366a2d91ebd"
+    },
+    {
+      "path": "on/p128_o256_c8/run-02/server/before-stats.json",
+      "size_bytes": 297,
+      "sha256": "ff2ec6d46e4fec153cc47323c315d3786360d94ce593f65cf23a9763179b8807"
+    },
+    {
+      "path": "on/p128_o256_c8/run-03/client/command.txt",
+      "size_bytes": 609,
+      "sha256": "4c73d308a79d0d70190988e0f99232b4b826bb8dff87f9cf3e016038dac4a83e"
+    },
+    {
+      "path": "on/p128_o256_c8/run-03/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c8_r3/parallel_8_number_48/benchmark_args.json",
+      "size_bytes": 2147,
+      "sha256": "7cd0f8fec12c5c1477826077dda93fdbedfa3b5f941d96c712f299ba302e6f78"
+    },
+    {
+      "path": "on/p128_o256_c8/run-03/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c8_r3/parallel_8_number_48/benchmark_percentile.json",
+      "size_bytes": 2852,
+      "sha256": "6c51eddb983a92a9ae83ac82e954fbe6424ab62692a85e6b7758fcb6ba929934"
+    },
+    {
+      "path": "on/p128_o256_c8/run-03/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c8_r3/parallel_8_number_48/benchmark_summary.json",
+      "size_bytes": 562,
+      "sha256": "e112e451a1a8fd387cfb50df8572200756be0e18468d5d1b37d750ea5583794d"
+    },
+    {
+      "path": "on/p128_o256_c8/run-03/client/exit-code.txt",
+      "size_bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "on/p128_o256_c8/run-03/run-metadata.json",
+      "size_bytes": 394,
+      "sha256": "33d3db6d0fe45724d07c873b384da9272c8545fc83e471ca6475805f76cc15d0"
+    },
+    {
+      "path": "on/p128_o256_c8/run-03/server/after-metrics.prom",
+      "size_bytes": 13806,
+      "sha256": "e7d5abef316909a6fbb28a21013d7a2106824a92ac5e265552cf0b8d093211f8"
+    },
+    {
+      "path": "on/p128_o256_c8/run-03/server/after-stats.json",
+      "size_bytes": 297,
+      "sha256": "1ba4351a986776e4e6b4d2f60b5720c46e24700d70684ddcbb112844c3d218ff"
+    },
+    {
+      "path": "on/p128_o256_c8/run-03/server/before-metrics.prom",
+      "size_bytes": 13807,
+      "sha256": "23314d0476dfd08226471d1656dd0a2ecf85ff1f85da94d350075e5dff61e51f"
+    },
+    {
+      "path": "on/p128_o256_c8/run-03/server/before-stats.json",
+      "size_bytes": 297,
+      "sha256": "8354f3b94ea254e24adbe1c954e3fa569966ba3301ec9d7716d7b95bf87bf406"
+    },
+    {
+      "path": "on/server/health.json",
+      "size_bytes": 46,
+      "sha256": "a0ca3bdbba9ad899c2e92b2ba988bc2f3fdfd64d5c866fc58291b00c9f2464a9"
+    },
+    {
+      "path": "on/server/start-command.txt",
+      "size_bytes": 340,
+      "sha256": "a4cd68656c543545daffabe4e54bcd6f3fe5ff954effd189fd99e590e3bc9f6c"
+    },
+    {
+      "path": "on/server/start-metrics.prom",
+      "size_bytes": 6840,
+      "sha256": "a2c298f7ae9f18c992061f68e6662aaa2ee5a367e35a9bc5c5b89e726348d779"
+    },
+    {
+      "path": "on/server/start-stats.json",
+      "size_bytes": 273,
+      "sha256": "8240513349a83b96aff3fac3238bfccb5734b48ff3c734b8f6769fe443c1dff4"
+    },
+    {
+      "path": "on/server/stop-metrics.prom",
+      "size_bytes": 13806,
+      "sha256": "9232277f8f753721c6471e62faf4df969343cde2b92d6dd14fb588fb26c5b47d"
+    },
+    {
+      "path": "on/server/stop-stats.json",
+      "size_bytes": 297,
+      "sha256": "1ba4351a986776e4e6b4d2f60b5720c46e24700d70684ddcbb112844c3d218ff"
+    },
+    {
+      "path": "summary.csv",
+      "size_bytes": 8760,
+      "sha256": "ecb2656098022805518ae41279675148a349349dc7c99d501be5b599d731817b"
+    }
+  ],
+  "omitted_file_count": 92,
+  "omitted_size_bytes": 22065087,
+  "omitted_files": [
+    {
+      "path": "calibration/p128_body106/calibration_p128_body106/benchmark.log",
+      "size_bytes": 6948,
+      "sha256": "76c582c13a088e0018936ad095aeaf440651f9a756ed5f97e38701e869a30e28"
+    },
+    {
+      "path": "calibration/p128_body106/calibration_p128_body106/parallel_1_number_1/benchmark_args.json",
+      "size_bytes": 2054,
+      "sha256": "8ee7886db53b8ff0938516d524ed5160f25222823da678284f68cd136bef9273"
+    },
+    {
+      "path": "calibration/p128_body106/calibration_p128_body106/parallel_1_number_1/benchmark_data.db",
+      "size_bytes": 8192,
+      "sha256": "c726afd5205989dd226edec81e345c430d8598aea7e441c5291d25f1211783f2"
+    },
+    {
+      "path": "calibration/p128_body106/calibration_p128_body106/parallel_1_number_1/benchmark_percentile.json",
+      "size_bytes": 2763,
+      "sha256": "f8a93a92a52204e6b40bfe7dbf58cef5d2f118e53640981bd7d04b53c0faf650"
+    },
+    {
+      "path": "calibration/p128_body106/calibration_p128_body106/parallel_1_number_1/benchmark_summary.json",
+      "size_bytes": 487,
+      "sha256": "126890f3c52d9d62d21b5daec37ae39c84dac8e1874bae985d969860c0248580"
+    },
+    {
+      "path": "calibration/p128_body106/calibration_p128_body106/perf_report.html",
+      "size_bytes": 160482,
+      "sha256": "f24c94fec73dd40b204c5e31fc74defe44d02e51d7cda12425e1a71de01ee437"
+    },
+    {
+      "path": "calibration/p128_body106/calibration_p128_body106/performance_summary.txt",
+      "size_bytes": 4218,
+      "sha256": "dfd7faf8f66e84b0d55384eeae6b347db128d4fb56890de8e1c20278a7843f57"
+    },
+    {
+      "path": "off/p128_o256_c1/run-01/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c1_r1/benchmark.log",
+      "size_bytes": 7496,
+      "sha256": "c915c5025ba436523dab2416b4ecfaa530d3ca5180cade568665763a708a25f0"
+    },
+    {
+      "path": "off/p128_o256_c1/run-01/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c1_r1/parallel_1_number_3/benchmark_data.db",
+      "size_bytes": 204800,
+      "sha256": "37c3a220a34df6a0e5d381f623390b6cf63c8afccdf42dabdb2c4ecd166ae1fc"
+    },
+    {
+      "path": "off/p128_o256_c1/run-01/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c1_r1/perf_report.html",
+      "size_bytes": 160925,
+      "sha256": "1a49ae0768cb1cb940e492b232fb6ba0ed4c997cfd49666a97cd0d40f1181026"
+    },
+    {
+      "path": "off/p128_o256_c1/run-01/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c1_r1/performance_summary.txt",
+      "size_bytes": 4341,
+      "sha256": "286720daaada1f21adf2e0d4f81176a9449817efa65a8caaf73dc2252643f811"
+    },
+    {
+      "path": "off/p128_o256_c1/run-01/client/stdout.log",
+      "size_bytes": 15764,
+      "sha256": "f86ce39166826ac33776214fd164bd5352bec7c11d82671c079784ff56c8315e"
+    },
+    {
+      "path": "off/p128_o256_c1/run-02/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c1_r2/benchmark.log",
+      "size_bytes": 7496,
+      "sha256": "be7b674cbcca0552a99b23311cdc4375bab060b240a0e876065b292181e56d24"
+    },
+    {
+      "path": "off/p128_o256_c1/run-02/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c1_r2/parallel_1_number_3/benchmark_data.db",
+      "size_bytes": 204800,
+      "sha256": "15af8b7651dd5d6ec67a652bab7ec966e14f6adbbd83460ada08da93d3570c48"
+    },
+    {
+      "path": "off/p128_o256_c1/run-02/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c1_r2/perf_report.html",
+      "size_bytes": 160931,
+      "sha256": "bece6b9d1ae56cafd28aa4d52a76849cc75d1b2a9761b5cc0a1569e08c847651"
+    },
+    {
+      "path": "off/p128_o256_c1/run-02/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c1_r2/performance_summary.txt",
+      "size_bytes": 4341,
+      "sha256": "9edaddb9caaf69ba72d35a3c2b453504ea5948622cba82891290964b56b6393b"
+    },
+    {
+      "path": "off/p128_o256_c1/run-02/client/stdout.log",
+      "size_bytes": 15756,
+      "sha256": "31b4bce4a728b1348199672dc0b867b05ea9b8a8c5b57f9f8eac1e8b7a0fcf7d"
+    },
+    {
+      "path": "off/p128_o256_c1/run-03/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c1_r3/benchmark.log",
+      "size_bytes": 7496,
+      "sha256": "e5c06b336d8820c729a7aeb59e03ab891649825b9762c3b2131572493d3351bc"
+    },
+    {
+      "path": "off/p128_o256_c1/run-03/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c1_r3/parallel_1_number_3/benchmark_data.db",
+      "size_bytes": 204800,
+      "sha256": "e4649e03f885da163258867c4be4909bb5ab736a349ed343e520a38c6df39399"
+    },
+    {
+      "path": "off/p128_o256_c1/run-03/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c1_r3/perf_report.html",
+      "size_bytes": 160930,
+      "sha256": "1e316c028f8721bc11b0bd3ef3596a24ca981d41da951420d0947365d8f100ea"
+    },
+    {
+      "path": "off/p128_o256_c1/run-03/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c1_r3/performance_summary.txt",
+      "size_bytes": 4341,
+      "sha256": "b9712b816583d544efed4ba1669b80d8e69a82d0c4c041eea7873c58b4c913c1"
+    },
+    {
+      "path": "off/p128_o256_c1/run-03/client/stdout.log",
+      "size_bytes": 15764,
+      "sha256": "0dff4c3588b22421440e26f86b735cda71d54a81b0f1f486e6405875b8a56358"
+    },
+    {
+      "path": "off/p128_o256_c4/run-01/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c4_r1/benchmark.log",
+      "size_bytes": 7856,
+      "sha256": "e24714d6c30a3e2961040fad512f96d3e06041f0661e58af1ec071ac8414f91d"
+    },
+    {
+      "path": "off/p128_o256_c4/run-01/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c4_r1/parallel_4_number_8/benchmark_data.db",
+      "size_bytes": 540672,
+      "sha256": "f062b943d8d5807d4f615970127274456485e0fa09f4e93217ce71e6fb54d063"
+    },
+    {
+      "path": "off/p128_o256_c4/run-01/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c4_r1/perf_report.html",
+      "size_bytes": 161570,
+      "sha256": "c4a08f1c55cd3887caf3b1659c712e19bf2bc97613ef86efc65e22696262a90f"
+    },
+    {
+      "path": "off/p128_o256_c4/run-01/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c4_r1/performance_summary.txt",
+      "size_bytes": 4341,
+      "sha256": "2657fd11ea328f603f9a7696d872f0ccd5efa31da1c6705c4d5dd8f67a33822e"
+    },
+    {
+      "path": "off/p128_o256_c4/run-01/client/stdout.log",
+      "size_bytes": 17196,
+      "sha256": "fa8244b408b8118eff43e8ff68519b5118f71e8a1f6626236e3f40b4fd75f436"
+    },
+    {
+      "path": "off/p128_o256_c4/run-02/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c4_r2/benchmark.log",
+      "size_bytes": 7856,
+      "sha256": "694ef1340d8906633eb4fbb992a42f7175470062766eba2158b455e1c2429618"
+    },
+    {
+      "path": "off/p128_o256_c4/run-02/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c4_r2/parallel_4_number_8/benchmark_data.db",
+      "size_bytes": 544768,
+      "sha256": "6c50a2ce75b7c88b966b6535adcec1c2e8511f5cefb5b8794aea857132f1d933"
+    },
+    {
+      "path": "off/p128_o256_c4/run-02/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c4_r2/perf_report.html",
+      "size_bytes": 161577,
+      "sha256": "11263256259a6ad840f2858b3de27492079c9d9023540b51cc25c6fab9d3a561"
+    },
+    {
+      "path": "off/p128_o256_c4/run-02/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c4_r2/performance_summary.txt",
+      "size_bytes": 4341,
+      "sha256": "4ff43d929bb3bcc7f20dc06a44a03969ee7c17f6cb6f038d00a680dee233e51b"
+    },
+    {
+      "path": "off/p128_o256_c4/run-02/client/stdout.log",
+      "size_bytes": 16939,
+      "sha256": "b500fe948d56d40039839d769238dd24930028d689252746a4143066f7adfcb5"
+    },
+    {
+      "path": "off/p128_o256_c4/run-03/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c4_r3/benchmark.log",
+      "size_bytes": 7856,
+      "sha256": "806efd261255e0acd0eb1904584fffc7a6ab8045dc7c53493d80d84692f11eae"
+    },
+    {
+      "path": "off/p128_o256_c4/run-03/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c4_r3/parallel_4_number_8/benchmark_data.db",
+      "size_bytes": 540672,
+      "sha256": "24c7f7c79ce89875783977d5c1a33387f84ce830ba9892bca0b40fa8a714d6f3"
+    },
+    {
+      "path": "off/p128_o256_c4/run-03/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c4_r3/perf_report.html",
+      "size_bytes": 161565,
+      "sha256": "eb917d2a39a8f963a203481ac8608c7a357202896771b7a796d45dd8891f9c4e"
+    },
+    {
+      "path": "off/p128_o256_c4/run-03/client/evalscope/20260711_qwen3_32b_tp2_fp16_off_p128_o256_c4_r3/performance_summary.txt",
+      "size_bytes": 4341,
+      "sha256": "ae5484b326cd6d550ef903283e635a1dc4feeca87e86b8d773dd310c53bbdb76"
+    },
+    {
+      "path": "off/p128_o256_c4/run-03/client/stdout.log",
+      "size_bytes": 17112,
+      "sha256": "bf1600fa7cfd481e48bb6d6f97259f2f6ca29205a47bc11c47d4601d2cb3ff81"
+    },
+    {
+      "path": "off/server/server.log",
+      "size_bytes": 7090,
+      "sha256": "0860238b3f036310fed253c44b4bbe3436f6110a5720472049095730cbfd894d"
+    },
+    {
+      "path": "off/server/server.pid",
+      "size_bytes": 6,
+      "sha256": "0b4641aad02d475d67760c6b5fb5c02e8267f2c87cb2b9c36634dddbb9f5a31f"
+    },
+    {
+      "path": "on/p128_o256_c1/run-01/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c1_r1/benchmark.log",
+      "size_bytes": 7680,
+      "sha256": "9167bf7bdc6f039a51af7370dcf0f021cd72a525361ccf69c7f18459d9afc137"
+    },
+    {
+      "path": "on/p128_o256_c1/run-01/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c1_r1/parallel_1_number_12/benchmark_data.db",
+      "size_bytes": 802816,
+      "sha256": "1573c7468ca481beca57b03e83b6ba5e3c92e91f4134df804fc3d8739f968644"
+    },
+    {
+      "path": "on/p128_o256_c1/run-01/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c1_r1/perf_report.html",
+      "size_bytes": 162050,
+      "sha256": "c057391465b6b052a53cb7711d7dac29dda1fd1fe86f33c2440d9421455482e9"
+    },
+    {
+      "path": "on/p128_o256_c1/run-01/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c1_r1/performance_summary.txt",
+      "size_bytes": 4341,
+      "sha256": "237791cc605e76cbd7d0053f6ebba8ad8be467548443fa03fadb61ced888825e"
+    },
+    {
+      "path": "on/p128_o256_c1/run-01/client/stdout.log",
+      "size_bytes": 17358,
+      "sha256": "e648fe0ee891918378aaabc8011acd46b766c7fec516a27214286d4c8b90ab2d"
+    },
+    {
+      "path": "on/p128_o256_c1/run-01-blocked-stale-queue/client/command.txt",
+      "size_bytes": 587,
+      "sha256": "b04d78a66c78aa077248a1e0402e2520a391af5df841577e3a6f72f5b22b6447"
+    },
+    {
+      "path": "on/p128_o256_c1/run-01-blocked-stale-queue/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c1_r1/benchmark.log",
+      "size_bytes": 20694,
+      "sha256": "5af1690310fc5bc46e83ff587c533b903f7a7b7fa2f08fd89a6c3cd0764066c5"
+    },
+    {
+      "path": "on/p128_o256_c1/run-01-blocked-stale-queue/client/stdout.log",
+      "size_bytes": 23682,
+      "sha256": "0d840ebfdc3230171b77938cffc602d8fff4c9446d889db2b4c43dc24fb23c25"
+    },
+    {
+      "path": "on/p128_o256_c1/run-01-blocked-stale-queue/run-metadata.json",
+      "size_bytes": 393,
+      "sha256": "7f2d94e176c9e73ceb23447b74b799bb170e1b74a5e9d42d1358edf21a3500df"
+    },
+    {
+      "path": "on/p128_o256_c1/run-01-blocked-stale-queue/server/before-metrics.prom",
+      "size_bytes": 12249,
+      "sha256": "668cbb68e46b38d10dd0bcbd6674a4bcf47b2a94575f273a757cfb2e6840cfae"
+    },
+    {
+      "path": "on/p128_o256_c1/run-01-blocked-stale-queue/server/before-stats.json",
+      "size_bytes": 290,
+      "sha256": "8752b3a60b3478d8c92f669ccfb96edc65d173fa9a3ba88f460cf15b832d44e5"
+    },
+    {
+      "path": "on/p128_o256_c1/run-02/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c1_r2/benchmark.log",
+      "size_bytes": 7680,
+      "sha256": "a7be2676c36f8e1117c32b7d6d0c451c7c35133711cdaf49e7a4b2e0f9709fd9"
+    },
+    {
+      "path": "on/p128_o256_c1/run-02/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c1_r2/parallel_1_number_12/benchmark_data.db",
+      "size_bytes": 802816,
+      "sha256": "c698c509e3984c450d884ec9a66fbb5273ea7750971cbf11b47808e1efcd42a5"
+    },
+    {
+      "path": "on/p128_o256_c1/run-02/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c1_r2/perf_report.html",
+      "size_bytes": 162030,
+      "sha256": "a9789b47c42a3ca1b2f19ff9ef4d7961d13533759193311d1014d18fd8c3ae68"
+    },
+    {
+      "path": "on/p128_o256_c1/run-02/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c1_r2/performance_summary.txt",
+      "size_bytes": 4341,
+      "sha256": "f4b9972837015477bf4f6df0f29b213abd4d7beb756106ac1e9b14686bac1f58"
+    },
+    {
+      "path": "on/p128_o256_c1/run-02/client/stdout.log",
+      "size_bytes": 17444,
+      "sha256": "2a3930d5907036908d9fa23a4a6749ddf846f94c3eea5cd2bb772f260c83d2eb"
+    },
+    {
+      "path": "on/p128_o256_c1/run-03/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c1_r3/benchmark.log",
+      "size_bytes": 7867,
+      "sha256": "9bf4ae8decab438a1691cad6a23b0ea77ca8e01041bdee7b232d1ce57f640db3"
+    },
+    {
+      "path": "on/p128_o256_c1/run-03/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c1_r3/parallel_1_number_12/benchmark_data.db",
+      "size_bytes": 770048,
+      "sha256": "01ac8cae970e4dfc018fadcb97d93c44b5d14a69bc8d341a85c1284cd3e26622"
+    },
+    {
+      "path": "on/p128_o256_c1/run-03/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c1_r3/perf_report.html",
+      "size_bytes": 162038,
+      "sha256": "53569901244756efa1210269e8764e8bdbbe5518ea60643669420cb8a4fbc0a5"
+    },
+    {
+      "path": "on/p128_o256_c1/run-03/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c1_r3/performance_summary.txt",
+      "size_bytes": 4678,
+      "sha256": "996fcfbcdf2d96e7972672600b2888e6397574c03a697e61e837eda558c9ce9d"
+    },
+    {
+      "path": "on/p128_o256_c1/run-03/client/stdout.log",
+      "size_bytes": 17972,
+      "sha256": "6ab75f8046a12f0475cb3f9e032199b4606629bfda53e9897cb770444dbd2aba"
+    },
+    {
+      "path": "on/p128_o256_c4/run-01/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c4_r1/benchmark.log",
+      "size_bytes": 8171,
+      "sha256": "d04e3422b0363cacac7303f4d775d36dc057f9cabb84a115406c5dbf249c0a3c"
+    },
+    {
+      "path": "on/p128_o256_c4/run-01/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c4_r1/parallel_4_number_24/benchmark_data.db",
+      "size_bytes": 1593344,
+      "sha256": "2db83d3f980f3b435403d6dbb5fb807ae7d75b2465217ac439aaf351b53f14a5"
+    },
+    {
+      "path": "on/p128_o256_c4/run-01/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c4_r1/perf_report.html",
+      "size_bytes": 163647,
+      "sha256": "20d9316e28cbeace9c2f88cd6d3ca8601c809a5dd05c7e79568d61d8b88791ad"
+    },
+    {
+      "path": "on/p128_o256_c4/run-01/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c4_r1/performance_summary.txt",
+      "size_bytes": 4678,
+      "sha256": "648ba8b431174e841733d3ee9573cd9346cbf81d2b8e7513b731218d53156261"
+    },
+    {
+      "path": "on/p128_o256_c4/run-01/client/stdout.log",
+      "size_bytes": 19199,
+      "sha256": "df59e88c85db81b67a5906c01e4501e8c572abe60438a21f38fd88b2eb4acd5d"
+    },
+    {
+      "path": "on/p128_o256_c4/run-02/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c4_r2/benchmark.log",
+      "size_bytes": 8171,
+      "sha256": "79a5b89bca2703a922a656eb7096f31ecc1a233566d00d1f5b0f3c1ba931f1d7"
+    },
+    {
+      "path": "on/p128_o256_c4/run-02/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c4_r2/parallel_4_number_24/benchmark_data.db",
+      "size_bytes": 1560576,
+      "sha256": "c94dc16f894366fa4852b092f9ffb2c30eea5a79f571dbf136326b0263486e18"
+    },
+    {
+      "path": "on/p128_o256_c4/run-02/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c4_r2/perf_report.html",
+      "size_bytes": 163643,
+      "sha256": "e56cc5b573e4346af328fac099ea2cd8cfd7dffc645ce02a4bb57222b316ef2a"
+    },
+    {
+      "path": "on/p128_o256_c4/run-02/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c4_r2/performance_summary.txt",
+      "size_bytes": 4678,
+      "sha256": "9bce7fb7d4fa946eb2165295407889aa3d984b4edb9426a883068542d8c52106"
+    },
+    {
+      "path": "on/p128_o256_c4/run-02/client/stdout.log",
+      "size_bytes": 19561,
+      "sha256": "a8d9022db7862387daa3551c3f7382f0d097b835b02d5f8169d8417088d45688"
+    },
+    {
+      "path": "on/p128_o256_c4/run-03/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c4_r3/benchmark.log",
+      "size_bytes": 8171,
+      "sha256": "9f37a7fa7f968c98dbcd1031be4ecd7a8ea5acd031e44502f0e40c1486c35d6f"
+    },
+    {
+      "path": "on/p128_o256_c4/run-03/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c4_r3/parallel_4_number_24/benchmark_data.db",
+      "size_bytes": 1597440,
+      "sha256": "f20d9880f069fc99c9c4c12765912a6c1a494da3507c15752db70c2d272dc2e0"
+    },
+    {
+      "path": "on/p128_o256_c4/run-03/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c4_r3/perf_report.html",
+      "size_bytes": 163627,
+      "sha256": "0d832e47c7f7b3da7e5071592c93cac8aab2c8ffa3084aaeb761bf3c8a78ddf9"
+    },
+    {
+      "path": "on/p128_o256_c4/run-03/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c4_r3/performance_summary.txt",
+      "size_bytes": 4678,
+      "sha256": "59c4859deebb53bdc73795dd70476ebd7c43159225e41526fcfa5c28729d40f7"
+    },
+    {
+      "path": "on/p128_o256_c4/run-03/client/stdout.log",
+      "size_bytes": 19192,
+      "sha256": "fcf3e930bb4e72c71a8deb08c37bb6407d73a0193cc8e1a6943a4d680dbf17f4"
+    },
+    {
+      "path": "on/p128_o256_c8/run-01/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c8_r1/benchmark.log",
+      "size_bytes": 8305,
+      "sha256": "a7f281d223ad1c03d33721ddc4195a5b7fea93bc414849cfc8aec72cdfc231cc"
+    },
+    {
+      "path": "on/p128_o256_c8/run-01/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c8_r1/parallel_8_number_48/benchmark_data.db",
+      "size_bytes": 3178496,
+      "sha256": "62cedd9b083587fda6fe5cfc487be9e5a9dcb25e50e5c1167a969afc6650f61c"
+    },
+    {
+      "path": "on/p128_o256_c8/run-01/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c8_r1/perf_report.html",
+      "size_bytes": 166744,
+      "sha256": "61009ecf137bccfa83da3828128d39fb34c7620a2925466412c787d71b7d6890"
+    },
+    {
+      "path": "on/p128_o256_c8/run-01/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c8_r1/performance_summary.txt",
+      "size_bytes": 4678,
+      "sha256": "b4251e69eae0dec861b917c1448d8c165ad37d3467486f7e0fdc45ee7ac902c2"
+    },
+    {
+      "path": "on/p128_o256_c8/run-01/client/stdout.log",
+      "size_bytes": 21066,
+      "sha256": "f52c793577849f7f759458b6f449453234d5048af0cff8a6154286106041ac47"
+    },
+    {
+      "path": "on/p128_o256_c8/run-02/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c8_r2/benchmark.log",
+      "size_bytes": 8305,
+      "sha256": "c00c37331b2064c3b999f1fb32b0493574ca06ffe12813bc1e22dfa5b5c35adf"
+    },
+    {
+      "path": "on/p128_o256_c8/run-02/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c8_r2/parallel_8_number_48/benchmark_data.db",
+      "size_bytes": 3182592,
+      "sha256": "c6af932143000843f3fe0f3c0016936f79bd98d2aa4076dbb02d4e43073c0cef"
+    },
+    {
+      "path": "on/p128_o256_c8/run-02/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c8_r2/perf_report.html",
+      "size_bytes": 166736,
+      "sha256": "df8e7a7fd8ab2ab08fb3c4cc071bcc4ba816115a00a063758b81c16089c17783"
+    },
+    {
+      "path": "on/p128_o256_c8/run-02/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c8_r2/performance_summary.txt",
+      "size_bytes": 4678,
+      "sha256": "902fd7712496714d5c04a834c359b969d6359b0d43e2cac2b06bb2289411766b"
+    },
+    {
+      "path": "on/p128_o256_c8/run-02/client/stdout.log",
+      "size_bytes": 20898,
+      "sha256": "c66e942180e2838ecd200841269bd31a882a3f6b994271eb63a3a39e8fa3b763"
+    },
+    {
+      "path": "on/p128_o256_c8/run-03/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c8_r3/benchmark.log",
+      "size_bytes": 8305,
+      "sha256": "7b4a47a0bd9d9d6bf6fb3fe14d37658f9b66c3b85a07b12d54b9273536ed9841"
+    },
+    {
+      "path": "on/p128_o256_c8/run-03/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c8_r3/parallel_8_number_48/benchmark_data.db",
+      "size_bytes": 3174400,
+      "sha256": "d08145495ab76b977aca9ebcb31d5138ff4555d5ff19a0c04f297c000cb3af3b"
+    },
+    {
+      "path": "on/p128_o256_c8/run-03/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c8_r3/perf_report.html",
+      "size_bytes": 166722,
+      "sha256": "2b08e3adf017558e322394bf8c16e38cffe8264ea6998e609cb08e1ba6f4589e"
+    },
+    {
+      "path": "on/p128_o256_c8/run-03/client/evalscope/20260711_qwen3_32b_tp2_fp16_on_p128_o256_c8_r3/performance_summary.txt",
+      "size_bytes": 4678,
+      "sha256": "35ee2566ad6099c6232879b88ee2a42cb35f8511517ecbff90c061a5f9767a0b"
+    },
+    {
+      "path": "on/p128_o256_c8/run-03/client/stdout.log",
+      "size_bytes": 20638,
+      "sha256": "9c0a54f0573c65de566edeeca268c6f2fc73009307dfe89261736b201e126522"
+    },
+    {
+      "path": "on/server/server.log",
+      "size_bytes": 9127,
+      "sha256": "d8cd9e0b14e5f5a74e101fb90938cf186a01955dff36cafb9dbcee2942d5c00e"
+    },
+    {
+      "path": "on/server/server.pid",
+      "size_bytes": 6,
+      "sha256": "1ba0b3c1c71a55a0b7cbe17c14f8bddaa72f0cfd6b265c57f7fa121d55470634"
+    }
+  ],
+  "regenerate_commands": {
+    "server_campaign": "bash benchmarks/qwen3_32b_tp2_fp16/collect_env.sh <campaign>; bash benchmarks/qwen3_32b_tp2_fp16/start_server.sh on|off <campaign>; bash benchmarks/qwen3_32b_tp2_fp16/run_case.sh <campaign> <on|off> <target_prompt> <evalscope_prompt> 256 <concurrency> <requests>",
+    "summaries": "python benchmarks/qwen3_32b_tp2_fp16/summarize.py benchmarks/results/20260711_qwen3_32b_tp2_fp16",
+    "bundle_validation": "python benchmarks/qwen3_32b_tp2_fp16/validate_bundle.py benchmarks/results/20260711_qwen3_32b_tp2_fp16"
+  }
+}

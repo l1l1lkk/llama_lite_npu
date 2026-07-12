@@ -1,0 +1,209 @@
+# HELP process_virtual_memory_bytes Virtual memory size in bytes.
+# TYPE process_virtual_memory_bytes gauge
+process_virtual_memory_bytes 9.91422806016e+012
+# HELP process_resident_memory_bytes Resident memory size in bytes.
+# TYPE process_resident_memory_bytes gauge
+process_resident_memory_bytes 1.924943872e+09
+# HELP process_start_time_seconds Start time of the process since unix epoch in seconds.
+# TYPE process_start_time_seconds gauge
+process_start_time_seconds 1.78378479949e+09
+# HELP process_cpu_seconds_total Total user and system CPU time spent in seconds.
+# TYPE process_cpu_seconds_total counter
+process_cpu_seconds_total 553.15
+# HELP process_open_fds Number of open file descriptors.
+# TYPE process_open_fds gauge
+process_open_fds 51.0
+# HELP process_max_fds Maximum number of open file descriptors.
+# TYPE process_max_fds gauge
+process_max_fds 1024.0
+# HELP python_info Python platform information
+# TYPE python_info gauge
+python_info{implementation="CPython",major="3",minor="10",patchlevel="12",version="3.10.12"} 1.0
+# HELP python_gc_objects_collected_total Objects collected during gc
+# TYPE python_gc_objects_collected_total counter
+python_gc_objects_collected_total{generation="0"} 8051.0
+python_gc_objects_collected_total{generation="1"} 1626.0
+python_gc_objects_collected_total{generation="2"} 1153.0
+# HELP python_gc_objects_uncollectable_total Uncollectable objects found during GC
+# TYPE python_gc_objects_uncollectable_total counter
+python_gc_objects_uncollectable_total{generation="0"} 0.0
+python_gc_objects_uncollectable_total{generation="1"} 0.0
+python_gc_objects_uncollectable_total{generation="2"} 0.0
+# HELP python_gc_collections_total Number of times this generation was collected
+# TYPE python_gc_collections_total counter
+python_gc_collections_total{generation="0"} 1883.0
+python_gc_collections_total{generation="1"} 166.0
+python_gc_collections_total{generation="2"} 19.0
+# HELP lite_llama_requests_total Completed inference requests.
+# TYPE lite_llama_requests_total counter
+lite_llama_requests_total{endpoint="chat",status="success"} 266.0
+# HELP lite_llama_requests_created Completed inference requests.
+# TYPE lite_llama_requests_created gauge
+lite_llama_requests_created{endpoint="chat",status="success"} 1.7837849140848083e+09
+# HELP lite_llama_request_failures_total Inference request failures by stable root-cause category.
+# TYPE lite_llama_request_failures_total counter
+# HELP lite_llama_request_latency_seconds Time from scheduler submission to terminal request state.
+# TYPE lite_llama_request_latency_seconds histogram
+lite_llama_request_latency_seconds_bucket{endpoint="chat",le="0.005"} 0.0
+lite_llama_request_latency_seconds_bucket{endpoint="chat",le="0.01"} 0.0
+lite_llama_request_latency_seconds_bucket{endpoint="chat",le="0.025"} 0.0
+lite_llama_request_latency_seconds_bucket{endpoint="chat",le="0.05"} 0.0
+lite_llama_request_latency_seconds_bucket{endpoint="chat",le="0.1"} 0.0
+lite_llama_request_latency_seconds_bucket{endpoint="chat",le="0.25"} 0.0
+lite_llama_request_latency_seconds_bucket{endpoint="chat",le="0.5"} 0.0
+lite_llama_request_latency_seconds_bucket{endpoint="chat",le="1.0"} 0.0
+lite_llama_request_latency_seconds_bucket{endpoint="chat",le="2.5"} 0.0
+lite_llama_request_latency_seconds_bucket{endpoint="chat",le="5.0"} 0.0
+lite_llama_request_latency_seconds_bucket{endpoint="chat",le="10.0"} 14.0
+lite_llama_request_latency_seconds_bucket{endpoint="chat",le="30.0"} 258.0
+lite_llama_request_latency_seconds_bucket{endpoint="chat",le="60.0"} 266.0
+lite_llama_request_latency_seconds_bucket{endpoint="chat",le="120.0"} 266.0
+lite_llama_request_latency_seconds_bucket{endpoint="chat",le="300.0"} 266.0
+lite_llama_request_latency_seconds_bucket{endpoint="chat",le="+Inf"} 266.0
+lite_llama_request_latency_seconds_count{endpoint="chat"} 266.0
+lite_llama_request_latency_seconds_sum{endpoint="chat"} 5838.775955978781
+# HELP lite_llama_request_latency_seconds_created Time from scheduler submission to terminal request state.
+# TYPE lite_llama_request_latency_seconds_created gauge
+lite_llama_request_latency_seconds_created{endpoint="chat"} 1.7837849140848641e+09
+# HELP lite_llama_queue_wait_seconds Time from scheduler submission to first admission.
+# TYPE lite_llama_queue_wait_seconds histogram
+lite_llama_queue_wait_seconds_bucket{endpoint="chat",le="0.005"} 52.0
+lite_llama_queue_wait_seconds_bucket{endpoint="chat",le="0.01"} 52.0
+lite_llama_queue_wait_seconds_bucket{endpoint="chat",le="0.025"} 52.0
+lite_llama_queue_wait_seconds_bucket{endpoint="chat",le="0.05"} 52.0
+lite_llama_queue_wait_seconds_bucket{endpoint="chat",le="0.1"} 52.0
+lite_llama_queue_wait_seconds_bucket{endpoint="chat",le="0.25"} 52.0
+lite_llama_queue_wait_seconds_bucket{endpoint="chat",le="0.5"} 52.0
+lite_llama_queue_wait_seconds_bucket{endpoint="chat",le="1.0"} 52.0
+lite_llama_queue_wait_seconds_bucket{endpoint="chat",le="2.5"} 52.0
+lite_llama_queue_wait_seconds_bucket{endpoint="chat",le="5.0"} 52.0
+lite_llama_queue_wait_seconds_bucket{endpoint="chat",le="10.0"} 130.0
+lite_llama_queue_wait_seconds_bucket{endpoint="chat",le="30.0"} 266.0
+lite_llama_queue_wait_seconds_bucket{endpoint="chat",le="60.0"} 266.0
+lite_llama_queue_wait_seconds_bucket{endpoint="chat",le="120.0"} 266.0
+lite_llama_queue_wait_seconds_bucket{endpoint="chat",le="300.0"} 266.0
+lite_llama_queue_wait_seconds_bucket{endpoint="chat",le="+Inf"} 266.0
+lite_llama_queue_wait_seconds_count{endpoint="chat"} 266.0
+lite_llama_queue_wait_seconds_sum{endpoint="chat"} 2267.2909979112446
+# HELP lite_llama_queue_wait_seconds_created Time from scheduler submission to first admission.
+# TYPE lite_llama_queue_wait_seconds_created gauge
+lite_llama_queue_wait_seconds_created{endpoint="chat"} 1.7837849017073634e+09
+# HELP lite_llama_time_to_first_token_seconds Time from scheduler submission to first sampled token.
+# TYPE lite_llama_time_to_first_token_seconds histogram
+lite_llama_time_to_first_token_seconds_bucket{endpoint="chat",le="0.005"} 0.0
+lite_llama_time_to_first_token_seconds_bucket{endpoint="chat",le="0.01"} 0.0
+lite_llama_time_to_first_token_seconds_bucket{endpoint="chat",le="0.025"} 0.0
+lite_llama_time_to_first_token_seconds_bucket{endpoint="chat",le="0.05"} 0.0
+lite_llama_time_to_first_token_seconds_bucket{endpoint="chat",le="0.1"} 0.0
+lite_llama_time_to_first_token_seconds_bucket{endpoint="chat",le="0.25"} 0.0
+lite_llama_time_to_first_token_seconds_bucket{endpoint="chat",le="0.5"} 52.0
+lite_llama_time_to_first_token_seconds_bucket{endpoint="chat",le="1.0"} 52.0
+lite_llama_time_to_first_token_seconds_bucket{endpoint="chat",le="2.5"} 52.0
+lite_llama_time_to_first_token_seconds_bucket{endpoint="chat",le="5.0"} 52.0
+lite_llama_time_to_first_token_seconds_bucket{endpoint="chat",le="10.0"} 52.0
+lite_llama_time_to_first_token_seconds_bucket{endpoint="chat",le="30.0"} 266.0
+lite_llama_time_to_first_token_seconds_bucket{endpoint="chat",le="60.0"} 266.0
+lite_llama_time_to_first_token_seconds_bucket{endpoint="chat",le="120.0"} 266.0
+lite_llama_time_to_first_token_seconds_bucket{endpoint="chat",le="300.0"} 266.0
+lite_llama_time_to_first_token_seconds_bucket{endpoint="chat",le="+Inf"} 266.0
+lite_llama_time_to_first_token_seconds_count{endpoint="chat"} 266.0
+lite_llama_time_to_first_token_seconds_sum{endpoint="chat"} 2645.2072678226978
+# HELP lite_llama_time_to_first_token_seconds_created Time from scheduler submission to first sampled token.
+# TYPE lite_llama_time_to_first_token_seconds_created gauge
+lite_llama_time_to_first_token_seconds_created{endpoint="chat"} 1.7837849021292036e+09
+# HELP lite_llama_inter_token_latency_seconds Time between consecutive sampled tokens.
+# TYPE lite_llama_inter_token_latency_seconds histogram
+lite_llama_inter_token_latency_seconds_bucket{endpoint="chat",le="0.001"} 0.0
+lite_llama_inter_token_latency_seconds_bucket{endpoint="chat",le="0.0025"} 0.0
+lite_llama_inter_token_latency_seconds_bucket{endpoint="chat",le="0.005"} 0.0
+lite_llama_inter_token_latency_seconds_bucket{endpoint="chat",le="0.01"} 0.0
+lite_llama_inter_token_latency_seconds_bucket{endpoint="chat",le="0.025"} 0.0
+lite_llama_inter_token_latency_seconds_bucket{endpoint="chat",le="0.05"} 38997.0
+lite_llama_inter_token_latency_seconds_bucket{endpoint="chat",le="0.1"} 67331.0
+lite_llama_inter_token_latency_seconds_bucket{endpoint="chat",le="0.25"} 67331.0
+lite_llama_inter_token_latency_seconds_bucket{endpoint="chat",le="0.5"} 67331.0
+lite_llama_inter_token_latency_seconds_bucket{endpoint="chat",le="1.0"} 67331.0
+lite_llama_inter_token_latency_seconds_bucket{endpoint="chat",le="2.5"} 67350.0
+lite_llama_inter_token_latency_seconds_bucket{endpoint="chat",le="5.0"} 67357.0
+lite_llama_inter_token_latency_seconds_bucket{endpoint="chat",le="10.0"} 67357.0
+lite_llama_inter_token_latency_seconds_bucket{endpoint="chat",le="+Inf"} 67357.0
+lite_llama_inter_token_latency_seconds_count{endpoint="chat"} 67357.0
+lite_llama_inter_token_latency_seconds_sum{endpoint="chat"} 3192.8315998651087
+# HELP lite_llama_inter_token_latency_seconds_created Time between consecutive sampled tokens.
+# TYPE lite_llama_inter_token_latency_seconds_created gauge
+lite_llama_inter_token_latency_seconds_created{endpoint="chat"} 1.7837849032816174e+09
+# HELP lite_llama_prompt_tokens_total Prompt tokens accepted by the scheduler.
+# TYPE lite_llama_prompt_tokens_total counter
+lite_llama_prompt_tokens_total{endpoint="chat"} 34043.0
+# HELP lite_llama_prompt_tokens_created Prompt tokens accepted by the scheduler.
+# TYPE lite_llama_prompt_tokens_created gauge
+lite_llama_prompt_tokens_created{endpoint="chat"} 1.7837849017067237e+09
+# HELP lite_llama_generated_tokens_total Tokens sampled by the inference engine.
+# TYPE lite_llama_generated_tokens_total counter
+lite_llama_generated_tokens_total{endpoint="chat"} 67623.0
+# HELP lite_llama_generated_tokens_created Tokens sampled by the inference engine.
+# TYPE lite_llama_generated_tokens_created gauge
+lite_llama_generated_tokens_created{endpoint="chat"} 1.7837849021291533e+09
+# HELP lite_llama_waiting_requests Requests waiting for scheduler admission.
+# TYPE lite_llama_waiting_requests gauge
+lite_llama_waiting_requests 0.0
+# HELP lite_llama_prefilling_requests Requests currently in Chunked Prefill.
+# TYPE lite_llama_prefilling_requests gauge
+lite_llama_prefilling_requests 0.0
+# HELP lite_llama_running_requests Requests currently active in Decode.
+# TYPE lite_llama_running_requests gauge
+lite_llama_running_requests 0.0
+# HELP lite_llama_preemptions_total Requests preempted because of KV pressure.
+# TYPE lite_llama_preemptions_total counter
+lite_llama_preemptions_total 0.0
+# HELP lite_llama_preemptions_created Requests preempted because of KV pressure.
+# TYPE lite_llama_preemptions_created gauge
+lite_llama_preemptions_created 1.783784809926582e+09
+# HELP lite_llama_kv_pages_used Allocated Paged KV cache pages.
+# TYPE lite_llama_kv_pages_used gauge
+lite_llama_kv_pages_used 2114.0
+# HELP lite_llama_kv_pages_free Free Paged KV cache pages.
+# TYPE lite_llama_kv_pages_free gauge
+lite_llama_kv_pages_free 9020.0
+# HELP lite_llama_graph_capture_attempts_total NPU Graph capture attempts.
+# TYPE lite_llama_graph_capture_attempts_total counter
+lite_llama_graph_capture_attempts_total 8.0
+# HELP lite_llama_graph_capture_attempts_created NPU Graph capture attempts.
+# TYPE lite_llama_graph_capture_attempts_created gauge
+lite_llama_graph_capture_attempts_created 1.7837848099266238e+09
+# HELP lite_llama_graph_captures_total Successful NPU Graph captures.
+# TYPE lite_llama_graph_captures_total counter
+lite_llama_graph_captures_total 8.0
+# HELP lite_llama_graph_captures_created Successful NPU Graph captures.
+# TYPE lite_llama_graph_captures_created gauge
+lite_llama_graph_captures_created 1.7837848099266367e+09
+# HELP lite_llama_graph_replays_total Successful NPU Graph replays.
+# TYPE lite_llama_graph_replays_total counter
+lite_llama_graph_replays_total 30983.0
+# HELP lite_llama_graph_replays_created Successful NPU Graph replays.
+# TYPE lite_llama_graph_replays_created gauge
+lite_llama_graph_replays_created 1.7837848099266498e+09
+# HELP lite_llama_graph_fallbacks_total NPU Graph calls that fell back to eager execution.
+# TYPE lite_llama_graph_fallbacks_total counter
+lite_llama_graph_fallbacks_total 0.0
+# HELP lite_llama_graph_fallbacks_created NPU Graph calls that fell back to eager execution.
+# TYPE lite_llama_graph_fallbacks_created gauge
+lite_llama_graph_fallbacks_created 1.7837848099266634e+09
+# HELP lite_llama_sampling_candidate_rows_total Rows sampled through the vocabulary-parallel candidate path.
+# TYPE lite_llama_sampling_candidate_rows_total counter
+lite_llama_sampling_candidate_rows_total 0.0
+# HELP lite_llama_sampling_candidate_rows_created Rows sampled through the vocabulary-parallel candidate path.
+# TYPE lite_llama_sampling_candidate_rows_created gauge
+lite_llama_sampling_candidate_rows_created 1.7837848099266763e+09
+# HELP lite_llama_sampling_fallback_rows_total Rows that fell back to full-logit gather for exact sampling.
+# TYPE lite_llama_sampling_fallback_rows_total counter
+lite_llama_sampling_fallback_rows_total 0.0
+# HELP lite_llama_sampling_fallback_rows_created Rows that fell back to full-logit gather for exact sampling.
+# TYPE lite_llama_sampling_fallback_rows_created gauge
+lite_llama_sampling_fallback_rows_created 1.7837848099266899e+09
+# HELP lite_llama_sampling_full_logit_gather_batches_total Batches that required a full vocabulary gather during sampling.
+# TYPE lite_llama_sampling_full_logit_gather_batches_total counter
+lite_llama_sampling_full_logit_gather_batches_total 0.0
+# HELP lite_llama_sampling_full_logit_gather_batches_created Batches that required a full vocabulary gather during sampling.
+# TYPE lite_llama_sampling_full_logit_gather_batches_created gauge
+lite_llama_sampling_full_logit_gather_batches_created 1.7837848099268372e+09
