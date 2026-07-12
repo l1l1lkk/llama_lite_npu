@@ -36,9 +36,20 @@ for REP in $RUN_REPETITIONS; do
   CACHE_STATE=${CACHE_STATE_OVERRIDE:-kv-cache-cold-unique-offset}
   SEPARATE_WARMUP=${SEPARATE_WARMUP:-0}
   PAIR_ID="${CASE_ID}_r${REP}"
+  DATASET_KIND=${DATASET_KIND:-random}
+  FORMAL_DATASET_PATH=${FORMAL_DATASET_PATH:-}
+  WARMUP_DATASET_PATH=${WARMUP_DATASET_PATH:-$FORMAL_DATASET_PATH}
+  FORMAL_DATASET_SHA256=""
+  WARMUP_DATASET_SHA256=""
+  if [[ -n "$FORMAL_DATASET_PATH" ]]; then
+    FORMAL_DATASET_SHA256=$(sha256sum "$FORMAL_DATASET_PATH" | awk '{print $1}')
+  fi
+  if [[ -n "$WARMUP_DATASET_PATH" ]]; then
+    WARMUP_DATASET_SHA256=$(sha256sum "$WARMUP_DATASET_PATH" | awk '{print $1}')
+  fi
 
   cat > "$RUN_ROOT/run-metadata.json" <<EOF
-{"run_id":"$RUN_ID","pair_id":"$PAIR_ID","campaign":"$CAMPAIGN","graph":"$GRAPH_MODE","target_server_input_tokens":$TARGET_PROMPT,"evalscope_prompt_tokens":$EVALSCOPE_PROMPT,"min_tokens":$OUTPUT_TOKENS,"output_tokens":$OUTPUT_TOKENS,"concurrency":$CONCURRENCY,"requests":$REQUESTS,"warmup_requests":$WARMUP,"warmup_dataset_offset":$WARMUP_OFFSET,"separate_warmup":$SEPARATE_WARMUP,"seed":$SEED,"dataset_offset":$OFFSET,"temperature":0.0,"top_p":1.0,"sampling":"greedy","evalscope_version":"$EVALSCOPE_VERSION","strict_workload":true,"cache_state":"$CACHE_STATE","metric_boundary":"formal server metrics exclude the separately recorded warmup"}
+{"run_id":"$RUN_ID","pair_id":"$PAIR_ID","campaign":"$CAMPAIGN","graph":"$GRAPH_MODE","target_server_input_tokens":$TARGET_PROMPT,"evalscope_prompt_tokens":$EVALSCOPE_PROMPT,"min_tokens":$OUTPUT_TOKENS,"output_tokens":$OUTPUT_TOKENS,"concurrency":$CONCURRENCY,"requests":$REQUESTS,"warmup_requests":$WARMUP,"warmup_dataset_offset":$WARMUP_OFFSET,"separate_warmup":$SEPARATE_WARMUP,"dataset_kind":"$DATASET_KIND","formal_dataset_path":"$FORMAL_DATASET_PATH","formal_dataset_sha256":"$FORMAL_DATASET_SHA256","warmup_dataset_path":"$WARMUP_DATASET_PATH","warmup_dataset_sha256":"$WARMUP_DATASET_SHA256","seed":$SEED,"dataset_offset":$OFFSET,"temperature":0.0,"top_p":1.0,"sampling":"greedy","evalscope_version":"$EVALSCOPE_VERSION","strict_workload":true,"cache_state":"$CACHE_STATE","metric_boundary":"formal server metrics exclude the separately recorded warmup"}
 EOF
 
   FORMAL_WARMUP=$WARMUP
@@ -53,7 +64,7 @@ EOF
       --api openai
       --model "$MODEL_NAME"
       --tokenizer-path "$MODEL_DIR"
-      --dataset random
+      --dataset "$DATASET_KIND"
       --number "$WARMUP"
       --parallel "$CONCURRENCY"
       --warmup-num 0
@@ -72,6 +83,9 @@ EOF
       --no-timestamp
       --name "${RUN_ID}_warmup"
     )
+    if [[ -n "$WARMUP_DATASET_PATH" ]]; then
+      WARMUP_COMMAND+=(--dataset-path "$WARMUP_DATASET_PATH")
+    fi
     printf '%q ' "${WARMUP_COMMAND[@]}" > "$WARMUP_ROOT/command.txt"
     printf '\n' >> "$WARMUP_ROOT/command.txt"
     set +e
@@ -104,7 +118,7 @@ EOF
     --api openai
     --model "$MODEL_NAME"
     --tokenizer-path "$MODEL_DIR"
-    --dataset random
+    --dataset "$DATASET_KIND"
     --number "$REQUESTS"
     --parallel "$CONCURRENCY"
     --warmup-num "$FORMAL_WARMUP"
@@ -123,6 +137,9 @@ EOF
     --no-timestamp
     --name "$RUN_ID"
   )
+  if [[ -n "$FORMAL_DATASET_PATH" ]]; then
+    COMMAND+=(--dataset-path "$FORMAL_DATASET_PATH")
+  fi
   printf '%q ' "${COMMAND[@]}" > "$CLIENT_ROOT/command.txt"
   printf '\n' >> "$CLIENT_ROOT/command.txt"
   set +e
