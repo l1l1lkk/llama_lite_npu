@@ -14,3 +14,7 @@
 
 - [`min_tokens` 固定输出长度机制与严格 workload 验证](20260712_min_tokens_fixed_output.md)
 - [`Git-tracked strict workload bundle`](../../benchmarks/results/20260712_qwen3_32b_tp2_fp16_min_tokens/)
+
+任务2 NPU Graph 严格消融：
+- [`Qwen3-32B TP=2 FP16 NPU Graph 严格消融`](20260712_qwen3_32b_tp2_fp16_graph_ablation.md)
+- [`Git-tracked Graph ablation bundle`](../../benchmarks/results/20260712_qwen3_32b_tp2_fp16_graph_ablation/)

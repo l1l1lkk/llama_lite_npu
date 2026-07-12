@@ -106,6 +106,9 @@ def main() -> int:
             selected.add(Path(name))
     for name in ENVIRONMENT_FILES:
         selected.add(Path("environment") / name)
+    for workload_path in sorted((source / "workload").glob("*")):
+        if workload_path.is_file():
+            selected.add(workload_path.relative_to(source))
     for graph in ("on", "off"):
         for name in LIFECYCLE_FILES:
             candidate = Path(graph) / "server" / name

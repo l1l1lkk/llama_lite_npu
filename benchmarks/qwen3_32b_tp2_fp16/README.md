@@ -87,6 +87,13 @@ data unless a profiler artifact exists.
 
 Every accepted campaign has two explicitly separated artifact layers.
 
+For paired Graph ablation, freeze each input sequence as a line-by-line JSONL
+dataset and retain it under `workload/` in the bundle. The same concurrency pair
+must have identical formal/warmup dataset SHA256 values, EvalScope arguments,
+request counts, seed and offsets. Because concurrent responses can complete in
+a different order, observed request fingerprints are compared as an exact
+token-sequence multiset; the frozen JSONL SHA proves original input order.
+
 The Git-tracked reproducibility bundle is the durable source for published
 numbers and ships with the project:
 
@@ -94,6 +101,7 @@ numbers and ships with the project:
 benchmarks/results/<campaign>/
   campaign-manifest.json
   environment/**
+  workload/**
   <graph-mode>/server/{start-command.txt,start/stop metrics and stats,...}
   <graph-mode>/<case>/run-XX/
     run-metadata.json

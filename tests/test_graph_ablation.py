@@ -104,6 +104,7 @@ class GraphAblationScriptContractTest(unittest.TestCase):
             "graph-comparison.csv",
             "pre-warmup-stats.json",
             "workload-fingerprint.json",
+            'source / "workload"',
         ):
             self.assertIn(evidence, source)
 
