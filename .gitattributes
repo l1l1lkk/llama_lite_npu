@@ -1,0 +1,2 @@
+# Reproducibility manifests hash exact artifact bytes across platforms.
+benchmarks/results/** -text
