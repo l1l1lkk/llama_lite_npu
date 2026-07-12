@@ -1,2 +1,2 @@
 # Reproducibility manifests hash exact artifact bytes across platforms.
-benchmarks/results/** -text
+benchmarks/results/** -text whitespace=cr-at-eol
