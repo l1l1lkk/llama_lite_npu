@@ -12,7 +12,12 @@ from pathlib import Path
 
 
 ROOT_FILES = ("summary.csv", "aggregate.csv")
-OPTIONAL_ROOT_FILES = ("strict-validation.json",)
+OPTIONAL_ROOT_FILES = (
+    "strict-validation.json",
+    "paired-ratios.csv",
+    "graph-comparison.csv",
+    "pair-validation.json",
+)
 ENVIRONMENT_FILES = (
     "ascend-env.txt",
     "baseline.env",
@@ -38,6 +43,14 @@ RUN_DIRECT_FILES = (
     "server/after-metrics.prom",
     "server/before-stats.json",
     "server/after-stats.json",
+)
+OPTIONAL_RUN_DIRECT_FILES = (
+    "client/workload-fingerprint.json",
+    "client/warmup/command.txt",
+    "client/warmup/exit-code.txt",
+    "client/warmup/workload-fingerprint.json",
+    "server/pre-warmup-metrics.prom",
+    "server/pre-warmup-stats.json",
 )
 EVALSCOPE_FILES = (
     "benchmark_args.json",
@@ -111,12 +124,33 @@ def main() -> int:
         relative_run = run_root.relative_to(source)
         for name in RUN_DIRECT_FILES:
             selected.add(relative_run / name)
+        for name in OPTIONAL_RUN_DIRECT_FILES:
+            candidate = relative_run / name
+            if (source / candidate).is_file():
+                selected.add(candidate)
         evalscope_root = summaries[0].parent
         for name in EVALSCOPE_FILES:
             candidate = evalscope_root / name
             if not candidate.is_file():
                 raise FileNotFoundError(candidate)
             selected.add(candidate.relative_to(source))
+        warmup_summaries = list(
+            (run_root / "client" / "warmup" / "evalscope").glob(
+                "**/benchmark_summary.json"
+            )
+        )
+        if (run_root / "client" / "warmup").is_dir():
+            if len(warmup_summaries) != 1:
+                raise RuntimeError(
+                    f"{run_root}: expected one warmup summary, "
+                    f"found {len(warmup_summaries)}"
+                )
+            warmup_evalscope_root = warmup_summaries[0].parent
+            for name in EVALSCOPE_FILES:
+                candidate = warmup_evalscope_root / name
+                if not candidate.is_file():
+                    raise FileNotFoundError(candidate)
+                selected.add(candidate.relative_to(source))
 
     for relative in sorted(selected):
         copy_relative(source, output, relative)
@@ -160,6 +194,10 @@ def main() -> int:
             ),
             "strict_workload": (
                 "python benchmarks/qwen3_32b_tp2_fp16/validate_strict_workload.py "
+                f"benchmarks/results/{source.name} --compare"
+            ),
+            "graph_comparison": (
+                "python benchmarks/qwen3_32b_tp2_fp16/compare_graph.py "
                 f"benchmarks/results/{source.name} --compare"
             ),
             "bundle_validation": (

@@ -42,6 +42,12 @@ def validate_run(metadata_path: Path, campaign: Path) -> dict[str, object]:
     target_output = int(metadata["output_tokens"])
     input_values = [row.get("Input tokens") for row in percentiles]
     output_values = [row.get("Output tokens") for row in percentiles]
+    fingerprint_path = run_root / "client" / "workload-fingerprint.json"
+    fingerprint = (
+        json.loads(fingerprint_path.read_text(encoding="utf-8"))
+        if fingerprint_path.is_file()
+        else None
+    )
     checks = {
         "exit_code_zero": exit_code == 0,
         "zero_failed_requests": summary.get("Failed Requests") == 0,
@@ -68,7 +74,22 @@ def validate_run(metadata_path: Path, campaign: Path) -> dict[str, object]:
             and all(exact(value, target_output) for value in output_values)
         ),
     }
-    return {
+    if fingerprint is not None:
+        checks["request_level_fingerprint_valid"] = (
+            fingerprint.get("request_count") == metadata.get("requests")
+            and all(
+                len(request.get("prompt_token_ids", [])) == target_input
+                and request.get("prompt_tokens") == target_input
+                and request.get("completion_tokens") == target_output
+                and request.get("success") == 1
+                for request in fingerprint.get("requests", [])
+            )
+        )
+    if metadata.get("separate_warmup"):
+        checks["formal_evalscope_warmup_zero_when_separate"] = exact(
+            benchmark_args.get("warmup_num"), 0
+        )
+    result = {
         "run_id": metadata["run_id"],
         "graph": metadata["graph"],
         "concurrency": metadata["concurrency"],
@@ -83,6 +104,11 @@ def validate_run(metadata_path: Path, campaign: Path) -> dict[str, object]:
         "raw_percentile": percentile_path.relative_to(campaign).as_posix(),
         "raw_args": args_path.relative_to(campaign).as_posix(),
     }
+    if fingerprint is not None:
+        result["prompt_sequence_sha256"] = fingerprint.get(
+            "prompt_sequence_sha256"
+        )
+    return result
 
 
 def build_report(campaign: Path) -> dict[str, object]:

@@ -30,14 +30,72 @@ for REP in $RUN_REPETITIONS; do
   DEFAULT_OFFSET=$(( TARGET_PROMPT * 100000 + CONCURRENCY * 1000 + REP * REQUESTS ))
   OFFSET=${DATASET_OFFSET_OVERRIDE:-$DEFAULT_OFFSET}
   WARMUP=$(( CONCURRENCY * WARMUP_REQUESTS_PER_WORKER ))
+  WARMUP_OFFSET=$(( OFFSET + 700000000 ))
   EVALSCOPE_VERSION=$(python -c 'from importlib.metadata import version; print(version("evalscope"))')
   CACHE_STATE=${CACHE_STATE_OVERRIDE:-kv-cache-cold-unique-offset}
+  SEPARATE_WARMUP=${SEPARATE_WARMUP:-0}
+  PAIR_ID="${CASE_ID}_r${REP}"
 
-  curl -fsS "$SERVER_URL/metrics" > "$SERVER_ROOT/before-metrics.prom"
-  curl -fsS "$SERVER_URL/debug/stats" > "$SERVER_ROOT/before-stats.json"
   cat > "$RUN_ROOT/run-metadata.json" <<EOF
-{"run_id":"$RUN_ID","campaign":"$CAMPAIGN","graph":"$GRAPH_MODE","target_server_input_tokens":$TARGET_PROMPT,"evalscope_prompt_tokens":$EVALSCOPE_PROMPT,"min_tokens":$OUTPUT_TOKENS,"output_tokens":$OUTPUT_TOKENS,"concurrency":$CONCURRENCY,"requests":$REQUESTS,"warmup_requests":$WARMUP,"seed":$SEED,"dataset_offset":$OFFSET,"temperature":0.0,"top_p":1.0,"sampling":"greedy","evalscope_version":"$EVALSCOPE_VERSION","strict_workload":true,"cache_state":"$CACHE_STATE","metric_boundary":"client and server snapshots stored separately"}
+{"run_id":"$RUN_ID","pair_id":"$PAIR_ID","campaign":"$CAMPAIGN","graph":"$GRAPH_MODE","target_server_input_tokens":$TARGET_PROMPT,"evalscope_prompt_tokens":$EVALSCOPE_PROMPT,"min_tokens":$OUTPUT_TOKENS,"output_tokens":$OUTPUT_TOKENS,"concurrency":$CONCURRENCY,"requests":$REQUESTS,"warmup_requests":$WARMUP,"warmup_dataset_offset":$WARMUP_OFFSET,"separate_warmup":$SEPARATE_WARMUP,"seed":$SEED,"dataset_offset":$OFFSET,"temperature":0.0,"top_p":1.0,"sampling":"greedy","evalscope_version":"$EVALSCOPE_VERSION","strict_workload":true,"cache_state":"$CACHE_STATE","metric_boundary":"formal server metrics exclude the separately recorded warmup"}
 EOF
+
+  FORMAL_WARMUP=$WARMUP
+  if (( SEPARATE_WARMUP == 1 )); then
+    WARMUP_ROOT="$CLIENT_ROOT/warmup"
+    mkdir -p "$WARMUP_ROOT"
+    curl -fsS "$SERVER_URL/metrics" > "$SERVER_ROOT/pre-warmup-metrics.prom"
+    curl -fsS "$SERVER_URL/debug/stats" > "$SERVER_ROOT/pre-warmup-stats.json"
+    WARMUP_COMMAND=(
+      evalscope perf
+      --url "$SERVER_URL/v1/chat/completions"
+      --api openai
+      --model "$MODEL_NAME"
+      --tokenizer-path "$MODEL_DIR"
+      --dataset random
+      --number "$WARMUP"
+      --parallel "$CONCURRENCY"
+      --warmup-num 0
+      --min-prompt-length "$EVALSCOPE_PROMPT"
+      --max-prompt-length "$EVALSCOPE_PROMPT"
+      --min-tokens "$OUTPUT_TOKENS"
+      --max-tokens "$OUTPUT_TOKENS"
+      --temperature 0
+      --top-p 1
+      --seed "$SEED"
+      --dataset-offset "$WARMUP_OFFSET"
+      --stream
+      --no-test-connection
+      --total-timeout 21600
+      --outputs-dir "$WARMUP_ROOT/evalscope"
+      --no-timestamp
+      --name "${RUN_ID}_warmup"
+    )
+    printf '%q ' "${WARMUP_COMMAND[@]}" > "$WARMUP_ROOT/command.txt"
+    printf '\n' >> "$WARMUP_ROOT/command.txt"
+    set +e
+    "${WARMUP_COMMAND[@]}" > "$WARMUP_ROOT/stdout.log" 2>&1
+    WARMUP_STATUS=$?
+    set -e
+    echo "$WARMUP_STATUS" > "$WARMUP_ROOT/exit-code.txt"
+    curl -fsS "$SERVER_URL/metrics" > "$SERVER_ROOT/before-metrics.prom" || true
+    curl -fsS "$SERVER_URL/debug/stats" > "$SERVER_ROOT/before-stats.json" || true
+    (( WARMUP_STATUS == 0 )) || {
+      echo "$RUN_ID warmup failed with exit code $WARMUP_STATUS" >&2
+      exit "$WARMUP_STATUS"
+    }
+    python "$ROOT/benchmarks/qwen3_32b_tp2_fp16/extract_workload_fingerprint.py" \
+      "$WARMUP_ROOT/evalscope" \
+      --tokenizer-path "$MODEL_DIR" \
+      --repo-root "$ROOT" \
+      --expected-prompt-tokens "$TARGET_PROMPT" \
+      --expected-completion-tokens "$OUTPUT_TOKENS" \
+      --output "$WARMUP_ROOT/workload-fingerprint.json"
+    FORMAL_WARMUP=0
+  else
+    curl -fsS "$SERVER_URL/metrics" > "$SERVER_ROOT/before-metrics.prom"
+    curl -fsS "$SERVER_URL/debug/stats" > "$SERVER_ROOT/before-stats.json"
+  fi
 
   COMMAND=(
     evalscope perf
@@ -48,7 +106,7 @@ EOF
     --dataset random
     --number "$REQUESTS"
     --parallel "$CONCURRENCY"
-    --warmup-num "$WARMUP"
+    --warmup-num "$FORMAL_WARMUP"
     --min-prompt-length "$EVALSCOPE_PROMPT"
     --max-prompt-length "$EVALSCOPE_PROMPT"
     --min-tokens "$OUTPUT_TOKENS"
@@ -74,4 +132,11 @@ EOF
   curl -fsS "$SERVER_URL/debug/stats" > "$SERVER_ROOT/after-stats.json" || true
   echo "$STATUS" > "$CLIENT_ROOT/exit-code.txt"
   (( STATUS == 0 )) || { echo "$RUN_ID failed with exit code $STATUS" >&2; exit "$STATUS"; }
+  python "$ROOT/benchmarks/qwen3_32b_tp2_fp16/extract_workload_fingerprint.py" \
+    "$CLIENT_ROOT/evalscope" \
+    --tokenizer-path "$MODEL_DIR" \
+    --repo-root "$ROOT" \
+    --expected-prompt-tokens "$TARGET_PROMPT" \
+    --expected-completion-tokens "$OUTPUT_TOKENS" \
+    --output "$CLIENT_ROOT/workload-fingerprint.json"
 done

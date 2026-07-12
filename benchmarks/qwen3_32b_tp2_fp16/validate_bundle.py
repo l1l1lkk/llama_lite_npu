@@ -66,6 +66,12 @@ def main() -> int:
         copied = Path(temp) / bundle.name
         shutil.copytree(bundle, copied)
         subprocess.run([sys.executable, str(script), str(copied)], check=True)
+        if (copied / "pair-validation.json").is_file():
+            compare_script = Path(__file__).with_name("compare_graph.py").resolve()
+            subprocess.run(
+                [sys.executable, str(compare_script), str(copied), "--compare"],
+                check=True,
+            )
         rebuilt_summary = rows(copied / "summary.csv")
         rebuilt_aggregate = rows(copied / "aggregate.csv")
     if not equivalent(expected_summary, rebuilt_summary):
