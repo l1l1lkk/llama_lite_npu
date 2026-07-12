@@ -67,6 +67,7 @@ class GraphAblationScriptContractTest(unittest.TestCase):
     def test_run_script_separates_warmup_from_formal_metrics(self):
         source = (BENCHMARK / "run_case.sh").read_text(encoding="utf-8")
         self.assertIn("SEPARATE_WARMUP", source)
+        self.assertIn("WARMUP_DATASET_OFFSET_OVERRIDE", source)
         self.assertIn("pre-warmup-stats.json", source)
         self.assertIn("FORMAL_WARMUP=0", source)
         self.assertIn("workload-fingerprint.json", source)
