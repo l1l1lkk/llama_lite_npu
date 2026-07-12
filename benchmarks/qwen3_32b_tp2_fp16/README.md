@@ -38,6 +38,14 @@ chat template adds tokens. A run is valid only when the EvalScope summary
 shows the expected average input and output lengths (or a documented deviation
 with request-level evidence), all requests succeed, and greedy settings match.
 
+Fixed-output campaigns set both `--min-tokens` and `--max-tokens`. The server
+masks EOS logits independently for each batch row until its `min_tokens`
+threshold; a table-only average is not sufficient evidence. Run
+`validate_strict_workload.py` to check the summary plus every reported input
+and output token percentile, request counts, exit codes and greedy arguments.
+Rejected calibration attempts remain server-only and are indexed by the
+campaign manifest rather than mixed into formal aggregates.
+
 Cache vocabulary:
 
 - `kv-cache-cold`: unique prompt token sequences/offsets with no reusable exact
@@ -142,6 +150,8 @@ python benchmarks/qwen3_32b_tp2_fp16/build_bundle.py \
 # Must pass without access to benchmark-results/ or the server.
 python benchmarks/qwen3_32b_tp2_fp16/validate_bundle.py \
   "benchmarks/results/$CAMPAIGN"
+python benchmarks/qwen3_32b_tp2_fp16/validate_strict_workload.py \
+  "benchmarks/results/$CAMPAIGN" --compare
 ```
 
 Graph off is a separate server lifecycle using `start_server.sh off`; never

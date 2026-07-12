@@ -86,10 +86,11 @@ def validate_run(metadata_path: Path, campaign: Path) -> dict[str, object]:
 
 
 def build_report(campaign: Path) -> dict[str, object]:
-    runs = [
-        validate_run(path, campaign)
-        for path in sorted(campaign.glob("**/run-metadata.json"))
-    ]
+    metadata_paths = sorted([
+        *campaign.glob("on/p*/run-*/run-metadata.json"),
+        *campaign.glob("off/p*/run-*/run-metadata.json"),
+    ])
+    runs = [validate_run(path, campaign) for path in metadata_paths]
     if not runs:
         raise ValueError(f"no runs found under {campaign}")
     cases: dict[str, dict[str, object]] = {}

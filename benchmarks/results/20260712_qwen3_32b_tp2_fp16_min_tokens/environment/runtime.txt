@@ -1,0 +1,59 @@
+2026-07-12T15:11:46+08:00
+Linux bms-ubuntu13 5.15.0-25-generic #25-Ubuntu SMP Wed Mar 30 15:57:31 UTC 2022 aarch64 aarch64 aarch64 GNU/Linux
+Python 3.10.12
+evalscope 1.7.1
+Name: torch
+Version: 2.7.1
+Summary: Tensors and Dynamic neural networks in Python with strong GPU acceleration
+Home-page: https://pytorch.org/
+Author: PyTorch Team
+Author-email: packages@pytorch.org
+License: BSD-3-Clause
+Location: /usr/local/lib/python3.10/dist-packages
+Requires: filelock, fsspec, jinja2, networkx, sympy, typing-extensions
+Required-by: accelerate, torch_npu, torchvision
+---
+Name: torch_npu
+Version: 2.7.1
+Summary: NPU bridge for PyTorch
+Home-page: https://gitcode.com/ascend/pytorch
+Author: 
+Author-email: 
+License: BSD License
+Location: /usr/local/lib/python3.10/dist-packages
+Requires: torch
+Required-by: 
+---
+Name: triton-ascend
+Version: 3.2.0
+Summary: A language and compiler for custom Deep Learning operations on Ascend hardwares
+Home-page: https://gitcode.com/Ascend/triton-ascend/
+Author: 
+Author-email: 
+License: 
+Location: /usr/local/lib/python3.10/dist-packages
+Requires: 
+Required-by: 
+---
+Name: evalscope
+Version: 1.7.1
+Summary: EvalScope: Lightweight LLMs Evaluation Framework
+Home-page: https://github.com/modelscope/evalscope
+Author: ModelScope team
+Author-email: contact@modelscope.cn
+License-Expression: Apache-2.0
+Location: /usr/local/lib/python3.10/dist-packages
+Requires: colorlog, docstring_parser, dotenv, editdistance, jieba, jinja2, jsonlines, jsonschema, latex2sympy2_extended, litellm, Markdown, modelscope, more_itertools, nltk, openai, overrides, pandas, pillow, plotly, pydantic, pylatexenc, pyyaml, requests, rich, rouge-chinese, rouge-score, sacrebleu, sympy, tabulate, tqdm, transformers, word2number, zhconv
+Required-by: 
+Version=26.0.rc1
+ascendhal_version=7.35.23
+aicpu_version=1.0
+tdt_version=1.0
+log_version=1.0
+prof_version=2.0
+dvppkernels_version=1.1
+tsfw_version=1.0
+Innerversion=V100R001C10SPC001B260
+compatible_version=[V100R001C21],[V100R001C22],[V100R001C23],[V100R001C25],[V100R001C10]
+compatible_version_fw=[7.0.0,9.9.9]
+package_version=26.0.rc1

@@ -40,13 +40,22 @@ def nested_delta(before: Path, after: Path, section: str, key: str) -> float | N
     )
 
 
+def stable_float(value: float) -> float:
+    """Remove irrelevant last-bit differences across CPU architectures."""
+    return round(float(value), 12)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("campaign_dir", type=Path)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     rows = []
-    for metadata_path in sorted(args.campaign_dir.glob("**/run-metadata.json")):
+    metadata_paths = sorted([
+        *args.campaign_dir.glob("on/p*/run-*/run-metadata.json"),
+        *args.campaign_dir.glob("off/p*/run-*/run-metadata.json"),
+    ])
+    for metadata_path in metadata_paths:
         run_root = metadata_path.parent
         summaries = list((run_root / "client" / "evalscope").glob("**/benchmark_summary.json"))
         if len(summaries) != 1:
@@ -153,8 +162,14 @@ def main() -> int:
         }
         for name in metric_names:
             values = [float(r[name]) for r in group if r[name] is not None]
-            aggregate[name + "_mean"] = statistics.mean(values) if values else None
-            aggregate[name + "_stdev"] = statistics.stdev(values) if len(values) > 1 else 0.0 if values else None
+            aggregate[name + "_mean"] = (
+                stable_float(statistics.mean(values)) if values else None
+            )
+            aggregate[name + "_stdev"] = (
+                stable_float(statistics.stdev(values))
+                if len(values) > 1
+                else 0.0 if values else None
+            )
         aggregates.append(aggregate)
     aggregate_path = output.with_name("aggregate.csv")
     with aggregate_path.open("w", newline="", encoding="utf-8") as handle:

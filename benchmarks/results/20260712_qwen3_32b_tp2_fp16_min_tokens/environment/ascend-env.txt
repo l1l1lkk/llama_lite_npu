@@ -1,0 +1,4 @@
+ASCEND_AICPU_PATH=/usr/local/Ascend/cann-8.5.0
+ASCEND_HOME_PATH=/usr/local/Ascend/cann-8.5.0
+ASCEND_OPP_PATH=/usr/local/Ascend/cann-8.5.0/opp
+ASCEND_TOOLKIT_HOME=/usr/local/Ascend/cann-8.5.0

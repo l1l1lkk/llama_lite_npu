@@ -20,20 +20,23 @@ CASE_ROOT="$ROOT/benchmark-results/$CAMPAIGN/$GRAPH_MODE/$CASE_ID"
 mkdir -p "$CASE_ROOT"
 curl -fsS "$SERVER_URL/health" >/dev/null
 
-for REP in $(seq 1 "$FORMAL_REPEATS"); do
+RUN_REPETITIONS=${RUN_REPETITIONS:-$(seq 1 "$FORMAL_REPEATS")}
+for REP in $RUN_REPETITIONS; do
   RUN_ID="${CAMPAIGN}_${GRAPH_MODE}_${CASE_ID}_r${REP}"
   RUN_ROOT="$CASE_ROOT/run-$(printf '%02d' "$REP")"
   CLIENT_ROOT="$RUN_ROOT/client"
   SERVER_ROOT="$RUN_ROOT/server"
   mkdir -p "$CLIENT_ROOT" "$SERVER_ROOT"
-  OFFSET=$(( TARGET_PROMPT * 100000 + CONCURRENCY * 1000 + REP * REQUESTS ))
+  DEFAULT_OFFSET=$(( TARGET_PROMPT * 100000 + CONCURRENCY * 1000 + REP * REQUESTS ))
+  OFFSET=${DATASET_OFFSET_OVERRIDE:-$DEFAULT_OFFSET}
   WARMUP=$(( CONCURRENCY * WARMUP_REQUESTS_PER_WORKER ))
   EVALSCOPE_VERSION=$(python -c 'from importlib.metadata import version; print(version("evalscope"))')
+  CACHE_STATE=${CACHE_STATE_OVERRIDE:-kv-cache-cold-unique-offset}
 
   curl -fsS "$SERVER_URL/metrics" > "$SERVER_ROOT/before-metrics.prom"
   curl -fsS "$SERVER_URL/debug/stats" > "$SERVER_ROOT/before-stats.json"
   cat > "$RUN_ROOT/run-metadata.json" <<EOF
-{"run_id":"$RUN_ID","campaign":"$CAMPAIGN","graph":"$GRAPH_MODE","target_server_input_tokens":$TARGET_PROMPT,"evalscope_prompt_tokens":$EVALSCOPE_PROMPT,"min_tokens":$OUTPUT_TOKENS,"output_tokens":$OUTPUT_TOKENS,"concurrency":$CONCURRENCY,"requests":$REQUESTS,"warmup_requests":$WARMUP,"seed":$SEED,"dataset_offset":$OFFSET,"temperature":0.0,"top_p":1.0,"sampling":"greedy","evalscope_version":"$EVALSCOPE_VERSION","strict_workload":true,"cache_state":"kv-cache-cold-unique-offset","metric_boundary":"client and server snapshots stored separately"}
+{"run_id":"$RUN_ID","campaign":"$CAMPAIGN","graph":"$GRAPH_MODE","target_server_input_tokens":$TARGET_PROMPT,"evalscope_prompt_tokens":$EVALSCOPE_PROMPT,"min_tokens":$OUTPUT_TOKENS,"output_tokens":$OUTPUT_TOKENS,"concurrency":$CONCURRENCY,"requests":$REQUESTS,"warmup_requests":$WARMUP,"seed":$SEED,"dataset_offset":$OFFSET,"temperature":0.0,"top_p":1.0,"sampling":"greedy","evalscope_version":"$EVALSCOPE_VERSION","strict_workload":true,"cache_state":"$CACHE_STATE","metric_boundary":"client and server snapshots stored separately"}
 EOF
 
   COMMAND=(

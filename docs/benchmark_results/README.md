@@ -9,3 +9,8 @@
 - [`20260711_qwen3_32b_tp2_fp16.md`](20260711_qwen3_32b_tp2_fp16.md)
 - [`20260711_qwen3_32b_tp2_fp16_aggregate.csv`](20260711_qwen3_32b_tp2_fp16_aggregate.csv)
 - [`Git-tracked reproducibility bundle`](../../benchmarks/results/20260711_qwen3_32b_tp2_fp16/)
+
+任务1固定输出长度验证：
+
+- [`min_tokens` 固定输出长度机制与严格 workload 验证](20260712_min_tokens_fixed_output.md)
+- [`Git-tracked strict workload bundle`](../../benchmarks/results/20260712_qwen3_32b_tp2_fp16_min_tokens/)
