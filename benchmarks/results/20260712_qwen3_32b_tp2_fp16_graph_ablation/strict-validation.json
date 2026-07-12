@@ -1,0 +1,358 @@
+{
+  "schema_version": 1,
+  "campaign_id": "20260712_qwen3_32b_tp2_fp16_graph_ablation",
+  "status": "pass",
+  "formal_run_count": 12,
+  "cases": {
+    "off:c1": {
+      "runs": 3,
+      "passed": 3,
+      "run_ids": [
+        "20260712_qwen3_32b_tp2_fp16_graph_ablation_off_p128_o256_c1_r1",
+        "20260712_qwen3_32b_tp2_fp16_graph_ablation_off_p128_o256_c1_r2",
+        "20260712_qwen3_32b_tp2_fp16_graph_ablation_off_p128_o256_c1_r3"
+      ]
+    },
+    "off:c4": {
+      "runs": 3,
+      "passed": 3,
+      "run_ids": [
+        "20260712_qwen3_32b_tp2_fp16_graph_ablation_off_p128_o256_c4_r1",
+        "20260712_qwen3_32b_tp2_fp16_graph_ablation_off_p128_o256_c4_r2",
+        "20260712_qwen3_32b_tp2_fp16_graph_ablation_off_p128_o256_c4_r3"
+      ]
+    },
+    "on:c1": {
+      "runs": 3,
+      "passed": 3,
+      "run_ids": [
+        "20260712_qwen3_32b_tp2_fp16_graph_ablation_on_p128_o256_c1_r1",
+        "20260712_qwen3_32b_tp2_fp16_graph_ablation_on_p128_o256_c1_r2",
+        "20260712_qwen3_32b_tp2_fp16_graph_ablation_on_p128_o256_c1_r3"
+      ]
+    },
+    "on:c4": {
+      "runs": 3,
+      "passed": 3,
+      "run_ids": [
+        "20260712_qwen3_32b_tp2_fp16_graph_ablation_on_p128_o256_c4_r1",
+        "20260712_qwen3_32b_tp2_fp16_graph_ablation_on_p128_o256_c4_r2",
+        "20260712_qwen3_32b_tp2_fp16_graph_ablation_on_p128_o256_c4_r3"
+      ]
+    }
+  },
+  "runs": [
+    {
+      "run_id": "20260712_qwen3_32b_tp2_fp16_graph_ablation_off_p128_o256_c1_r1",
+      "graph": "off",
+      "concurrency": 1,
+      "requests": 6,
+      "seed": 42,
+      "dataset_offset": 12801006,
+      "target_input_tokens": 128,
+      "target_output_tokens": 256,
+      "checks": {
+        "exit_code_zero": true,
+        "zero_failed_requests": true,
+        "all_requests_succeeded": true,
+        "args_fixed_output": true,
+        "args_greedy": true,
+        "strict_input_length": true,
+        "strict_output_length": true,
+        "request_level_fingerprint_valid": true,
+        "formal_evalscope_warmup_zero_when_separate": true
+      },
+      "status": "pass",
+      "raw_summary": "off/p128_o256_c1/run-01/client/evalscope/benchmark_summary.json",
+      "raw_percentile": "off/p128_o256_c1/run-01/client/evalscope/benchmark_percentile.json",
+      "raw_args": "off/p128_o256_c1/run-01/client/evalscope/benchmark_args.json",
+      "prompt_sequence_sha256": "407959149a41e5e0b8a0130303178e8f2503141f73656e7f6ec882ae541fe68b"
+    },
+    {
+      "run_id": "20260712_qwen3_32b_tp2_fp16_graph_ablation_off_p128_o256_c1_r2",
+      "graph": "off",
+      "concurrency": 1,
+      "requests": 6,
+      "seed": 42,
+      "dataset_offset": 12801012,
+      "target_input_tokens": 128,
+      "target_output_tokens": 256,
+      "checks": {
+        "exit_code_zero": true,
+        "zero_failed_requests": true,
+        "all_requests_succeeded": true,
+        "args_fixed_output": true,
+        "args_greedy": true,
+        "strict_input_length": true,
+        "strict_output_length": true,
+        "request_level_fingerprint_valid": true,
+        "formal_evalscope_warmup_zero_when_separate": true
+      },
+      "status": "pass",
+      "raw_summary": "off/p128_o256_c1/run-02/client/evalscope/benchmark_summary.json",
+      "raw_percentile": "off/p128_o256_c1/run-02/client/evalscope/benchmark_percentile.json",
+      "raw_args": "off/p128_o256_c1/run-02/client/evalscope/benchmark_args.json",
+      "prompt_sequence_sha256": "6fb682552ef973c832dc81697e381ee75ca6b33a96fd3478f99a8a2a3c56af18"
+    },
+    {
+      "run_id": "20260712_qwen3_32b_tp2_fp16_graph_ablation_off_p128_o256_c1_r3",
+      "graph": "off",
+      "concurrency": 1,
+      "requests": 6,
+      "seed": 42,
+      "dataset_offset": 12801024,
+      "target_input_tokens": 128,
+      "target_output_tokens": 256,
+      "checks": {
+        "exit_code_zero": true,
+        "zero_failed_requests": true,
+        "all_requests_succeeded": true,
+        "args_fixed_output": true,
+        "args_greedy": true,
+        "strict_input_length": true,
+        "strict_output_length": true,
+        "request_level_fingerprint_valid": true,
+        "formal_evalscope_warmup_zero_when_separate": true
+      },
+      "status": "pass",
+      "raw_summary": "off/p128_o256_c1/run-03/client/evalscope/benchmark_summary.json",
+      "raw_percentile": "off/p128_o256_c1/run-03/client/evalscope/benchmark_percentile.json",
+      "raw_args": "off/p128_o256_c1/run-03/client/evalscope/benchmark_args.json",
+      "prompt_sequence_sha256": "8c426133dad573f5aa8460e60c097464af3d9def8ee817fb2905c33a83231911"
+    },
+    {
+      "run_id": "20260712_qwen3_32b_tp2_fp16_graph_ablation_off_p128_o256_c4_r1",
+      "graph": "off",
+      "concurrency": 4,
+      "requests": 8,
+      "seed": 42,
+      "dataset_offset": 12804008,
+      "target_input_tokens": 128,
+      "target_output_tokens": 256,
+      "checks": {
+        "exit_code_zero": true,
+        "zero_failed_requests": true,
+        "all_requests_succeeded": true,
+        "args_fixed_output": true,
+        "args_greedy": true,
+        "strict_input_length": true,
+        "strict_output_length": true,
+        "request_level_fingerprint_valid": true,
+        "formal_evalscope_warmup_zero_when_separate": true
+      },
+      "status": "pass",
+      "raw_summary": "off/p128_o256_c4/run-01/client/evalscope/benchmark_summary.json",
+      "raw_percentile": "off/p128_o256_c4/run-01/client/evalscope/benchmark_percentile.json",
+      "raw_args": "off/p128_o256_c4/run-01/client/evalscope/benchmark_args.json",
+      "prompt_sequence_sha256": "e8d6d76d43a74ff5934bd5cfcfa569f26828a070dab65b005560f1dfdd7f3bd3"
+    },
+    {
+      "run_id": "20260712_qwen3_32b_tp2_fp16_graph_ablation_off_p128_o256_c4_r2",
+      "graph": "off",
+      "concurrency": 4,
+      "requests": 8,
+      "seed": 42,
+      "dataset_offset": 12804016,
+      "target_input_tokens": 128,
+      "target_output_tokens": 256,
+      "checks": {
+        "exit_code_zero": true,
+        "zero_failed_requests": true,
+        "all_requests_succeeded": true,
+        "args_fixed_output": true,
+        "args_greedy": true,
+        "strict_input_length": true,
+        "strict_output_length": true,
+        "request_level_fingerprint_valid": true,
+        "formal_evalscope_warmup_zero_when_separate": true
+      },
+      "status": "pass",
+      "raw_summary": "off/p128_o256_c4/run-02/client/evalscope/benchmark_summary.json",
+      "raw_percentile": "off/p128_o256_c4/run-02/client/evalscope/benchmark_percentile.json",
+      "raw_args": "off/p128_o256_c4/run-02/client/evalscope/benchmark_args.json",
+      "prompt_sequence_sha256": "32e6f7552364a9106fab8d9edfcd83dc67bb43cb16258062120869a9efa028fa"
+    },
+    {
+      "run_id": "20260712_qwen3_32b_tp2_fp16_graph_ablation_off_p128_o256_c4_r3",
+      "graph": "off",
+      "concurrency": 4,
+      "requests": 8,
+      "seed": 42,
+      "dataset_offset": 12804032,
+      "target_input_tokens": 128,
+      "target_output_tokens": 256,
+      "checks": {
+        "exit_code_zero": true,
+        "zero_failed_requests": true,
+        "all_requests_succeeded": true,
+        "args_fixed_output": true,
+        "args_greedy": true,
+        "strict_input_length": true,
+        "strict_output_length": true,
+        "request_level_fingerprint_valid": true,
+        "formal_evalscope_warmup_zero_when_separate": true
+      },
+      "status": "pass",
+      "raw_summary": "off/p128_o256_c4/run-03/client/evalscope/benchmark_summary.json",
+      "raw_percentile": "off/p128_o256_c4/run-03/client/evalscope/benchmark_percentile.json",
+      "raw_args": "off/p128_o256_c4/run-03/client/evalscope/benchmark_args.json",
+      "prompt_sequence_sha256": "c78b2af5b17ad20d1e1532d60a702b70517038e0054ed03bb1c24295c6d57f26"
+    },
+    {
+      "run_id": "20260712_qwen3_32b_tp2_fp16_graph_ablation_on_p128_o256_c1_r1",
+      "graph": "on",
+      "concurrency": 1,
+      "requests": 6,
+      "seed": 42,
+      "dataset_offset": 12801006,
+      "target_input_tokens": 128,
+      "target_output_tokens": 256,
+      "checks": {
+        "exit_code_zero": true,
+        "zero_failed_requests": true,
+        "all_requests_succeeded": true,
+        "args_fixed_output": true,
+        "args_greedy": true,
+        "strict_input_length": true,
+        "strict_output_length": true,
+        "request_level_fingerprint_valid": true,
+        "formal_evalscope_warmup_zero_when_separate": true
+      },
+      "status": "pass",
+      "raw_summary": "on/p128_o256_c1/run-01/client/evalscope/benchmark_summary.json",
+      "raw_percentile": "on/p128_o256_c1/run-01/client/evalscope/benchmark_percentile.json",
+      "raw_args": "on/p128_o256_c1/run-01/client/evalscope/benchmark_args.json",
+      "prompt_sequence_sha256": "407959149a41e5e0b8a0130303178e8f2503141f73656e7f6ec882ae541fe68b"
+    },
+    {
+      "run_id": "20260712_qwen3_32b_tp2_fp16_graph_ablation_on_p128_o256_c1_r2",
+      "graph": "on",
+      "concurrency": 1,
+      "requests": 6,
+      "seed": 42,
+      "dataset_offset": 12801012,
+      "target_input_tokens": 128,
+      "target_output_tokens": 256,
+      "checks": {
+        "exit_code_zero": true,
+        "zero_failed_requests": true,
+        "all_requests_succeeded": true,
+        "args_fixed_output": true,
+        "args_greedy": true,
+        "strict_input_length": true,
+        "strict_output_length": true,
+        "request_level_fingerprint_valid": true,
+        "formal_evalscope_warmup_zero_when_separate": true
+      },
+      "status": "pass",
+      "raw_summary": "on/p128_o256_c1/run-02/client/evalscope/benchmark_summary.json",
+      "raw_percentile": "on/p128_o256_c1/run-02/client/evalscope/benchmark_percentile.json",
+      "raw_args": "on/p128_o256_c1/run-02/client/evalscope/benchmark_args.json",
+      "prompt_sequence_sha256": "6fb682552ef973c832dc81697e381ee75ca6b33a96fd3478f99a8a2a3c56af18"
+    },
+    {
+      "run_id": "20260712_qwen3_32b_tp2_fp16_graph_ablation_on_p128_o256_c1_r3",
+      "graph": "on",
+      "concurrency": 1,
+      "requests": 6,
+      "seed": 42,
+      "dataset_offset": 12801024,
+      "target_input_tokens": 128,
+      "target_output_tokens": 256,
+      "checks": {
+        "exit_code_zero": true,
+        "zero_failed_requests": true,
+        "all_requests_succeeded": true,
+        "args_fixed_output": true,
+        "args_greedy": true,
+        "strict_input_length": true,
+        "strict_output_length": true,
+        "request_level_fingerprint_valid": true,
+        "formal_evalscope_warmup_zero_when_separate": true
+      },
+      "status": "pass",
+      "raw_summary": "on/p128_o256_c1/run-03/client/evalscope/benchmark_summary.json",
+      "raw_percentile": "on/p128_o256_c1/run-03/client/evalscope/benchmark_percentile.json",
+      "raw_args": "on/p128_o256_c1/run-03/client/evalscope/benchmark_args.json",
+      "prompt_sequence_sha256": "8c426133dad573f5aa8460e60c097464af3d9def8ee817fb2905c33a83231911"
+    },
+    {
+      "run_id": "20260712_qwen3_32b_tp2_fp16_graph_ablation_on_p128_o256_c4_r1",
+      "graph": "on",
+      "concurrency": 4,
+      "requests": 8,
+      "seed": 42,
+      "dataset_offset": 12804008,
+      "target_input_tokens": 128,
+      "target_output_tokens": 256,
+      "checks": {
+        "exit_code_zero": true,
+        "zero_failed_requests": true,
+        "all_requests_succeeded": true,
+        "args_fixed_output": true,
+        "args_greedy": true,
+        "strict_input_length": true,
+        "strict_output_length": true,
+        "request_level_fingerprint_valid": true,
+        "formal_evalscope_warmup_zero_when_separate": true
+      },
+      "status": "pass",
+      "raw_summary": "on/p128_o256_c4/run-01/client/evalscope/benchmark_summary.json",
+      "raw_percentile": "on/p128_o256_c4/run-01/client/evalscope/benchmark_percentile.json",
+      "raw_args": "on/p128_o256_c4/run-01/client/evalscope/benchmark_args.json",
+      "prompt_sequence_sha256": "279df53b2b78a6a9ceb38901fa3e194239cd3f1bbd7ace62014f75fead0e924f"
+    },
+    {
+      "run_id": "20260712_qwen3_32b_tp2_fp16_graph_ablation_on_p128_o256_c4_r2",
+      "graph": "on",
+      "concurrency": 4,
+      "requests": 8,
+      "seed": 42,
+      "dataset_offset": 12804016,
+      "target_input_tokens": 128,
+      "target_output_tokens": 256,
+      "checks": {
+        "exit_code_zero": true,
+        "zero_failed_requests": true,
+        "all_requests_succeeded": true,
+        "args_fixed_output": true,
+        "args_greedy": true,
+        "strict_input_length": true,
+        "strict_output_length": true,
+        "request_level_fingerprint_valid": true,
+        "formal_evalscope_warmup_zero_when_separate": true
+      },
+      "status": "pass",
+      "raw_summary": "on/p128_o256_c4/run-02/client/evalscope/benchmark_summary.json",
+      "raw_percentile": "on/p128_o256_c4/run-02/client/evalscope/benchmark_percentile.json",
+      "raw_args": "on/p128_o256_c4/run-02/client/evalscope/benchmark_args.json",
+      "prompt_sequence_sha256": "c58ba6ba59387873540996ad78b390b5797704443dd317daa340b97dd93efdf1"
+    },
+    {
+      "run_id": "20260712_qwen3_32b_tp2_fp16_graph_ablation_on_p128_o256_c4_r3",
+      "graph": "on",
+      "concurrency": 4,
+      "requests": 8,
+      "seed": 42,
+      "dataset_offset": 12804032,
+      "target_input_tokens": 128,
+      "target_output_tokens": 256,
+      "checks": {
+        "exit_code_zero": true,
+        "zero_failed_requests": true,
+        "all_requests_succeeded": true,
+        "args_fixed_output": true,
+        "args_greedy": true,
+        "strict_input_length": true,
+        "strict_output_length": true,
+        "request_level_fingerprint_valid": true,
+        "formal_evalscope_warmup_zero_when_separate": true
+      },
+      "status": "pass",
+      "raw_summary": "on/p128_o256_c4/run-03/client/evalscope/benchmark_summary.json",
+      "raw_percentile": "on/p128_o256_c4/run-03/client/evalscope/benchmark_percentile.json",
+      "raw_args": "on/p128_o256_c4/run-03/client/evalscope/benchmark_args.json",
+      "prompt_sequence_sha256": "80d2a35691ee45f0d4d7a43d2a1c4102e6869688034040620f7f7a734175e9e0"
+    }
+  ]
+}

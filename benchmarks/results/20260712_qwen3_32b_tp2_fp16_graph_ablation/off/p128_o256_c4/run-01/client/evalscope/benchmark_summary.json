@@ -1,0 +1,18 @@
+{
+    "Test Duration (s)": 206.0176,
+    "Concurrency": 4,
+    "Request Rate (req/s)": -1.0,
+    "Total Requests": 8,
+    "Success Requests": 8,
+    "Failed Requests": 0,
+    "Req Throughput (req/s)": 0.0388,
+    "Avg Latency (s)": 96.4129,
+    "Avg Input Tokens": 128.0,
+    "Output Throughput (tok/s)": 9.9409,
+    "Total Throughput (tok/s)": 14.9113,
+    "TTFT (ms)": 45232.75,
+    "TPOT (ms)": 200.71,
+    "ITL (ms)": 199.92,
+    "Avg Output Tokens": 256.0,
+    "Input Throughput (tok/s)": 0.0
+}

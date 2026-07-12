@@ -1,0 +1,382 @@
+{
+  "schema_version": 1,
+  "status": "pass",
+  "campaign_id": "20260712_qwen3_32b_tp2_fp16_graph_ablation",
+  "pair_count": 6,
+  "normalized_server_command": "ASCEND_RT_VISIBLE_DEVICES=6\\,7 python -m torch.distributed.run --nproc_per_node=2 --master_addr=127.0.0.1 --master_port=29613 server.py --checkpoints_dir /data/liuke/llama_lite_npu/my_weight/Qwen3-32B --host 0.0.0.0 --port 8213 --max_seq_len 4096 --page_size 16 <GRAPH_FLAG> --continuous_batching --max_batch_size 32 --decode_priority",
+  "server_commands_equal_except_graph_flag": true,
+  "pairs": [
+    {
+      "pair_id": "p128_o256_c1_r1",
+      "checks": {
+        "metadata_fields_equal": true,
+        "evalscope_args_equal": true,
+        "formal_prompt_multiset_equal": true,
+        "warmup_prompt_multiset_equal": true,
+        "formal_prompt_multiset_hash_equal": true,
+        "warmup_prompt_multiset_hash_equal": true,
+        "graph_on_captured_before_formal": true,
+        "graph_on_no_formal_capture": true,
+        "graph_on_no_fallback": true,
+        "graph_off_all_zero": true
+      },
+      "formal_args_sha256": "eb39175a301717b1d13f8664d2c932551e56fe84679161c9b967913a78a2a4a9",
+      "formal_dataset_sequence_sha256": "5e5b28edcf617cf1dfe4dbdc1d08371b33cf695835a70dd19dc0b60addf8f6d7",
+      "warmup_dataset_sequence_sha256": "243b275f48e0b67d9db150525a888ef43b7d757d2cf8a6ad5bc3e4e366d55249",
+      "formal_observed_prompt_multiset_sha256": "eb579dd28457e38d605dc422766f0e3b0a109625bd37e9349f6e50cf9c1bfc11",
+      "warmup_observed_prompt_multiset_sha256": "540e3d42f18479fa2929d0ead344a615a7c731a7443aca1d3111393b36bf31ea",
+      "graph_evidence": {
+        "off": {
+          "pre_warmup": {
+            "capture_attempts": 0,
+            "captures": 0,
+            "replays": 0,
+            "fallbacks": 0
+          },
+          "before_formal": {
+            "capture_attempts": 0,
+            "captures": 0,
+            "replays": 0,
+            "fallbacks": 0
+          },
+          "after_formal": {
+            "capture_attempts": 0,
+            "captures": 0,
+            "replays": 0,
+            "fallbacks": 0
+          }
+        },
+        "on": {
+          "pre_warmup": {
+            "capture_attempts": 0,
+            "captures": 0,
+            "replays": 0,
+            "fallbacks": 0
+          },
+          "before_formal": {
+            "capture_attempts": 2,
+            "captures": 2,
+            "replays": 510,
+            "fallbacks": 0
+          },
+          "after_formal": {
+            "capture_attempts": 2,
+            "captures": 2,
+            "replays": 2040,
+            "fallbacks": 0
+          }
+        }
+      }
+    },
+    {
+      "pair_id": "p128_o256_c1_r2",
+      "checks": {
+        "metadata_fields_equal": true,
+        "evalscope_args_equal": true,
+        "formal_prompt_multiset_equal": true,
+        "warmup_prompt_multiset_equal": true,
+        "formal_prompt_multiset_hash_equal": true,
+        "warmup_prompt_multiset_hash_equal": true,
+        "graph_on_captured_before_formal": true,
+        "graph_on_no_formal_capture": true,
+        "graph_on_no_fallback": true,
+        "graph_off_all_zero": true
+      },
+      "formal_args_sha256": "dd4ec8946e47585c1a851a52f9ed545226785d0d35604fff62044b825bbe2fd3",
+      "formal_dataset_sequence_sha256": "96f920cd947ccb4b55f01b239c6ee5c402d027d4dff801290e886c2db5d11bc0",
+      "warmup_dataset_sequence_sha256": "233af70986c05e06f9affdd2058fd80bc87a4a0b6e79dbe16e3c77bd9e6705ba",
+      "formal_observed_prompt_multiset_sha256": "5043d03164b489501a9c3995a4c18684e412922e2a21d2c40c23007b7901ba8a",
+      "warmup_observed_prompt_multiset_sha256": "fa8475e0c96f82e3d2eb5609fc71cd2ceaf0f84fff98b62ebac65a00a343d1c9",
+      "graph_evidence": {
+        "off": {
+          "pre_warmup": {
+            "capture_attempts": 0,
+            "captures": 0,
+            "replays": 0,
+            "fallbacks": 0
+          },
+          "before_formal": {
+            "capture_attempts": 0,
+            "captures": 0,
+            "replays": 0,
+            "fallbacks": 0
+          },
+          "after_formal": {
+            "capture_attempts": 0,
+            "captures": 0,
+            "replays": 0,
+            "fallbacks": 0
+          }
+        },
+        "on": {
+          "pre_warmup": {
+            "capture_attempts": 2,
+            "captures": 2,
+            "replays": 2040,
+            "fallbacks": 0
+          },
+          "before_formal": {
+            "capture_attempts": 2,
+            "captures": 2,
+            "replays": 2550,
+            "fallbacks": 0
+          },
+          "after_formal": {
+            "capture_attempts": 2,
+            "captures": 2,
+            "replays": 4080,
+            "fallbacks": 0
+          }
+        }
+      }
+    },
+    {
+      "pair_id": "p128_o256_c1_r3",
+      "checks": {
+        "metadata_fields_equal": true,
+        "evalscope_args_equal": true,
+        "formal_prompt_multiset_equal": true,
+        "warmup_prompt_multiset_equal": true,
+        "formal_prompt_multiset_hash_equal": true,
+        "warmup_prompt_multiset_hash_equal": true,
+        "graph_on_captured_before_formal": true,
+        "graph_on_no_formal_capture": true,
+        "graph_on_no_fallback": true,
+        "graph_off_all_zero": true
+      },
+      "formal_args_sha256": "0350f2291ab84fda8f203b5ead722ead35b05d87c7e0c42431395e3e23210eeb",
+      "formal_dataset_sequence_sha256": "628d488da76d2bc898cffbba7f2be38dddd442874bf0a512a9f6e80ba5c5750e",
+      "warmup_dataset_sequence_sha256": "f32ef55706e2b83fef457dbeb9c8f839e9d44d415c882cb3d06876b741151cc9",
+      "formal_observed_prompt_multiset_sha256": "3ae9a5c792313b6b4ce2e726df8c515cd3ac1b25e90ca8640fec903c945d0ab4",
+      "warmup_observed_prompt_multiset_sha256": "afe8bd17e6ac0cb12a6dc0cc0aa16c70638e0f10d5f05cde79709e32206b6133",
+      "graph_evidence": {
+        "off": {
+          "pre_warmup": {
+            "capture_attempts": 0,
+            "captures": 0,
+            "replays": 0,
+            "fallbacks": 0
+          },
+          "before_formal": {
+            "capture_attempts": 0,
+            "captures": 0,
+            "replays": 0,
+            "fallbacks": 0
+          },
+          "after_formal": {
+            "capture_attempts": 0,
+            "captures": 0,
+            "replays": 0,
+            "fallbacks": 0
+          }
+        },
+        "on": {
+          "pre_warmup": {
+            "capture_attempts": 2,
+            "captures": 2,
+            "replays": 4080,
+            "fallbacks": 0
+          },
+          "before_formal": {
+            "capture_attempts": 2,
+            "captures": 2,
+            "replays": 4590,
+            "fallbacks": 0
+          },
+          "after_formal": {
+            "capture_attempts": 2,
+            "captures": 2,
+            "replays": 6120,
+            "fallbacks": 0
+          }
+        }
+      }
+    },
+    {
+      "pair_id": "p128_o256_c4_r1",
+      "checks": {
+        "metadata_fields_equal": true,
+        "evalscope_args_equal": true,
+        "formal_prompt_multiset_equal": true,
+        "warmup_prompt_multiset_equal": true,
+        "formal_prompt_multiset_hash_equal": true,
+        "warmup_prompt_multiset_hash_equal": true,
+        "graph_on_captured_before_formal": true,
+        "graph_on_no_formal_capture": true,
+        "graph_on_no_fallback": true,
+        "graph_off_all_zero": true
+      },
+      "formal_args_sha256": "50bf78f819692bc664a8dfc9c2e44d7ef39edcf3e305becb48851d871fc6ced1",
+      "formal_dataset_sequence_sha256": "3fc0bf9f408a1304fe15e3cb350aff5d40460d401d5ceaeeadc4f670a39362c4",
+      "warmup_dataset_sequence_sha256": "13914cbc5155bfa1dfcfb0e674ae8f32318fac30b01f61977593ac594fe7f31c",
+      "formal_observed_prompt_multiset_sha256": "6caa351f35a3eec7d810da471fcd8a3033cfde3eb0f2769f7e76b79b740239f5",
+      "warmup_observed_prompt_multiset_sha256": "89d5fdd089aaaa9fa546c988047e3eee00da41b1d989bad6ab85b6fb4f0e0383",
+      "graph_evidence": {
+        "off": {
+          "pre_warmup": {
+            "capture_attempts": 0,
+            "captures": 0,
+            "replays": 0,
+            "fallbacks": 0
+          },
+          "before_formal": {
+            "capture_attempts": 0,
+            "captures": 0,
+            "replays": 0,
+            "fallbacks": 0
+          },
+          "after_formal": {
+            "capture_attempts": 0,
+            "captures": 0,
+            "replays": 0,
+            "fallbacks": 0
+          }
+        },
+        "on": {
+          "pre_warmup": {
+            "capture_attempts": 2,
+            "captures": 2,
+            "replays": 6120,
+            "fallbacks": 0
+          },
+          "before_formal": {
+            "capture_attempts": 4,
+            "captures": 4,
+            "replays": 7140,
+            "fallbacks": 0
+          },
+          "after_formal": {
+            "capture_attempts": 4,
+            "captures": 4,
+            "replays": 8160,
+            "fallbacks": 0
+          }
+        }
+      }
+    },
+    {
+      "pair_id": "p128_o256_c4_r2",
+      "checks": {
+        "metadata_fields_equal": true,
+        "evalscope_args_equal": true,
+        "formal_prompt_multiset_equal": true,
+        "warmup_prompt_multiset_equal": true,
+        "formal_prompt_multiset_hash_equal": true,
+        "warmup_prompt_multiset_hash_equal": true,
+        "graph_on_captured_before_formal": true,
+        "graph_on_no_formal_capture": true,
+        "graph_on_no_fallback": true,
+        "graph_off_all_zero": true
+      },
+      "formal_args_sha256": "f78dd9d7cae09f3a8e63c7c9ff4236e8c550b0199bc472960dec380c9dcf1614",
+      "formal_dataset_sequence_sha256": "7217b496cb1d26b5220ecfa83aa7d3f9781c7013f969e1e6c1daf2e8ccd05c19",
+      "warmup_dataset_sequence_sha256": "881a292b78b95eac58c21d1f7def3f7110a5401304515b98d1415aebbb09a0c4",
+      "formal_observed_prompt_multiset_sha256": "5dc0e9f6be7f736a092f65018c4710782bfb5c9927dde861ed80f651bb695924",
+      "warmup_observed_prompt_multiset_sha256": "5da8d0bf0183b282fd6744391d4c52295e960a4c9659e3f628914a7ae5fa0d10",
+      "graph_evidence": {
+        "off": {
+          "pre_warmup": {
+            "capture_attempts": 0,
+            "captures": 0,
+            "replays": 0,
+            "fallbacks": 0
+          },
+          "before_formal": {
+            "capture_attempts": 0,
+            "captures": 0,
+            "replays": 0,
+            "fallbacks": 0
+          },
+          "after_formal": {
+            "capture_attempts": 0,
+            "captures": 0,
+            "replays": 0,
+            "fallbacks": 0
+          }
+        },
+        "on": {
+          "pre_warmup": {
+            "capture_attempts": 4,
+            "captures": 4,
+            "replays": 8160,
+            "fallbacks": 0
+          },
+          "before_formal": {
+            "capture_attempts": 4,
+            "captures": 4,
+            "replays": 9180,
+            "fallbacks": 0
+          },
+          "after_formal": {
+            "capture_attempts": 4,
+            "captures": 4,
+            "replays": 10200,
+            "fallbacks": 0
+          }
+        }
+      }
+    },
+    {
+      "pair_id": "p128_o256_c4_r3",
+      "checks": {
+        "metadata_fields_equal": true,
+        "evalscope_args_equal": true,
+        "formal_prompt_multiset_equal": true,
+        "warmup_prompt_multiset_equal": true,
+        "formal_prompt_multiset_hash_equal": true,
+        "warmup_prompt_multiset_hash_equal": true,
+        "graph_on_captured_before_formal": true,
+        "graph_on_no_formal_capture": true,
+        "graph_on_no_fallback": true,
+        "graph_off_all_zero": true
+      },
+      "formal_args_sha256": "9afb2e78e6f4eb8b4816f2e53426703a668806b31e1d5449216153953b70e64a",
+      "formal_dataset_sequence_sha256": "7936480e0cb38c72eeab126981e0f37fc2c1e0183910f7b3305845fc48117b25",
+      "warmup_dataset_sequence_sha256": "03e7121a5f7fdac0580e9fe2912d9c7e7bb897d1208c5a4f798968abee1952d1",
+      "formal_observed_prompt_multiset_sha256": "f96614cd969f5ccefc109b4c244a898bcb62ef83cbc3d40015aed27d040fced7",
+      "warmup_observed_prompt_multiset_sha256": "f118d543fe61c34c7bd07a051833258f940740880471835860991f31c2dd0d21",
+      "graph_evidence": {
+        "off": {
+          "pre_warmup": {
+            "capture_attempts": 0,
+            "captures": 0,
+            "replays": 0,
+            "fallbacks": 0
+          },
+          "before_formal": {
+            "capture_attempts": 0,
+            "captures": 0,
+            "replays": 0,
+            "fallbacks": 0
+          },
+          "after_formal": {
+            "capture_attempts": 0,
+            "captures": 0,
+            "replays": 0,
+            "fallbacks": 0
+          }
+        },
+        "on": {
+          "pre_warmup": {
+            "capture_attempts": 4,
+            "captures": 4,
+            "replays": 10200,
+            "fallbacks": 0
+          },
+          "before_formal": {
+            "capture_attempts": 4,
+            "captures": 4,
+            "replays": 11220,
+            "fallbacks": 0
+          },
+          "after_formal": {
+            "capture_attempts": 4,
+            "captures": 4,
+            "replays": 12240,
+            "fallbacks": 0
+          }
+        }
+      }
+    }
+  ]
+}
