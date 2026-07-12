@@ -7,6 +7,7 @@ import hashlib
 import json
 import shutil
 import subprocess
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -169,6 +170,18 @@ def main() -> int:
 
     for relative in sorted(selected):
         copy_relative(source, output, relative, output_paths.get(relative))
+
+    # Rebuild path-bearing summaries after flattening EvalScope JSON paths so
+    # every raw_summary reference resolves inside the portable bundle.
+    subprocess.run(
+        [sys.executable, str(Path(__file__).with_name("summarize.py")), str(output)],
+        check=True,
+    )
+    if (output / "pair-validation.json").is_file():
+        subprocess.run(
+            [sys.executable, str(Path(__file__).with_name("compare_graph.py")), str(output)],
+            check=True,
+        )
 
     source_files = sorted(path for path in source.rglob("*") if path.is_file())
     omitted = [file_record(path, source) for path in source_files if path.relative_to(source) not in selected]
