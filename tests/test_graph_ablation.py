@@ -64,6 +64,26 @@ class GraphComparisonTest(unittest.TestCase):
         self.assertEqual(latency, (1.25, 20.0, "off/on"))
         self.assertEqual(throughput, (1.2, 20.0, "on/off"))
 
+    def test_request_multiset_ignores_completion_order_not_content(self):
+        first = {"index": 0, "prompt_token_ids": [1, 2], "success": 1}
+        second = {"index": 1, "prompt_token_ids": [3, 4], "success": 1}
+        reordered = [
+            {"index": 0, "prompt_token_ids": [3, 4], "success": 1},
+            {"index": 1, "prompt_token_ids": [1, 2], "success": 1},
+        ]
+        expected = self.module.canonical_request_multiset(
+            {"requests": [first, second]}
+        )
+        self.assertEqual(
+            expected,
+            self.module.canonical_request_multiset({"requests": reordered}),
+        )
+        reordered[0]["prompt_token_ids"] = [3, 5]
+        self.assertNotEqual(
+            expected,
+            self.module.canonical_request_multiset({"requests": reordered}),
+        )
+
 
 class GraphAblationScriptContractTest(unittest.TestCase):
     def test_run_script_separates_warmup_from_formal_metrics(self):

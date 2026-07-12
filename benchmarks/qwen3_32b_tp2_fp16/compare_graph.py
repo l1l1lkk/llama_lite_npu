@@ -61,6 +61,23 @@ def sha256_json(value) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def canonical_request_multiset(fingerprint: dict) -> list[dict]:
+    """Return request evidence independent of concurrent completion order.
+
+    EvalScope stores SQLite rows in completion order, so the synthetic ``index``
+    assigned while extracting a fingerprint is not the input dataset index.  The
+    frozen dataset SHA proves input order; this multiset proves that every exact
+    token sequence was actually submitted and completed.
+    """
+    requests = []
+    for request in fingerprint["requests"]:
+        normalized = {key: value for key, value in request.items() if key != "index"}
+        requests.append(normalized)
+    return sorted(requests, key=lambda value: json.dumps(
+        value, sort_keys=True, ensure_ascii=False, separators=(",", ":")
+    ))
+
+
 def single(root: Path, pattern: str) -> Path:
     matches = list(root.glob(pattern))
     if len(matches) != 1:
@@ -153,17 +170,19 @@ def build(campaign: Path) -> tuple[list[dict], list[dict], dict]:
         off_fingerprint = read_json(off_root / "client/workload-fingerprint.json")
         on_warmup = read_json(on_root / "client/warmup/workload-fingerprint.json")
         off_warmup = read_json(off_root / "client/warmup/workload-fingerprint.json")
-        checks["formal_prompt_tokens_equal"] = (
-            on_fingerprint["requests"] == off_fingerprint["requests"]
+        on_formal_requests = canonical_request_multiset(on_fingerprint)
+        off_formal_requests = canonical_request_multiset(off_fingerprint)
+        on_warmup_requests = canonical_request_multiset(on_warmup)
+        off_warmup_requests = canonical_request_multiset(off_warmup)
+        checks["formal_prompt_multiset_equal"] = on_formal_requests == off_formal_requests
+        checks["warmup_prompt_multiset_equal"] = on_warmup_requests == off_warmup_requests
+        formal_multiset_sha256 = sha256_json(on_formal_requests)
+        warmup_multiset_sha256 = sha256_json(on_warmup_requests)
+        checks["formal_prompt_multiset_hash_equal"] = (
+            formal_multiset_sha256 == sha256_json(off_formal_requests)
         )
-        checks["warmup_prompt_tokens_equal"] = on_warmup["requests"] == off_warmup["requests"]
-        checks["formal_prompt_hash_equal"] = (
-            on_fingerprint["prompt_sequence_sha256"]
-            == off_fingerprint["prompt_sequence_sha256"]
-        )
-        checks["warmup_prompt_hash_equal"] = (
-            on_warmup["prompt_sequence_sha256"]
-            == off_warmup["prompt_sequence_sha256"]
+        checks["warmup_prompt_multiset_hash_equal"] = (
+            warmup_multiset_sha256 == sha256_json(off_warmup_requests)
         )
 
         graph_evidence = {}
@@ -206,7 +225,8 @@ def build(campaign: Path) -> tuple[list[dict], list[dict], dict]:
             "warmup_requests": int(on_meta["warmup_requests"]),
             "seed": int(on_meta["seed"]),
             "dataset_offset": int(on_meta["dataset_offset"]),
-            "prompt_sequence_sha256": on_fingerprint["prompt_sequence_sha256"],
+            "prompt_sequence_sha256": on_meta["formal_dataset_sha256"],
+            "observed_prompt_multiset_sha256": formal_multiset_sha256,
         }
         for metric, (column, kind) in METRICS.items():
             on_value = float(on_summary[column])
@@ -222,8 +242,10 @@ def build(campaign: Path) -> tuple[list[dict], list[dict], dict]:
             "pair_id": pair_id,
             "checks": checks,
             "formal_args_sha256": sha256_json(on_args),
-            "formal_prompt_sequence_sha256": on_fingerprint["prompt_sequence_sha256"],
-            "warmup_prompt_sequence_sha256": on_warmup["prompt_sequence_sha256"],
+            "formal_dataset_sequence_sha256": on_meta["formal_dataset_sha256"],
+            "warmup_dataset_sequence_sha256": on_meta["warmup_dataset_sha256"],
+            "formal_observed_prompt_multiset_sha256": formal_multiset_sha256,
+            "warmup_observed_prompt_multiset_sha256": warmup_multiset_sha256,
             "graph_evidence": graph_evidence,
         })
 
