@@ -16,6 +16,7 @@ import torch
 
 
 NumberOrSequence = Union[float, Sequence[float], torch.Tensor]
+TokenIdsByRow = Sequence[Sequence[int]]
 
 
 class SamplingStats:
@@ -56,6 +57,35 @@ def _last_token_logits(logits: torch.Tensor) -> torch.Tensor:
         f"logits must have shape [batch, vocab] or [batch, seq, vocab], "
         f"got {tuple(logits.shape)}"
     )
+
+
+def mask_blocked_token_logits(
+    logits: torch.Tensor,
+    blocked_token_ids: TokenIdsByRow | None,
+    *,
+    vocab_start_index: int = 0,
+) -> torch.Tensor:
+    """Mask global token IDs independently for each logits batch row."""
+    local_logits = _last_token_logits(logits)
+    if blocked_token_ids is None:
+        return local_logits
+    if len(blocked_token_ids) != local_logits.shape[0]:
+        raise ValueError(
+            "blocked_token_ids row count must match logits batch size"
+        )
+    if not any(token_ids for token_ids in blocked_token_ids):
+        return local_logits
+    masked = local_logits.clone()
+    vocab_end_index = vocab_start_index + local_logits.shape[-1]
+    for row, token_ids in enumerate(blocked_token_ids):
+        local_ids = [
+            int(token_id) - vocab_start_index
+            for token_id in token_ids
+            if vocab_start_index <= int(token_id) < vocab_end_index
+        ]
+        if local_ids:
+            masked[row, local_ids] = float("-inf")
+    return masked
 
 
 def _parameter_values(
@@ -472,12 +502,27 @@ def sample_next_token(
     *,
     temperature: NumberOrSequence = 0.0,
     top_p: NumberOrSequence = 1.0,
+    blocked_token_ids: TokenIdsByRow | None = None,
     vocab_parallel: bool = False,
     candidate_k: int = 2048,
     return_stats: bool = False,
 ):
     """Sample next-token IDs, preserving a device tensor result."""
     local_logits = _last_token_logits(logits)
+    config = group = None
+    distributed = False
+    if vocab_parallel:
+        config, group, distributed = _tp_state()
+    vocab_start_index = (
+        int(config.rank) * local_logits.shape[-1]
+        if vocab_parallel and config is not None
+        else 0
+    )
+    local_logits = mask_blocked_token_logits(
+        local_logits,
+        blocked_token_ids,
+        vocab_start_index=vocab_start_index,
+    )
     if not vocab_parallel:
         sampled = sample_local_logits(local_logits, temperature, top_p)
         if (
@@ -489,7 +534,6 @@ def sample_next_token(
             return SamplingResult(sampled, SamplingStats())
         return sampled
 
-    config, group, distributed = _tp_state()
     if not distributed:
         sampled = sample_local_logits(local_logits, temperature, top_p)
         if return_stats:

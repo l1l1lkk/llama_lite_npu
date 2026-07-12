@@ -48,6 +48,7 @@ class TensorCommandCodecTest(unittest.TestCase):
         self.assertEqual(decoded.control_ids, [4, 9])
         self.assertEqual(decoded.prompt_tokens, [[10, 11], [20]])
         self.assertEqual(decoded.max_new_tokens, [32, 16])
+        self.assertEqual(decoded.min_tokens, [0, 0])
         self.assertEqual(decoded.temperatures, [0.6, 0.0])
         self.assertEqual(decoded.top_ps, [0.9, 1.0])
 
@@ -71,6 +72,7 @@ class TensorCommandCodecTest(unittest.TestCase):
         self.assertEqual(decoded.control_ids, [1])
         self.assertEqual(decoded.prompt_tokens, [[101, 102, 103]])
         self.assertEqual(decoded.max_new_tokens, [8])
+        self.assertEqual(decoded.min_tokens, [0])
         self.assertEqual(decoded.temperatures, [0.0])
         self.assertEqual(decoded.top_ps, [1.0])
 
@@ -175,6 +177,7 @@ class TensorCommandCodecTest(unittest.TestCase):
         self.assertEqual(decoded.control_ids, [4])
         self.assertEqual(decoded.prompt_tokens, [[10, 11, 12]])
         self.assertEqual(decoded.max_new_tokens, [32])
+        self.assertEqual(decoded.min_tokens, [0])
         self.assertEqual(decoded.temperatures, [0.0])
         self.assertEqual(decoded.top_ps, [1.0])
         self.assertEqual(decoded.prefill_cursors, [2])

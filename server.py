@@ -36,7 +36,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from PIL import Image
 
 from lite_llama.utils.device import get_device
@@ -60,9 +60,16 @@ class ChatCompletionRequest(BaseModel):
     temperature: float = Field(default=0.6, ge=0.0, le=2.0)
     top_p: float = Field(default=0.9, ge=0.0, le=1.0)
     max_tokens: int = Field(default=512, ge=1, le=32768)
+    min_tokens: int = Field(default=0, ge=0, le=32768)
     stream: bool = False
     stream_options: Optional[StreamOptions] = None
     enable_thinking: bool = True
+
+    @model_validator(mode="after")
+    def validate_token_limits(self):
+        if self.min_tokens > self.max_tokens:
+            raise ValueError("min_tokens must not exceed max_tokens")
+        return self
 
 
 class CompletionRequest(BaseModel):
@@ -71,7 +78,14 @@ class CompletionRequest(BaseModel):
     temperature: float = Field(default=0.6, ge=0.0, le=2.0)
     top_p: float = Field(default=0.9, ge=0.0, le=1.0)
     max_tokens: int = Field(default=512, ge=1, le=32768)
+    min_tokens: int = Field(default=0, ge=0, le=32768)
     stream: bool = False
+
+    @model_validator(mode="after")
+    def validate_token_limits(self):
+        if self.min_tokens > self.max_tokens:
+            raise ValueError("min_tokens must not exceed max_tokens")
+        return self
 
 
 class ModelInfo(BaseModel):
@@ -354,6 +368,7 @@ def _tp_continuous_worker_loop():
                             control_id=control_id,
                             prompt_tokens=command.prompt_tokens[index],
                             max_new_tokens=command.max_new_tokens[index],
+                            min_tokens=command.min_tokens[index],
                             temperature=command.temperatures[index],
                             top_p=command.top_ps[index],
                         )
@@ -569,6 +584,7 @@ def _submit_continuous_request(
     temperature: float,
     top_p: float,
     max_tokens: int,
+    min_tokens: int,
     endpoint: str,
 ):
     if _continuous_scheduler is None or _continuous_backend is None:
@@ -579,6 +595,7 @@ def _submit_continuous_request(
             request_id=request_id,
             prompt_tokens=prompt_tokens,
             max_new_tokens=max_tokens,
+            min_tokens=min_tokens,
             temperature=temperature,
             top_p=top_p,
             endpoint=endpoint,
@@ -611,6 +628,7 @@ async def _wait_continuous_chat(
         req.temperature,
         req.top_p,
         req.max_tokens,
+        req.min_tokens,
         endpoint="chat",
     )
     try:
@@ -649,6 +667,7 @@ async def _wait_continuous_completion(
         req.temperature,
         req.top_p,
         req.max_tokens,
+        req.min_tokens,
         endpoint="completion",
     )
     try:
@@ -789,6 +808,7 @@ async def _stream_continuous_chat(
         req.temperature,
         req.top_p,
         req.max_tokens,
+        req.min_tokens,
         endpoint="chat",
     )
     completion = ""
@@ -869,6 +889,7 @@ async def _stream_continuous_completion(
         req.temperature,
         req.top_p,
         req.max_tokens,
+        req.min_tokens,
         endpoint="completion",
     )
     try:

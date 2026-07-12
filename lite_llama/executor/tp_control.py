@@ -36,6 +36,7 @@ class DecodedCommand(NamedTuple):
     control_ids: list[int]
     prompt_tokens: list[list[int]]
     max_new_tokens: list[int]
+    min_tokens: list[int]
     temperatures: list[float]
     top_ps: list[float]
     prefill_cursors: list[int] = []
@@ -58,6 +59,7 @@ def encode_prefill(requests):
             [
                 int(request.control_id),
                 int(request.max_new_tokens),
+                int(getattr(request, "min_tokens", 0)),
                 len(prompt_tokens),
                 *prompt_tokens,
             ]
@@ -77,6 +79,7 @@ def encode_prefill_chunk(requests, chunk_size: int):
             [
                 int(request.control_id),
                 int(request.max_new_tokens),
+                int(getattr(request, "min_tokens", 0)),
                 int(getattr(request, "prefill_cursor", 0)),
                 len(prompt_tokens),
                 *prompt_tokens,
@@ -144,17 +147,21 @@ def decode_command(header, integers, floats) -> DecodedCommand:
         control_ids: list[int] = []
         prompt_tokens: list[list[int]] = []
         max_new_tokens: list[int] = []
+        min_tokens: list[int] = []
         cursor = 0
         for _ in range(batch_size):
-            if cursor + 3 > len(integers):
+            if cursor + 4 > len(integers):
                 raise RuntimeError("truncated TP prefill metadata")
-            control_id, max_new, prompt_length = integers[cursor : cursor + 3]
-            cursor += 3
+            control_id, max_new, min_new, prompt_length = integers[
+                cursor : cursor + 4
+            ]
+            cursor += 4
             end = cursor + prompt_length
             if end > len(integers):
                 raise RuntimeError("truncated TP prefill prompt")
             control_ids.append(control_id)
             max_new_tokens.append(max_new)
+            min_tokens.append(min_new)
             prompt_tokens.append(integers[cursor:end])
             cursor = end
         if cursor != len(integers) or len(floats) != batch_size * 2:
@@ -165,23 +172,25 @@ def decode_command(header, integers, floats) -> DecodedCommand:
         control_ids = []
         prompt_tokens = []
         max_new_tokens = []
+        min_tokens = []
         prefill_cursors = []
         if not integers:
             raise RuntimeError("missing TP prefill_chunk chunk size")
         chunk_size = int(integers[0])
         cursor = 1
         for _ in range(batch_size):
-            if cursor + 4 > len(integers):
+            if cursor + 5 > len(integers):
                 raise RuntimeError("truncated TP prefill_chunk metadata")
-            control_id, max_new, prefill_cursor, prompt_length = integers[
-                cursor : cursor + 4
+            control_id, max_new, min_new, prefill_cursor, prompt_length = integers[
+                cursor : cursor + 5
             ]
-            cursor += 4
+            cursor += 5
             end = cursor + prompt_length
             if end > len(integers):
                 raise RuntimeError("truncated TP prefill_chunk prompt")
             control_ids.append(control_id)
             max_new_tokens.append(max_new)
+            min_tokens.append(min_new)
             prefill_cursors.append(prefill_cursor)
             prompt_tokens.append(integers[cursor:end])
             cursor = end
@@ -200,6 +209,7 @@ def decode_command(header, integers, floats) -> DecodedCommand:
             expected_seq_lens.append(expected_seq_len)
         prompt_tokens = []
         max_new_tokens = []
+        min_tokens = []
         temperatures = []
         top_ps = []
     else:
@@ -208,6 +218,7 @@ def decode_command(header, integers, floats) -> DecodedCommand:
         control_ids = integers
         prompt_tokens = []
         max_new_tokens = []
+        min_tokens = []
         temperatures = []
         top_ps = []
 
@@ -216,6 +227,7 @@ def decode_command(header, integers, floats) -> DecodedCommand:
         control_ids=control_ids,
         prompt_tokens=prompt_tokens,
         max_new_tokens=max_new_tokens,
+        min_tokens=min_tokens,
         temperatures=temperatures,
         top_ps=top_ps,
         prefill_cursors=prefill_cursors,

@@ -82,16 +82,23 @@ class BatchRequest:
         max_new_tokens: int,
         temperature: float,
         top_p: float,
+        min_tokens: int = 0,
         control_id: int | None = None,
         endpoint: str = "unknown",
     ) -> None:
         if max_new_tokens < 1:
             raise ValueError("max_new_tokens must be positive")
+        if min_tokens < 0:
+            raise ValueError("min_tokens must be non-negative")
+        if min_tokens > max_new_tokens:
+            raise ValueError("min_tokens must not exceed max_new_tokens")
         self.request_id = request_id
         self.control_id = control_id
         self.endpoint = str(endpoint or "unknown")
         self.prompt_tokens = list(prompt_tokens)
         self.max_new_tokens = max_new_tokens
+        self.min_tokens = int(min_tokens)
+        self.sampled_token_count = 0
         self.temperature = temperature
         self.top_p = top_p
         self.generated_token_ids: list[int] = []
@@ -331,6 +338,7 @@ class ContinuousBatchScheduler:
         max_new_tokens: int,
         temperature: float,
         top_p: float,
+        min_tokens: int = 0,
         endpoint: str = "unknown",
     ) -> BatchRequest:
         try:
@@ -362,6 +370,7 @@ class ContinuousBatchScheduler:
                     request_id=request_id,
                     prompt_tokens=prompt_tokens,
                     max_new_tokens=max_new_tokens,
+                    min_tokens=min_tokens,
                     temperature=temperature,
                     top_p=top_p,
                     control_id=self._next_control_id,
@@ -796,6 +805,12 @@ class ContinuousBatchModelBackend:
             logits,
             temperature=[request.temperature for request in requests],
             top_p=[request.top_p for request in requests],
+            blocked_token_ids=[
+                [self.eos_token_id]
+                if request.sampled_token_count < request.min_tokens
+                else []
+                for request in requests
+            ],
             vocab_parallel=bool(
                 getattr(self.executor, "logits_are_sharded", False)
             ),
@@ -821,6 +836,7 @@ class ContinuousBatchModelBackend:
         for row, request in enumerate(requests):
             req_idx = int(request.model_request_id)
             self._device_tokens[req_idx] = sampled[row].reshape(())
+            request.sampled_token_count += 1
             if initial_positions is not None:
                 self._device_positions[req_idx] = torch.tensor(
                     int(initial_positions[row]),

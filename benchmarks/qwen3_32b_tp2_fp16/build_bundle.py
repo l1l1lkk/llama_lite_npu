@@ -12,6 +12,7 @@ from pathlib import Path
 
 
 ROOT_FILES = ("summary.csv", "aggregate.csv")
+OPTIONAL_ROOT_FILES = ("strict-validation.json",)
 ENVIRONMENT_FILES = (
     "ascend-env.txt",
     "baseline.env",
@@ -87,6 +88,9 @@ def main() -> int:
     run_ids: list[str] = []
     for name in ROOT_FILES:
         selected.add(Path(name))
+    for name in OPTIONAL_ROOT_FILES:
+        if (source / name).is_file():
+            selected.add(Path(name))
     for name in ENVIRONMENT_FILES:
         selected.add(Path("environment") / name)
     for graph in ("on", "off"):
@@ -152,11 +156,15 @@ def main() -> int:
             ),
             "summaries": (
                 "python benchmarks/qwen3_32b_tp2_fp16/summarize.py "
-                "benchmarks/results/20260711_qwen3_32b_tp2_fp16"
+                f"benchmarks/results/{source.name}"
+            ),
+            "strict_workload": (
+                "python benchmarks/qwen3_32b_tp2_fp16/validate_strict_workload.py "
+                f"benchmarks/results/{source.name} --compare"
             ),
             "bundle_validation": (
                 "python benchmarks/qwen3_32b_tp2_fp16/validate_bundle.py "
-                "benchmarks/results/20260711_qwen3_32b_tp2_fp16"
+                f"benchmarks/results/{source.name}"
             ),
         },
     }
