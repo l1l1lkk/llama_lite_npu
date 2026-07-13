@@ -18,6 +18,11 @@ OPTIONAL_ROOT_FILES = (
     "paired-ratios.csv",
     "graph-comparison.csv",
     "pair-validation.json",
+    "scalability-run-metrics.csv",
+    "scalability-aggregate.csv",
+    "timeseries-summary.csv",
+    "saturation-analysis.json",
+    "task3-validation.json",
 )
 ENVIRONMENT_FILES = (
     "ascend-env.txt",
@@ -52,6 +57,11 @@ OPTIONAL_RUN_DIRECT_FILES = (
     "client/warmup/workload-fingerprint.json",
     "server/pre-warmup-metrics.prom",
     "server/pre-warmup-stats.json",
+    "run-timing.json",
+    "client/request-metrics.json",
+    "server/timeseries.jsonl",
+    "server/timeseries-command.txt",
+    "server/timeseries-exit-code.txt",
 )
 EVALSCOPE_FILES = (
     "benchmark_args.json",
@@ -121,6 +131,13 @@ def main() -> int:
             candidate = Path(graph) / "server" / name
             if (source / candidate).is_file():
                 selected.add(candidate)
+        for lifecycle_server in sorted(
+            (source / graph / "lifecycles").glob("*/server")
+        ):
+            for name in LIFECYCLE_FILES:
+                candidate_path = lifecycle_server / name
+                if candidate_path.is_file():
+                    selected.add(candidate_path.relative_to(source))
 
     for metadata_path in sorted(source.glob("on/p*/run-*/run-metadata.json")) + sorted(
         source.glob("off/p*/run-*/run-metadata.json")
@@ -191,6 +208,15 @@ def main() -> int:
             [sys.executable, str(Path(__file__).with_name("compare_graph.py")), str(output)],
             check=True,
         )
+    if (output / "task3-validation.json").is_file():
+        subprocess.run(
+            [
+                sys.executable,
+                str(Path(__file__).with_name("analyze_scalability.py")),
+                str(output),
+            ],
+            check=True,
+        )
 
     source_files = sorted(path for path in source.rglob("*") if path.is_file())
     omitted = [file_record(path, source) for path in source_files if path.relative_to(source) not in selected]
@@ -238,6 +264,10 @@ def main() -> int:
             ),
             "graph_comparison": (
                 "python benchmarks/qwen3_32b_tp2_fp16/compare_graph.py "
+                f"benchmarks/results/{source.name} --compare"
+            ),
+            "scalability_analysis": (
+                "python benchmarks/qwen3_32b_tp2_fp16/analyze_scalability.py "
                 f"benchmarks/results/{source.name} --compare"
             ),
             "bundle_validation": (

@@ -5,7 +5,12 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 source "$ROOT/benchmarks/qwen3_32b_tp2_fp16/baseline.env"
 GRAPH_MODE=${1:?usage: stop_server.sh on|off CAMPAIGN_ID}
 CAMPAIGN=${2:?usage: stop_server.sh on|off CAMPAIGN_ID}
-RESULT_ROOT="$ROOT/benchmark-results/$CAMPAIGN/$GRAPH_MODE"
+SERVER_LIFECYCLE_ID=${SERVER_LIFECYCLE_ID:-}
+if [[ -n "$SERVER_LIFECYCLE_ID" ]]; then
+  RESULT_ROOT="$ROOT/benchmark-results/$CAMPAIGN/$GRAPH_MODE/lifecycles/$SERVER_LIFECYCLE_ID"
+else
+  RESULT_ROOT="$ROOT/benchmark-results/$CAMPAIGN/$GRAPH_MODE"
+fi
 PID_FILE="$RESULT_ROOT/server/server.pid"
 
 curl -fsS "$SERVER_URL/debug/stats" > "$RESULT_ROOT/server/stop-stats.json" 2>/dev/null || true
@@ -31,4 +36,3 @@ for _ in $(seq 1 30); do
 done
 echo "server did not stop after SIGTERM; no force signal sent" >&2
 exit 1
-

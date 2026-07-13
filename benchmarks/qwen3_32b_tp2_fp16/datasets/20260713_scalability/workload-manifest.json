@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "workload_id": "qwen3_32b_p128_o256_n32_scalability_v1",
+  "selection": "first 64 unique message lists in sorted source path and line order",
+  "sources": [
+    {
+      "path": "datasets/20260712_graph_ablation/p128_o256_c1_r1-formal.jsonl",
+      "sha256": "5e5b28edcf617cf1dfe4dbdc1d08371b33cf695835a70dd19dc0b60addf8f6d7",
+      "line_count": 6
+    },
+    {
+      "path": "datasets/20260712_graph_ablation/p128_o256_c1_r1-warmup.jsonl",
+      "sha256": "243b275f48e0b67d9db150525a888ef43b7d757d2cf8a6ad5bc3e4e366d55249",
+      "line_count": 2
+    },
+    {
+      "path": "datasets/20260712_graph_ablation/p128_o256_c1_r2-formal.jsonl",
+      "sha256": "96f920cd947ccb4b55f01b239c6ee5c402d027d4dff801290e886c2db5d11bc0",
+      "line_count": 6
+    },
+    {
+      "path": "datasets/20260712_graph_ablation/p128_o256_c1_r2-warmup.jsonl",
+      "sha256": "233af70986c05e06f9affdd2058fd80bc87a4a0b6e79dbe16e3c77bd9e6705ba",
+      "line_count": 2
+    },
+    {
+      "path": "datasets/20260712_graph_ablation/p128_o256_c1_r3-formal.jsonl",
+      "sha256": "628d488da76d2bc898cffbba7f2be38dddd442874bf0a512a9f6e80ba5c5750e",
+      "line_count": 6
+    },
+    {
+      "path": "datasets/20260712_graph_ablation/p128_o256_c1_r3-warmup.jsonl",
+      "sha256": "f32ef55706e2b83fef457dbeb9c8f839e9d44d415c882cb3d06876b741151cc9",
+      "line_count": 2
+    },
+    {
+      "path": "datasets/20260712_graph_ablation/p128_o256_c4_r1-formal.jsonl",
+      "sha256": "3fc0bf9f408a1304fe15e3cb350aff5d40460d401d5ceaeeadc4f670a39362c4",
+      "line_count": 8
+    },
+    {
+      "path": "datasets/20260712_graph_ablation/p128_o256_c4_r1-warmup.jsonl",
+      "sha256": "13914cbc5155bfa1dfcfb0e674ae8f32318fac30b01f61977593ac594fe7f31c",
+      "line_count": 8
+    },
+    {
+      "path": "datasets/20260712_graph_ablation/p128_o256_c4_r2-formal.jsonl",
+      "sha256": "7217b496cb1d26b5220ecfa83aa7d3f9781c7013f969e1e6c1daf2e8ccd05c19",
+      "line_count": 8
+    },
+    {
+      "path": "datasets/20260712_graph_ablation/p128_o256_c4_r2-warmup.jsonl",
+      "sha256": "881a292b78b95eac58c21d1f7def3f7110a5401304515b98d1415aebbb09a0c4",
+      "line_count": 8
+    },
+    {
+      "path": "datasets/20260712_graph_ablation/p128_o256_c4_r3-formal.jsonl",
+      "sha256": "7936480e0cb38c72eeab126981e0f37fc2c1e0183910f7b3305845fc48117b25",
+      "line_count": 8
+    },
+    {
+      "path": "datasets/20260712_graph_ablation/p128_o256_c4_r3-warmup.jsonl",
+      "sha256": "03e7121a5f7fdac0580e9fe2912d9c7e7bb897d1208c5a4f798968abee1952d1",
+      "line_count": 8
+    }
+  ],
+  "outputs": [
+    {
+      "path": "p128_o256_n32-formal.jsonl",
+      "request_count": 32,
+      "sha256": "5d49a3333bbde8a6a43438f5ad9f247bcd672eabb5d238da20191baf31e83bf2"
+    },
+    {
+      "path": "p128_o256_n32-warmup.jsonl",
+      "request_count": 32,
+      "sha256": "fd724c012486d16cc7c33e41fd38ff41f93688a0ad637f832d17bbd247b1d4e7"
+    }
+  ]
+}

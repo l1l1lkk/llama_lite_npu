@@ -14,7 +14,12 @@ case "$GRAPH_MODE" in
   *) echo "graph mode must be on or off" >&2; exit 2 ;;
 esac
 
-RESULT_ROOT="$ROOT/benchmark-results/$CAMPAIGN/$GRAPH_MODE"
+SERVER_LIFECYCLE_ID=${SERVER_LIFECYCLE_ID:-}
+if [[ -n "$SERVER_LIFECYCLE_ID" ]]; then
+  RESULT_ROOT="$ROOT/benchmark-results/$CAMPAIGN/$GRAPH_MODE/lifecycles/$SERVER_LIFECYCLE_ID"
+else
+  RESULT_ROOT="$ROOT/benchmark-results/$CAMPAIGN/$GRAPH_MODE"
+fi
 mkdir -p "$RESULT_ROOT/server"
 PID_FILE="$RESULT_ROOT/server/server.pid"
 if [[ -f "$PID_FILE" ]] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then

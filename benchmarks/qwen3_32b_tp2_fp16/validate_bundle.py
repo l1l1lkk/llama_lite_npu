@@ -72,6 +72,12 @@ def main() -> int:
                 [sys.executable, str(compare_script), str(copied), "--compare"],
                 check=True,
             )
+        if (copied / "task3-validation.json").is_file():
+            scalability_script = Path(__file__).with_name("analyze_scalability.py").resolve()
+            subprocess.run(
+                [sys.executable, str(scalability_script), str(copied), "--compare"],
+                check=True,
+            )
         rebuilt_summary = rows(copied / "summary.csv")
         rebuilt_aggregate = rows(copied / "aggregate.csv")
     if not equivalent(expected_summary, rebuilt_summary):
