@@ -165,3 +165,27 @@ python benchmarks/qwen3_32b_tp2_fp16/validate_strict_workload.py \
 Graph off is a separate server lifecycle using `start_server.sh off`; never
 toggle graph mode inside a running campaign process. Only a PID created in the
 campaign artifact directory may be stopped by `stop_server.sh`.
+
+## Graph-on scalability campaigns
+
+Scalability campaigns freeze one formal JSONL and reuse the exact prompt token
+sequences, seed, offset, order and request count at every concurrency. Use an
+independent server lifecycle for every formal run, complete `2 * concurrency`
+warmup requests before the formal boundary, and retain one-second scheduler/KV/
+Graph time series plus five-second NPU samples. A formal run is rejected unless
+capture is complete before the run, capture delta is zero, fallback is zero and
+replay increases during the run.
+
+`analyze_scalability.py` rebuilds client metrics, server queue/TTFT histogram
+deltas, scheduler time-series summaries, Little's Law checks and the predefined
+saturation criterion. Queue histogram percentiles are bucket estimates; coarse
+10-to-30-second buckets must not be presented as exact percentiles. The
+estimated non-queue first-token time is server TTFT mean minus server queue-wait
+mean and is not a profiler measurement.
+
+```bash
+python benchmarks/qwen3_32b_tp2_fp16/analyze_scalability.py \
+  "benchmark-results/$CAMPAIGN"
+python benchmarks/qwen3_32b_tp2_fp16/analyze_scalability.py \
+  "benchmarks/results/$CAMPAIGN" --compare
+```

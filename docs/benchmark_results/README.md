@@ -18,3 +18,8 @@
 任务2 NPU Graph 严格消融：
 - [`Qwen3-32B TP=2 FP16 NPU Graph 严格消融`](20260712_qwen3_32b_tp2_fp16_graph_ablation.md)
 - [`Git-tracked Graph ablation bundle`](../../benchmarks/results/20260712_qwen3_32b_tp2_fp16_graph_ablation/)
+
+任务3 Graph-on 并发扩展与排队分析：
+
+- [`Qwen3-32B TP=2 FP16 Graph-on 并发扩展与排队分析`](20260713_qwen3_32b_tp2_fp16_graph_scalability.md)
+- [`Git-tracked Graph scalability bundle`](../../benchmarks/results/20260713_qwen3_32b_tp2_fp16_graph_scalability/)

@@ -1,0 +1,422 @@
+{
+  "schema_version": 1,
+  "status": "pass",
+  "campaign_id": "20260713_qwen3_32b_tp2_fp16_graph_scalability",
+  "common_checks": {
+    "formal_run_count_15": true,
+    "one_formal_dataset_sha": true,
+    "observed_prompt_multiset_equal": true,
+    "evalscope_args_equal_except_concurrency": true,
+    "server_commands_identical": true,
+    "campaign_plan_matches_runs": true,
+    "all_run_checks_pass": true
+  },
+  "formal_dataset_sha256": "11b2c0d603619092f7d2a35eae53cafc5cb32d4e7d642a429e29a41758a428ba",
+  "runs": [
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_graph_scalability_on_p128_o256_c1_r1",
+      "checks": {
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": [],
+      "before_graph": {
+        "capture_attempts": 2,
+        "captures": 2,
+        "replays": 510,
+        "fallbacks": 0
+      },
+      "after_graph": {
+        "capture_attempts": 2,
+        "captures": 2,
+        "replays": 8670,
+        "fallbacks": 0
+      }
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_graph_scalability_on_p128_o256_c1_r2",
+      "checks": {
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": [],
+      "before_graph": {
+        "capture_attempts": 2,
+        "captures": 2,
+        "replays": 510,
+        "fallbacks": 0
+      },
+      "after_graph": {
+        "capture_attempts": 2,
+        "captures": 2,
+        "replays": 8670,
+        "fallbacks": 0
+      }
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_graph_scalability_on_p128_o256_c1_r3",
+      "checks": {
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": [],
+      "before_graph": {
+        "capture_attempts": 2,
+        "captures": 2,
+        "replays": 510,
+        "fallbacks": 0
+      },
+      "after_graph": {
+        "capture_attempts": 2,
+        "captures": 2,
+        "replays": 8670,
+        "fallbacks": 0
+      }
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_graph_scalability_on_p128_o256_c16_r1",
+      "checks": {
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": [],
+      "before_graph": {
+        "capture_attempts": 6,
+        "captures": 6,
+        "replays": 1275,
+        "fallbacks": 0
+      },
+      "after_graph": {
+        "capture_attempts": 6,
+        "captures": 6,
+        "replays": 2550,
+        "fallbacks": 0
+      }
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_graph_scalability_on_p128_o256_c16_r2",
+      "checks": {
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": [],
+      "before_graph": {
+        "capture_attempts": 6,
+        "captures": 6,
+        "replays": 1275,
+        "fallbacks": 0
+      },
+      "after_graph": {
+        "capture_attempts": 6,
+        "captures": 6,
+        "replays": 2550,
+        "fallbacks": 0
+      }
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_graph_scalability_on_p128_o256_c16_r3",
+      "checks": {
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": [],
+      "before_graph": {
+        "capture_attempts": 6,
+        "captures": 6,
+        "replays": 1275,
+        "fallbacks": 0
+      },
+      "after_graph": {
+        "capture_attempts": 6,
+        "captures": 6,
+        "replays": 2550,
+        "fallbacks": 0
+      }
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_graph_scalability_on_p128_o256_c2_r1",
+      "checks": {
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": [],
+      "before_graph": {
+        "capture_attempts": 2,
+        "captures": 2,
+        "replays": 1020,
+        "fallbacks": 0
+      },
+      "after_graph": {
+        "capture_attempts": 2,
+        "captures": 2,
+        "replays": 9180,
+        "fallbacks": 0
+      }
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_graph_scalability_on_p128_o256_c2_r2",
+      "checks": {
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": [],
+      "before_graph": {
+        "capture_attempts": 2,
+        "captures": 2,
+        "replays": 1020,
+        "fallbacks": 0
+      },
+      "after_graph": {
+        "capture_attempts": 2,
+        "captures": 2,
+        "replays": 9180,
+        "fallbacks": 0
+      }
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_graph_scalability_on_p128_o256_c2_r3",
+      "checks": {
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": [],
+      "before_graph": {
+        "capture_attempts": 2,
+        "captures": 2,
+        "replays": 1020,
+        "fallbacks": 0
+      },
+      "after_graph": {
+        "capture_attempts": 2,
+        "captures": 2,
+        "replays": 9180,
+        "fallbacks": 0
+      }
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_graph_scalability_on_p128_o256_c4_r1",
+      "checks": {
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": [],
+      "before_graph": {
+        "capture_attempts": 4,
+        "captures": 4,
+        "replays": 1020,
+        "fallbacks": 0
+      },
+      "after_graph": {
+        "capture_attempts": 4,
+        "captures": 4,
+        "replays": 5100,
+        "fallbacks": 0
+      }
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_graph_scalability_on_p128_o256_c4_r2",
+      "checks": {
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": [],
+      "before_graph": {
+        "capture_attempts": 4,
+        "captures": 4,
+        "replays": 1020,
+        "fallbacks": 0
+      },
+      "after_graph": {
+        "capture_attempts": 4,
+        "captures": 4,
+        "replays": 5100,
+        "fallbacks": 0
+      }
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_graph_scalability_on_p128_o256_c4_r3",
+      "checks": {
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": [],
+      "before_graph": {
+        "capture_attempts": 4,
+        "captures": 4,
+        "replays": 1020,
+        "fallbacks": 0
+      },
+      "after_graph": {
+        "capture_attempts": 4,
+        "captures": 4,
+        "replays": 5100,
+        "fallbacks": 0
+      }
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_graph_scalability_on_p128_o256_c8_r1",
+      "checks": {
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": [],
+      "before_graph": {
+        "capture_attempts": 4,
+        "captures": 4,
+        "replays": 1020,
+        "fallbacks": 0
+      },
+      "after_graph": {
+        "capture_attempts": 4,
+        "captures": 4,
+        "replays": 3060,
+        "fallbacks": 0
+      }
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_graph_scalability_on_p128_o256_c8_r2",
+      "checks": {
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": [],
+      "before_graph": {
+        "capture_attempts": 4,
+        "captures": 4,
+        "replays": 1020,
+        "fallbacks": 0
+      },
+      "after_graph": {
+        "capture_attempts": 4,
+        "captures": 4,
+        "replays": 3060,
+        "fallbacks": 0
+      }
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_graph_scalability_on_p128_o256_c8_r3",
+      "checks": {
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": [],
+      "before_graph": {
+        "capture_attempts": 4,
+        "captures": 4,
+        "replays": 1020,
+        "fallbacks": 0
+      },
+      "after_graph": {
+        "capture_attempts": 4,
+        "captures": 4,
+        "replays": 3060,
+        "fallbacks": 0
+      }
+    }
+  ]
+}
