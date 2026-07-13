@@ -8,6 +8,8 @@ set -u
 
 CAMPAIGN=${1:?usage: run_case.sh CAMPAIGN GRAPH TARGET_PROMPT EVALSCOPE_PROMPT OUTPUT CONCURRENCY [REQUESTS]}
 GRAPH_MODE=${2:?}
+RESULT_NAMESPACE=${RESULT_NAMESPACE:-$GRAPH_MODE}
+BENCHMARK_VARIANT=${BENCHMARK_VARIANT:-$RESULT_NAMESPACE}
 TARGET_PROMPT=${3:?}
 EVALSCOPE_PROMPT=${4:?}
 OUTPUT_TOKENS=${5:?}
@@ -16,13 +18,13 @@ REQUESTS=${7:-$(( CONCURRENCY * 6 ))}
 (( REQUESTS >= CONCURRENCY )) || { echo "requests must be >= concurrency" >&2; exit 2; }
 
 CASE_ID="p${TARGET_PROMPT}_o${OUTPUT_TOKENS}_c${CONCURRENCY}"
-CASE_ROOT="$ROOT/benchmark-results/$CAMPAIGN/$GRAPH_MODE/$CASE_ID"
+CASE_ROOT="$ROOT/benchmark-results/$CAMPAIGN/$RESULT_NAMESPACE/$CASE_ID"
 mkdir -p "$CASE_ROOT"
 curl -fsS "$SERVER_URL/health" >/dev/null
 
 RUN_REPETITIONS=${RUN_REPETITIONS:-$(seq 1 "$FORMAL_REPEATS")}
 for REP in $RUN_REPETITIONS; do
-  RUN_ID="${CAMPAIGN}_${GRAPH_MODE}_${CASE_ID}_r${REP}"
+  RUN_ID="${CAMPAIGN}_${RESULT_NAMESPACE}_${CASE_ID}_r${REP}"
   RUN_ROOT="$CASE_ROOT/run-$(printf '%02d' "$REP")"
   CLIENT_ROOT="$RUN_ROOT/client"
   SERVER_ROOT="$RUN_ROOT/server"
@@ -55,7 +57,7 @@ for REP in $RUN_REPETITIONS; do
   fi
 
   cat > "$RUN_ROOT/run-metadata.json" <<EOF
-{"run_id":"$RUN_ID","pair_id":"$PAIR_ID","campaign":"$CAMPAIGN","graph":"$GRAPH_MODE","target_server_input_tokens":$TARGET_PROMPT,"evalscope_prompt_tokens":$EVALSCOPE_PROMPT,"min_tokens":$OUTPUT_TOKENS,"output_tokens":$OUTPUT_TOKENS,"concurrency":$CONCURRENCY,"requests":$REQUESTS,"warmup_requests":$WARMUP,"warmup_dataset_offset":$WARMUP_OFFSET,"separate_warmup":$SEPARATE_WARMUP,"dataset_kind":"$DATASET_KIND","formal_dataset_path":"$FORMAL_DATASET_PATH","formal_dataset_sha256":"$FORMAL_DATASET_SHA256","warmup_dataset_path":"$WARMUP_DATASET_PATH","warmup_dataset_sha256":"$WARMUP_DATASET_SHA256","workload_id":"$WORKLOAD_ID","server_lifecycle_id":"$SERVER_LIFECYCLE_ID","lifecycle_order_index":$LIFECYCLE_ORDER_INDEX,"lifecycle_sequence":"$LIFECYCLE_SEQUENCE","run_order_in_lifecycle":$REP,"timeseries_interval_s":$TIMESERIES_INTERVAL_S,"npu_sample_interval_s":$NPU_SAMPLE_INTERVAL_S,"seed":$SEED,"dataset_offset":$OFFSET,"temperature":0.0,"top_p":1.0,"sampling":"greedy","evalscope_version":"$EVALSCOPE_VERSION","strict_workload":true,"cache_state":"$CACHE_STATE","metric_boundary":"formal server metrics exclude the separately recorded warmup"}
+{"run_id":"$RUN_ID","pair_id":"$PAIR_ID","campaign":"$CAMPAIGN","graph":"$GRAPH_MODE","benchmark_variant":"$BENCHMARK_VARIANT","result_namespace":"$RESULT_NAMESPACE","target_server_input_tokens":$TARGET_PROMPT,"evalscope_prompt_tokens":$EVALSCOPE_PROMPT,"min_tokens":$OUTPUT_TOKENS,"output_tokens":$OUTPUT_TOKENS,"concurrency":$CONCURRENCY,"requests":$REQUESTS,"warmup_requests":$WARMUP,"warmup_dataset_offset":$WARMUP_OFFSET,"separate_warmup":$SEPARATE_WARMUP,"dataset_kind":"$DATASET_KIND","formal_dataset_path":"$FORMAL_DATASET_PATH","formal_dataset_sha256":"$FORMAL_DATASET_SHA256","warmup_dataset_path":"$WARMUP_DATASET_PATH","warmup_dataset_sha256":"$WARMUP_DATASET_SHA256","workload_id":"$WORKLOAD_ID","server_lifecycle_id":"$SERVER_LIFECYCLE_ID","lifecycle_order_index":$LIFECYCLE_ORDER_INDEX,"lifecycle_sequence":"$LIFECYCLE_SEQUENCE","run_order_in_lifecycle":$REP,"timeseries_interval_s":$TIMESERIES_INTERVAL_S,"npu_sample_interval_s":$NPU_SAMPLE_INTERVAL_S,"seed":$SEED,"dataset_offset":$OFFSET,"temperature":0.0,"top_p":1.0,"sampling":"greedy","evalscope_version":"$EVALSCOPE_VERSION","strict_workload":true,"cache_state":"$CACHE_STATE","metric_boundary":"formal server metrics exclude the separately recorded warmup"}
 EOF
 
   RUN_STARTED_AT_UTC=$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -205,4 +207,7 @@ EOF
   python "$ROOT/benchmarks/qwen3_32b_tp2_fp16/extract_request_metrics.py" \
     "$CLIENT_ROOT/evalscope" \
     --output "$CLIENT_ROOT/request-metrics.json"
+  TRACE_FILE="$ROOT/benchmark-results/$CAMPAIGN/$RESULT_NAMESPACE/lifecycles/$SERVER_LIFECYCLE_ID/server/request-timing-trace.rank0.jsonl"
+  python "$ROOT/benchmarks/qwen3_32b_tp2_fp16/extract_server_request_trace.py" \
+    "$TRACE_FILE" --requests "$REQUESTS" --output "$SERVER_ROOT/request-timing.json"
 done

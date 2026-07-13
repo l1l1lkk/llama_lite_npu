@@ -1,5 +1,7 @@
 import unittest
 import importlib.util
+import json
+import tempfile
 from types import SimpleNamespace
 from pathlib import Path
 
@@ -106,6 +108,27 @@ class ObservabilityTests(unittest.TestCase):
             'lite_llama_request_latency_seconds_sum{endpoint="chat"} 1.0',
             text,
         )
+
+    def test_optional_request_trace_records_exact_queue_and_ttft(self):
+        request = SimpleNamespace(
+            request_id="trace-test", endpoint="chat", prompt_tokens=[1],
+            finish_reason=None,
+        )
+        with tempfile.TemporaryDirectory() as temp:
+            trace = Path(temp) / "trace.jsonl"
+            self.metrics.configure_request_timing_trace(trace)
+            self.metrics.on_request_submitted(request)
+            self.clock.advance(0.2)
+            self.metrics.on_request_admitted(request)
+            self.clock.advance(0.3)
+            self.metrics.on_token(request)
+            self.clock.advance(0.4)
+            self.metrics.on_request_finished(request)
+            record = json.loads(trace.read_text(encoding="utf-8"))
+        self.assertEqual(record["submission_order"], 1)
+        self.assertAlmostEqual(record["queue_wait_ms"], 200.0)
+        self.assertAlmostEqual(record["ttft_ms"], 500.0)
+        self.assertAlmostEqual(record["service_to_first_token_ms"], 300.0)
 
     def test_failures_and_rejections_are_attributed(self):
         request = SimpleNamespace(

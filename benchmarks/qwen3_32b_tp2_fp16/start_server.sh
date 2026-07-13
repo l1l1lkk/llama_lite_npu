@@ -15,10 +15,17 @@ case "$GRAPH_MODE" in
 esac
 
 SERVER_LIFECYCLE_ID=${SERVER_LIFECYCLE_ID:-}
+RESULT_NAMESPACE=${RESULT_NAMESPACE:-$GRAPH_MODE}
+DECODE_PRIORITY_MODE=${DECODE_PRIORITY_MODE:-on}
+case "$DECODE_PRIORITY_MODE" in
+  on) DECODE_PRIORITY_FLAG=--decode_priority ;;
+  off) DECODE_PRIORITY_FLAG=--no_decode_priority ;;
+  *) echo "DECODE_PRIORITY_MODE must be on or off" >&2; exit 2 ;;
+esac
 if [[ -n "$SERVER_LIFECYCLE_ID" ]]; then
-  RESULT_ROOT="$ROOT/benchmark-results/$CAMPAIGN/$GRAPH_MODE/lifecycles/$SERVER_LIFECYCLE_ID"
+  RESULT_ROOT="$ROOT/benchmark-results/$CAMPAIGN/$RESULT_NAMESPACE/lifecycles/$SERVER_LIFECYCLE_ID"
 else
-  RESULT_ROOT="$ROOT/benchmark-results/$CAMPAIGN/$GRAPH_MODE"
+  RESULT_ROOT="$ROOT/benchmark-results/$CAMPAIGN/$RESULT_NAMESPACE"
 fi
 mkdir -p "$RESULT_ROOT/server"
 PID_FILE="$RESULT_ROOT/server/server.pid"
@@ -45,13 +52,15 @@ COMMAND=(
   "$GRAPH_FLAG"
   --continuous_batching
   --max_batch_size "$MAX_BATCH_SIZE"
-  --decode_priority
+  "$DECODE_PRIORITY_FLAG"
 )
-printf '%q ' ASCEND_RT_VISIBLE_DEVICES="$NPU_DEVICES" "${COMMAND[@]}" > "$RESULT_ROOT/server/start-command.txt"
+TRACE_PREFIX="$RESULT_ROOT/server/request-timing-trace"
+printf '%q ' ASCEND_RT_VISIBLE_DEVICES="$NPU_DEVICES" LITE_LLAMA_REQUEST_TIMING_TRACE="$TRACE_PREFIX" "${COMMAND[@]}" > "$RESULT_ROOT/server/start-command.txt"
 printf '\n' >> "$RESULT_ROOT/server/start-command.txt"
 
 cd "$ROOT"
-nohup env ASCEND_RT_VISIBLE_DEVICES="$NPU_DEVICES" "${COMMAND[@]}" \
+nohup env ASCEND_RT_VISIBLE_DEVICES="$NPU_DEVICES" \
+  LITE_LLAMA_REQUEST_TIMING_TRACE="$TRACE_PREFIX" "${COMMAND[@]}" \
   > "$RESULT_ROOT/server/server.log" 2>&1 &
 SERVER_PID=$!
 echo "$SERVER_PID" > "$PID_FILE"
@@ -60,7 +69,7 @@ for _ in $(seq 1 180); do
   if curl -fsS "$SERVER_URL/health" > "$RESULT_ROOT/server/health.json" 2>/dev/null; then
     curl -fsS "$SERVER_URL/debug/stats" > "$RESULT_ROOT/server/start-stats.json"
     curl -fsS "$SERVER_URL/metrics" > "$RESULT_ROOT/server/start-metrics.prom"
-    echo "server ready: pid=$SERVER_PID graph=$GRAPH_MODE"
+    echo "server ready: pid=$SERVER_PID graph=$GRAPH_MODE decode_priority=$DECODE_PRIORITY_MODE"
     exit 0
   fi
   if ! kill -0 "$SERVER_PID" 2>/dev/null; then

@@ -7,9 +7,11 @@ they belong in structured logs instead.
 
 from __future__ import annotations
 
+import json
 import threading
 import time
 from collections import defaultdict
+from pathlib import Path
 from typing import Any, Callable
 
 from prometheus_client import (
@@ -90,9 +92,10 @@ def classify_failure(error: BaseException | str) -> str:
 
 
 class _RequestTiming:
-    def __init__(self, endpoint: str, started_at: float) -> None:
+    def __init__(self, endpoint: str, started_at: float, sequence: int) -> None:
         self.endpoint = endpoint
         self.started_at = started_at
+        self.sequence = sequence
         self.admitted_at: float | None = None
         self.first_token_at: float | None = None
         self.last_token_at: float | None = None
@@ -143,7 +146,10 @@ class InferenceMetrics:
         self.registry = registry or CollectorRegistry(auto_describe=True)
         self.clock = clock
         self._lock = threading.Lock()
+        self._trace_lock = threading.Lock()
         self._request_timings: dict[str, _RequestTiming] = {}
+        self._request_sequence = 0
+        self._request_trace_path: Path | None = None
         self._completed = defaultdict(int)
         self._failures = defaultdict(int)
         self._scheduler_snapshot = {
@@ -283,6 +289,23 @@ class InferenceMetrics:
             registry=self.registry,
         )
 
+    def configure_request_timing_trace(self, path: str | Path | None) -> None:
+        """Enable an optional benchmark-only JSONL request timing trace."""
+        trace_path = Path(path).resolve() if path else None
+        if trace_path is not None:
+            trace_path.parent.mkdir(parents=True, exist_ok=True)
+            trace_path.write_text("", encoding="utf-8")
+        with self._lock:
+            self._request_trace_path = trace_path
+
+    def _append_request_trace(self, record: dict[str, Any]) -> None:
+        path = self._request_trace_path
+        if path is None:
+            return
+        with self._trace_lock:
+            with path.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(record, sort_keys=True) + "\n")
+
     @staticmethod
     def _normalize_endpoint(endpoint: Any) -> str:
         endpoint = str(endpoint or "unknown")
@@ -296,8 +319,9 @@ class InferenceMetrics:
 
     def on_request_submitted(self, request: Any) -> None:
         endpoint = self._endpoint(request)
-        timing = _RequestTiming(endpoint, self.clock())
         with self._lock:
+            self._request_sequence += 1
+            timing = _RequestTiming(endpoint, self.clock(), self._request_sequence)
             self._request_timings[str(request.request_id)] = timing
         self.prompt_tokens_total.labels(endpoint=endpoint).inc(
             len(getattr(request, "prompt_tokens", ()))
@@ -371,12 +395,35 @@ class InferenceMetrics:
         request_id = str(request.request_id)
         endpoint = self._endpoint(request)
         elapsed = None
+        trace_record = None
+        finished_at = self.clock()
         with self._lock:
             timing = self._request_timings.pop(request_id, None)
             if timing is not None:
                 endpoint = timing.endpoint
-                elapsed = max(0.0, self.clock() - timing.started_at)
+                elapsed = max(0.0, finished_at - timing.started_at)
+                trace_record = {
+                    "submission_order": timing.sequence,
+                    "endpoint": endpoint,
+                    "status": status,
+                    "queue_wait_ms": (
+                        max(0.0, timing.admitted_at - timing.started_at) * 1000
+                        if timing.admitted_at is not None else None
+                    ),
+                    "ttft_ms": (
+                        max(0.0, timing.first_token_at - timing.started_at) * 1000
+                        if timing.first_token_at is not None else None
+                    ),
+                    "service_to_first_token_ms": (
+                        max(0.0, timing.first_token_at - timing.admitted_at) * 1000
+                        if timing.first_token_at is not None
+                        and timing.admitted_at is not None else None
+                    ),
+                    "e2e_ms": elapsed * 1000,
+                }
             self._completed[(endpoint, status)] += 1
+        if trace_record is not None:
+            self._append_request_trace(trace_record)
         self.requests_total.labels(endpoint=endpoint, status=status).inc()
         if elapsed is not None:
             self.request_latency_seconds.labels(

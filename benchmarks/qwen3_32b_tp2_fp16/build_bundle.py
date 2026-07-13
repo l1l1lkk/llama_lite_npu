@@ -23,6 +23,13 @@ OPTIONAL_ROOT_FILES = (
     "timeseries-summary.csv",
     "saturation-analysis.json",
     "task3-validation.json",
+    "decode-priority-run-metrics.csv",
+    "decode-priority-aggregate.csv",
+    "decode-priority-paired-ratios.csv",
+    "decode-priority-comparison.csv",
+    "decode-priority-fairness.csv",
+    "decode-priority-causal.json",
+    "task4-validation.json",
     "campaign-plan.json",
 )
 ENVIRONMENT_FILES = (
@@ -63,6 +70,7 @@ OPTIONAL_RUN_DIRECT_FILES = (
     "server/timeseries.jsonl",
     "server/timeseries-command.txt",
     "server/timeseries-exit-code.txt",
+    "server/request-timing.json",
 )
 EVALSCOPE_FILES = (
     "benchmark_args.json",
@@ -127,7 +135,11 @@ def main() -> int:
     for workload_path in sorted((source / "workload").glob("*")):
         if workload_path.is_file():
             selected.add(workload_path.relative_to(source))
-    for graph in ("on", "off"):
+    namespaces = sorted(
+        path.name for path in source.iterdir()
+        if path.is_dir() and path.name != "environment"
+    )
+    for graph in namespaces:
         for name in LIFECYCLE_FILES:
             candidate = Path(graph) / "server" / name
             if (source / candidate).is_file():
@@ -139,10 +151,10 @@ def main() -> int:
                 candidate_path = lifecycle_server / name
                 if candidate_path.is_file():
                     selected.add(candidate_path.relative_to(source))
+            for trace in lifecycle_server.glob("request-timing-trace.rank*.jsonl"):
+                selected.add(trace.relative_to(source))
 
-    for metadata_path in sorted(source.glob("on/p*/run-*/run-metadata.json")) + sorted(
-        source.glob("off/p*/run-*/run-metadata.json")
-    ):
+    for metadata_path in sorted(source.glob("*/p*/run-*/run-metadata.json")):
         run_root = metadata_path.parent
         summaries = list((run_root / "client" / "evalscope").glob("**/benchmark_summary.json"))
         if len(summaries) != 1:
@@ -218,6 +230,15 @@ def main() -> int:
             ],
             check=True,
         )
+    if (output / "task4-validation.json").is_file():
+        subprocess.run(
+            [
+                sys.executable,
+                str(Path(__file__).with_name("compare_decode_priority.py")),
+                str(output),
+            ],
+            check=True,
+        )
 
     source_files = sorted(path for path in source.rglob("*") if path.is_file())
     omitted = [file_record(path, source) for path in source_files if path.relative_to(source) not in selected]
@@ -269,6 +290,10 @@ def main() -> int:
             ),
             "scalability_analysis": (
                 "python benchmarks/qwen3_32b_tp2_fp16/analyze_scalability.py "
+                f"benchmarks/results/{source.name} --compare"
+            ),
+            "decode_priority_comparison": (
+                "python benchmarks/qwen3_32b_tp2_fp16/compare_decode_priority.py "
                 f"benchmarks/results/{source.name} --compare"
             ),
             "bundle_validation": (

@@ -108,20 +108,19 @@ def validate_run(metadata_path: Path, campaign: Path) -> dict[str, object]:
         result["prompt_sequence_sha256"] = fingerprint.get(
             "prompt_sequence_sha256"
         )
+    if "benchmark_variant" in metadata:
+        result["benchmark_variant"] = metadata["benchmark_variant"]
     return result
 
 
 def build_report(campaign: Path) -> dict[str, object]:
-    metadata_paths = sorted([
-        *campaign.glob("on/p*/run-*/run-metadata.json"),
-        *campaign.glob("off/p*/run-*/run-metadata.json"),
-    ])
+    metadata_paths = sorted(campaign.glob("*/p*/run-*/run-metadata.json"))
     runs = [validate_run(path, campaign) for path in metadata_paths]
     if not runs:
         raise ValueError(f"no runs found under {campaign}")
     cases: dict[str, dict[str, object]] = {}
     for run in runs:
-        key = f"{run['graph']}:c{run['concurrency']}"
+        key = f"{run.get('benchmark_variant', run['graph'])}:c{run['concurrency']}"
         case = cases.setdefault(key, {"runs": 0, "passed": 0, "run_ids": []})
         case["runs"] += 1
         case["passed"] += run["status"] == "pass"

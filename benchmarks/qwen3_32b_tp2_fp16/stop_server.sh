@@ -6,10 +6,11 @@ source "$ROOT/benchmarks/qwen3_32b_tp2_fp16/baseline.env"
 GRAPH_MODE=${1:?usage: stop_server.sh on|off CAMPAIGN_ID}
 CAMPAIGN=${2:?usage: stop_server.sh on|off CAMPAIGN_ID}
 SERVER_LIFECYCLE_ID=${SERVER_LIFECYCLE_ID:-}
+RESULT_NAMESPACE=${RESULT_NAMESPACE:-$GRAPH_MODE}
 if [[ -n "$SERVER_LIFECYCLE_ID" ]]; then
-  RESULT_ROOT="$ROOT/benchmark-results/$CAMPAIGN/$GRAPH_MODE/lifecycles/$SERVER_LIFECYCLE_ID"
+  RESULT_ROOT="$ROOT/benchmark-results/$CAMPAIGN/$RESULT_NAMESPACE/lifecycles/$SERVER_LIFECYCLE_ID"
 else
-  RESULT_ROOT="$ROOT/benchmark-results/$CAMPAIGN/$GRAPH_MODE"
+  RESULT_ROOT="$ROOT/benchmark-results/$CAMPAIGN/$RESULT_NAMESPACE"
 fi
 PID_FILE="$RESULT_ROOT/server/server.pid"
 

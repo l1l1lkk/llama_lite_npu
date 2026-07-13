@@ -116,6 +116,11 @@ _scheduler_thread = None
 _scheduler_stop = None
 _scheduler_poll_seconds = 0.001
 _metrics = InferenceMetrics()
+_request_trace_prefix = os.environ.get("LITE_LLAMA_REQUEST_TIMING_TRACE")
+if _request_trace_prefix:
+    _metrics.configure_request_timing_trace(
+        f"{_request_trace_prefix}.rank{os.environ.get('LOCAL_RANK', '0')}.jsonl"
+    )
 _sampling_candidate_k = 2048
 
 

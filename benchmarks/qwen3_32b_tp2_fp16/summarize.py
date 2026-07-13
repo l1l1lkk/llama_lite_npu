@@ -51,10 +51,7 @@ def main() -> int:
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     rows = []
-    metadata_paths = sorted([
-        *args.campaign_dir.glob("on/p*/run-*/run-metadata.json"),
-        *args.campaign_dir.glob("off/p*/run-*/run-metadata.json"),
-    ])
+    metadata_paths = sorted(args.campaign_dir.glob("*/p*/run-*/run-metadata.json"))
     for metadata_path in metadata_paths:
         run_root = metadata_path.parent
         summaries = list((run_root / "client" / "evalscope").glob("**/benchmark_summary.json"))
@@ -133,8 +130,9 @@ def main() -> int:
 
     grouped = defaultdict(list)
     for row in rows:
-        grouped[(row["graph"], row["target_server_input_tokens"], row["output_tokens"], row["concurrency"])].append(row)
+        grouped[(row.get("benchmark_variant", row["graph"]), row["target_server_input_tokens"], row["output_tokens"], row["concurrency"])].append(row)
     aggregates = []
+    include_variant = any("benchmark_variant" in row for row in rows)
     metric_names = (
         "client_e2e_latency_s",
         "client_ttft_ms",
@@ -145,9 +143,9 @@ def main() -> int:
         "client_qps",
         "server_queue_wait_mean_ms",
     )
-    for (graph, prompt, output_tokens, concurrency), group in sorted(grouped.items()):
+    for (variant, prompt, output_tokens, concurrency), group in sorted(grouped.items()):
         aggregate = {
-            "graph": graph,
+            "graph": group[0]["graph"],
             "target_server_input_tokens": prompt,
             "output_tokens": output_tokens,
             "concurrency": concurrency,
@@ -160,6 +158,12 @@ def main() -> int:
             "server_graph_fallbacks_delta": sum((r["server_graph_fallbacks_delta"] or 0) for r in group),
             "run_ids": ";".join(r["run_id"] for r in group),
         }
+        if include_variant:
+            aggregate = {
+                "graph": aggregate.pop("graph"),
+                "benchmark_variant": variant,
+                **aggregate,
+            }
         for name in metric_names:
             values = [float(r[name]) for r in group if r[name] is not None]
             aggregate[name + "_mean"] = (

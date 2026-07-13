@@ -63,6 +63,25 @@ class RequestMetricExtractorTest(unittest.TestCase):
             self.assertAlmostEqual(report["requests"][0]["itl_mean_ms"], 150.0)
 
 
+class ServerRequestTraceExtractorTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.module = load("server_request_trace_extractor_test", "extract_server_request_trace.py")
+
+    def test_extracts_last_formal_window_in_submission_order(self):
+        with tempfile.TemporaryDirectory() as temp:
+            trace = Path(temp) / "trace.jsonl"
+            records = [
+                {"submission_order": index, "status": "success", "queue_wait_ms": index,
+                 "ttft_ms": index + 10, "service_to_first_token_ms": 10, "e2e_ms": 20}
+                for index in range(1, 7)
+            ]
+            trace.write_text("".join(json.dumps(item) + "\n" for item in records), encoding="utf-8")
+            report = self.module.extract(trace, 4)
+        self.assertEqual([item["submission_order"] for item in report["requests"]], [3, 4, 5, 6])
+        self.assertEqual([item["formal_submission_order"] for item in report["requests"]], [1, 2, 3, 4])
+
+
 class ScalabilityAnalyzerTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -106,6 +125,9 @@ class ScalabilityContractTest(unittest.TestCase):
             self.assertIn(value, run)
         self.assertIn("SERVER_LIFECYCLE_ID", start)
         self.assertIn("SERVER_LIFECYCLE_ID", stop)
+        self.assertIn("DECODE_PRIORITY_MODE", start)
+        self.assertIn("RESULT_NAMESPACE", run)
+        self.assertIn("extract_server_request_trace.py", run)
 
     def test_campaign_plan_is_fixed_and_complete(self):
         plan = json.loads(
@@ -119,6 +141,35 @@ class ScalabilityContractTest(unittest.TestCase):
             {(item["concurrency"], item["repeat"]) for item in plan["sequence"]},
             {(concurrency, repeat) for concurrency in (1, 2, 4, 8, 16) for repeat in (1, 2, 3)},
         )
+
+    def test_decode_priority_campaign_plan_is_paired_and_interleaved(self):
+        plan = json.loads(
+            (BENCHMARK / "campaigns/20260713_decode_priority_ablation.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertTrue(plan["sequence_locked_before_formal_runs"])
+        self.assertEqual(len(plan["sequence"]), 30)
+        observed = {
+            (item["concurrency"], item["repeat"], item["mode"])
+            for item in plan["sequence"]
+        }
+        expected = {
+            (concurrency, repeat, mode)
+            for concurrency in (1, 2, 4, 8, 16)
+            for repeat in (1, 2, 3)
+            for mode in ("priority_on", "priority_off")
+        }
+        self.assertEqual(observed, expected)
+        for concurrency in (1, 2, 4, 8, 16):
+            first_modes = []
+            for repeat in (1, 2, 3):
+                pair = sorted(
+                    (item for item in plan["sequence"] if item["concurrency"] == concurrency and item["repeat"] == repeat),
+                    key=lambda item: item["order"],
+                )
+                first_modes.append(pair[0]["mode"])
+            self.assertNotEqual(first_modes[0], first_modes[1])
 
 
 if __name__ == "__main__":
