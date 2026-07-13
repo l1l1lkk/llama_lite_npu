@@ -58,9 +58,8 @@ def main() -> int:
         ("p128_o256_n32-warmup.jsonl", unique[args.requests:required]),
     ):
         path = output_root / name
-        path.write_text(
-            "".join(json.dumps(value, ensure_ascii=False) + "\n" for value in values),
-            encoding="utf-8",
+        path.write_bytes(
+            "".join(json.dumps(value, ensure_ascii=False) + "\n" for value in values).encode("utf-8")
         )
         outputs.append({"path": name, "request_count": len(values), "sha256": sha256(path)})
     manifest = {
