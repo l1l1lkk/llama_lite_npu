@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "campaign_id": "20260713_qwen3_32b_tp2_fp16_graph_scalability",
+  "strategy": "one independent Graph-on server lifecycle per formal run",
+  "formal_requests_per_run": 32,
+  "formal_dataset": "benchmarks/qwen3_32b_tp2_fp16/datasets/20260713_scalability/p128_o256_n32-formal.jsonl",
+  "formal_dataset_sha256": "11b2c0d603619092f7d2a35eae53cafc5cb32d4e7d642a429e29a41758a428ba",
+  "warmup_rule": "2 * concurrency",
+  "sequence_locked_before_remaining_formal_runs": true,
+  "sequence": [
+    {"order": 1, "round": 1, "concurrency": 1, "repeat": 1, "lifecycle_id": "c1", "status_at_plan_lock": "completed_before_strategy_change"},
+    {"order": 2, "round": 1, "concurrency": 8, "repeat": 1, "lifecycle_id": "r1-c8"},
+    {"order": 3, "round": 1, "concurrency": 2, "repeat": 1, "lifecycle_id": "r1-c2"},
+    {"order": 4, "round": 1, "concurrency": 16, "repeat": 1, "lifecycle_id": "r1-c16"},
+    {"order": 5, "round": 1, "concurrency": 4, "repeat": 1, "lifecycle_id": "r1-c4"},
+    {"order": 6, "round": 2, "concurrency": 4, "repeat": 2, "lifecycle_id": "r2-c4"},
+    {"order": 7, "round": 2, "concurrency": 16, "repeat": 2, "lifecycle_id": "r2-c16"},
+    {"order": 8, "round": 2, "concurrency": 2, "repeat": 2, "lifecycle_id": "r2-c2"},
+    {"order": 9, "round": 2, "concurrency": 8, "repeat": 2, "lifecycle_id": "r2-c8"},
+    {"order": 10, "round": 2, "concurrency": 1, "repeat": 2, "lifecycle_id": "r2-c1"},
+    {"order": 11, "round": 3, "concurrency": 2, "repeat": 3, "lifecycle_id": "r3-c2"},
+    {"order": 12, "round": 3, "concurrency": 1, "repeat": 3, "lifecycle_id": "r3-c1"},
+    {"order": 13, "round": 3, "concurrency": 4, "repeat": 3, "lifecycle_id": "r3-c4"},
+    {"order": 14, "round": 3, "concurrency": 8, "repeat": 3, "lifecycle_id": "r3-c8"},
+    {"order": 15, "round": 3, "concurrency": 16, "repeat": 3, "lifecycle_id": "r3-c16"}
+  ],
+  "rejected_diagnostic": {
+    "id": "c1-r2-warmup-stall",
+    "formal_run": false,
+    "reason": "same-service second warmup stalled with waiting=1, running=0 and idle AICore",
+    "root_cause_status": "suspected scheduler state or wakeup stall; not code-proven"
+  }
+}

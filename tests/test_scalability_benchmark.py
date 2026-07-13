@@ -107,6 +107,19 @@ class ScalabilityContractTest(unittest.TestCase):
         self.assertIn("SERVER_LIFECYCLE_ID", start)
         self.assertIn("SERVER_LIFECYCLE_ID", stop)
 
+    def test_campaign_plan_is_fixed_and_complete(self):
+        plan = json.loads(
+            (BENCHMARK / "campaigns/20260713_graph_scalability.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertTrue(plan["sequence_locked_before_remaining_formal_runs"])
+        self.assertEqual(len(plan["sequence"]), 15)
+        self.assertEqual(
+            {(item["concurrency"], item["repeat"]) for item in plan["sequence"]},
+            {(concurrency, repeat) for concurrency in (1, 2, 4, 8, 16) for repeat in (1, 2, 3)},
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

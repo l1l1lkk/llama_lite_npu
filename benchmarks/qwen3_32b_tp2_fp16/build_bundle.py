@@ -23,6 +23,7 @@ OPTIONAL_ROOT_FILES = (
     "timeseries-summary.csv",
     "saturation-analysis.json",
     "task3-validation.json",
+    "campaign-plan.json",
 )
 ENVIRONMENT_FILES = (
     "ascend-env.txt",

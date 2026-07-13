@@ -239,6 +239,7 @@ def write_csv(path: Path, rows: list[dict]) -> None:
 
 
 def build(campaign: Path) -> tuple[dict[str, list[dict]], dict[str, dict]]:
+    campaign_plan = read_json(campaign / "campaign-plan.json")
     metadata_paths = sorted(campaign.glob("on/p*/run-*/run-metadata.json"))
     if len(metadata_paths) != 15:
         raise ValueError(f"expected 15 runs, found {len(metadata_paths)}")
@@ -434,6 +435,23 @@ def build(campaign: Path) -> tuple[dict[str, list[dict]], dict[str, dict]]:
         "observed_prompt_multiset_equal": workload_equal,
         "evalscope_args_equal_except_concurrency": args_equal_except_concurrency,
         "server_commands_identical": commands_equal,
+        "campaign_plan_matches_runs": sorted(
+            (
+                int(item["order"]),
+                int(item["concurrency"]),
+                int(item["repeat"]),
+                item["lifecycle_id"],
+            )
+            for item in campaign_plan["sequence"]
+        ) == sorted(
+            (
+                int(read_json(path)["lifecycle_order_index"]),
+                int(read_json(path)["concurrency"]),
+                int(read_json(path)["run_order_in_lifecycle"]),
+                read_json(path)["server_lifecycle_id"],
+            )
+            for path in metadata_paths
+        ),
         "all_run_checks_pass": all(all(item["checks"].values()) for item in validations),
     }
     if not all(common_checks.values()):
