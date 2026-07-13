@@ -38,8 +38,17 @@ def check_version_docs() -> None:
         raise SystemExit(f"missing release document: {release_doc.relative_to(ROOT)}")
     for readme in ("README.md", "README_CN.md"):
         text = ROOT.joinpath(readme).read_text(encoding="utf-8")
-        if version not in text:
-            raise SystemExit(f"{readme} does not mention current VERSION={version}")
+        badge = f"version-{version}-blue"
+        if badge not in text:
+            raise SystemExit(f"{readme} badge does not match VERSION={version}")
+        if f"v{version}" not in text:
+            raise SystemExit(f"{readme} does not link current release v{version}")
+    changelog = ROOT.joinpath("CHANGELOG.md").read_text(encoding="utf-8")
+    if f"## [{version}]" not in changelog:
+        raise SystemExit(f"CHANGELOG.md is missing current VERSION={version}")
+    docs_index = ROOT.joinpath("docs/README.md").read_text(encoding="utf-8")
+    if f"releases/v{version}.md" not in docs_index:
+        raise SystemExit(f"docs/README.md does not index v{version}")
     print(f"version docs ok: {version}", flush=True)
 
 

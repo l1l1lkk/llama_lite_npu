@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.0.13rc3] - 2026-07-13
+
+Fixed-output request control and strict benchmark release.
+
+### Added
+
+- Added the public OpenAI-compatible `min_tokens` request field for chat and completion requests, including boundary validation and per-request propagation through Continuous Batching.
+- Added per-row EOS-logit masking before sampling until each request reaches its own `min_tokens` threshold.
+- Added `min_tokens` to Tensor Parallel prefill control messages so all ranks make the same EOS-mask decision.
+
+### Changed
+
+- Greedy and Top-P sampling now suppress EOS independently for only the rows that have not reached their minimum output length; `min_tokens=0` preserves the previous behavior and EOS can stop normally after the threshold.
+
+### Tests
+
+- Added schema, streaming, scheduler, sampling, TP-control, boundary, and post-threshold EOS tests.
+- Validated fixed 256-token output for Qwen3-32B, TP=2, FP16 on two Atlas 910B3 devices at concurrency 1 and 4, with three strict runs per case and zero failures.
+- Added a fully paired NPU Graph on/off campaign with frozen request datasets, per-request token fingerprints, Graph counter checks, and an offline-rebuildable Git bundle.
+
+### Benchmark
+
+- For Qwen3-32B, TP=2, FP16, prompt 128, fixed greedy output 256, Graph on reduced mean E2E latency by 79.43% at concurrency 1 and 78.17% at concurrency 4; output throughput was 4.862x and 4.558x higher respectively. These ratios use only the six exact on/off run pairs in the v0.0.13rc3 bundle and are not a vLLM comparison.
+
+### Known limitations
+
+- The legacy non-Continuous-Batching generation path does not yet consume the public `min_tokens` field.
+- High-concurrency TTFT and queue wait require separate root-cause analysis and are intentionally deferred to the next benchmark stage.
+
+### Docs
+
+- [v0.0.13rc3 release report](docs/releases/v0.0.13rc3.md)
+- [fixed-output validation report](docs/benchmark_results/20260712_min_tokens_fixed_output.md)
+- [strict NPU Graph ablation report](docs/benchmark_results/20260712_qwen3_32b_tp2_fp16_graph_ablation.md)
+
 ## [0.0.13rc2] - 2026-07-09
 
 Release-validation compatibility bugfix.

@@ -18,6 +18,9 @@
 
 ## 发布文档
 
+- [v0.0.13rc3 发布记录](releases/v0.0.13rc3.md)：`min_tokens` 固定输出控制与严格 NPU Graph 消融。
+- [v0.0.13rc2 发布记录](releases/v0.0.13rc2.md)：发布验证兼容性。
+- [v0.0.13rc1 发布记录](releases/v0.0.13rc1.md)：Decode Priority 调度。
 - [v0.0.10rc3 发布记录](releases/v0.0.10rc3.md)：Prometheus 可观测性。
 - [v0.0.10rc2 发布记录](releases/v0.0.10rc2.md)：GitHub 首页与文档整理。
 - [v0.0.10rc1 发布记录](releases/v0.0.10rc1.md)：Decode 热路径清理。

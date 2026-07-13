@@ -4,7 +4,7 @@
 
 [English](README.md) | [中文](README_CN.md)
 
-![Version](https://img.shields.io/badge/version-0.0.13rc2-blue)
+![Version](https://img.shields.io/badge/version-0.0.13rc3-blue)
 
 ## 项目定位
 
@@ -27,6 +27,7 @@ OpenAI 兼容 API -> Continuous Batch Scheduler -> ModelExecutor -> Paged KV / A
 | 模型 | Qwen3-VL | 已支持 |
 | 并行 | Tensor Parallel | 已支持 |
 | 服务 | OpenAI Chat/Completions API | 已支持 |
+| 服务 | 逐请求 `min_tokens` 固定输出控制 | Continuous Batching 已支持 |
 | 调度 | Continuous Batching | 已支持 |
 | 调度 | Token 预算准入 | 已支持 |
 | 调度 | 自适应 Chunked Prefill | 已支持 |
@@ -41,16 +42,16 @@ OpenAI 兼容 API -> Continuous Batch Scheduler -> ModelExecutor -> Paged KV / A
 
 以下结果来自 **2 张 Atlas 910B3、Qwen3-32B、TP=2** 的历史实测。原始上下文见 [`docs/inference_performance_history.md`](docs/inference_performance_history.md)。
 
-### 最新 v0.0.13rc2 调度 A/B
+### 最新 v0.0.13rc3 严格 NPU Graph 消融
 
-EvalScope random 数据集，Qwen3-32B，TP=2，并发 4，平均输入 178 tokens，Top-P 采样：
+Qwen3-32B、TP=2、FP16、prompt 128、`min_tokens=max_tokens=256`、greedy；每个 on/off 配对使用相同冻结请求并完成三轮正式测试：
 
-| 模式 | 输出吞吐 | 总吞吐 | 平均延迟 | TTFT | TPOT | ITL | 成功率 |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| `--decode_priority` | **39.00 tok/s** | 66.13 tok/s | 25.88 s | 13.438 s | 48.82 ms | 48.73 ms | 40 / 40 |
-| `--no_decode_priority` | **56.06 tok/s** | 97.42 tok/s | 16.59 s | 1.889 s | 61.66 ms | 61.21 ms | 40 / 40 |
+| 并发 | Graph on E2E | Graph off E2E | E2E 降低 | Graph on 输出吞吐 | Graph off 输出吞吐 | 吞吐比 |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 10.2149 s | 49.6692 s | **79.43%** | 25.060 tok/s | 5.154 tok/s | **4.862x** |
+| 4 | 21.0396 s | 96.3659 s | **78.17%** | 45.332 tok/s | 9.946 tok/s | **4.558x** |
 
-`--decode_priority` 会降低 decode 单步延迟，但会延后新请求的 prefill。在线服务建议默认开启；离线吞吐压测可以关闭。
+12 个正式 run 全部严格满足输入 128、输出 256、失败数 0。这是项目内部 Graph on/off 消融，不是与 vLLM-Ascend 的对比。逐 run JSON、metrics、token 指纹和离线重建工具位于 `benchmarks/results/20260712_qwen3_32b_tp2_fp16_graph_ablation/`。
 
 | 测试场景 | 版本 | 并发 | 平均输入 / 输出 | 输出吞吐 | 总吞吐 | TTFT | TPOT | ITL |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
@@ -59,11 +60,12 @@ EvalScope random 数据集，Qwen3-32B，TP=2，并发 4，平均输入 178 toke
 | 固定长度 Top-P | v0.0.7rc1 | 4 | 156 / 231.325 | **57.7176 tok/s** | 96.6409 tok/s | 1.4861 s | 62.9 ms | 61.6 ms |
 | 混合长度 Greedy | v0.0.8rc1 | 4 | 285.475 / 245.7 | **50.1580 tok/s** | 108.436 tok/s | 5.1176 s | 57.8 ms | 57.1 ms |
 
-v0.0.11rc1 和 v0.0.13rc2 是采样路径与调度策略更新，新的服务器实测数据会按 release 文档中的命令采集后再更新到性能表。
+v0.0.13rc3 在 Continuous Batching 路径新增逐请求 `min_tokens`，并在达到阈值前按 batch row 于采样前屏蔽 EOS。
 
 ## 当前版本说明
 
-- [v0.0.13rc2 发布记录](docs/releases/v0.0.13rc2.md)：自适应 Chunked Prefill 与调度策略。
+- [v0.0.13rc3 发布记录](docs/releases/v0.0.13rc3.md)：固定输出控制与严格 Graph 消融。
+- [v0.0.13rc2 发布记录](docs/releases/v0.0.13rc2.md)：发布验证兼容性。
 - [v0.0.11rc1 发布记录](docs/releases/v0.0.11rc1.md)：批量 vocab-parallel Top-P 采样。
 - [v0.0.10rc3 发布记录](docs/releases/v0.0.10rc3.md)：Prometheus 可观测性。
 

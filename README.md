@@ -12,7 +12,7 @@ the core execution path instead of wrapping a high-level inference library.
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.7-orange)
 ![Ascend](https://img.shields.io/badge/Ascend-910B3-red)
-![Version](https://img.shields.io/badge/version-0.0.13rc2-blue)
+![Version](https://img.shields.io/badge/version-0.0.13rc3-blue)
 
 </div>
 
@@ -74,6 +74,7 @@ It is not positioned as a production replacement for vLLM-Ascend or MindIE.
 | Parallelism | Tensor Parallel | Supported |
 | Parallelism | Single-node Expert Parallel | Experimental |
 | Serving | OpenAI Chat/Completions API | Supported |
+| Serving | Per-request `min_tokens` fixed-output control | Supported with Continuous Batching |
 | Scheduling | Continuous Batching | Supported |
 | Scheduling | Token-budget admission | Supported |
 | Scheduling | Adaptive Chunked Prefill | Supported |
@@ -99,16 +100,19 @@ All numbers below were measured on **2 × Atlas 910B3** with Qwen3-32B and
 
 ### EvalScope service benchmarks
 
-Latest v0.0.13rc2 server A/B, EvalScope random dataset, Qwen3-32B, TP=2,
-concurrency 4, average input 178 tokens, Top-P sampling:
+Latest v0.0.13rc3 strict NPU Graph ablation: Qwen3-32B, TP=2, FP16,
+prompt 128, `min_tokens=max_tokens=256`, greedy sampling. Each on/off pair uses
+the same frozen requests and three formal runs:
 
-| Mode | Output throughput | Total throughput | Avg latency | TTFT | TPOT | ITL | Success |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| `--decode_priority` | **39.00 tok/s** | 66.13 tok/s | 25.88 s | 13.438 s | 48.82 ms | 48.73 ms | 40 / 40 |
-| `--no_decode_priority` | **56.06 tok/s** | 97.42 tok/s | 16.59 s | 1.889 s | 61.66 ms | 61.21 ms | 40 / 40 |
+| Concurrency | Graph on E2E | Graph off E2E | E2E reduction | Graph on output throughput | Graph off output throughput | Throughput ratio |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 10.2149 s | 49.6692 s | **79.43%** | 25.060 tok/s | 5.154 tok/s | **4.862x** |
+| 4 | 21.0396 s | 96.3659 s | **78.17%** | 45.332 tok/s | 9.946 tok/s | **4.558x** |
 
-`--decode_priority` lowers decode-step latency but delays new prefill. Use it for
-serving stability; use `--no_decode_priority` for offline throughput tests.
+All 12 formal runs have exactly 128 input and 256 output tokens with zero
+failures. This is an internal Graph on/off ablation, not a comparison with
+vLLM-Ascend. Raw JSON, metrics, token fingerprints, and offline rebuild tools
+are tracked under `benchmarks/results/20260712_qwen3_32b_tp2_fp16_graph_ablation/`.
 
 | Workload | Version | Concurrency | Avg input / output | Output throughput | Total throughput | TTFT | TPOT | ITL |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
@@ -117,9 +121,8 @@ serving stability; use `--no_decode_priority` for offline throughput tests.
 | Fixed-length Top-P | v0.0.7rc1 | 4 | 156 / 231.325 | **57.7176 tok/s** | 96.6409 tok/s | 1.4861 s | 62.9 ms | 61.6 ms |
 | Mixed-length Greedy | v0.0.8rc1 | 4 | 285.475 / 245.7 | **50.1580 tok/s** | 108.436 tok/s | 5.1176 s | 57.8 ms | 57.1 ms |
 
-Current v0.0.13rc2 changes are scheduler and sampling-path changes. The release
-reports include the exact commands that should be used for fresh server-side
-measurements before adding new benchmark rows.
+v0.0.13rc3 adds per-request `min_tokens` to the Continuous Batching path and
+masks EOS per batch row before sampling until the threshold is reached.
 
 ### MoE kernel and graph evolution
 
@@ -137,7 +140,8 @@ tokens:
 
 ## Current Release Notes
 
-- [v0.0.13rc2 Release Report](docs/releases/v0.0.13rc2.md) - adaptive chunked prefill and scheduler policy.
+- [v0.0.13rc3 Release Report](docs/releases/v0.0.13rc3.md) - fixed-output control and strict Graph ablation.
+- [v0.0.13rc2 Release Report](docs/releases/v0.0.13rc2.md) - release-validation compatibility.
 - [v0.0.11rc1 Release Report](docs/releases/v0.0.11rc1.md) - batched vocabulary-parallel Top-P sampling.
 - [v0.0.10rc3 Release Report](docs/releases/v0.0.10rc3.md) - Prometheus observability.
 

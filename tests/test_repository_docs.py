@@ -33,7 +33,15 @@ class RepositoryDocumentationTests(unittest.TestCase):
         english = (ROOT / "README.md").read_text(encoding="utf-8")
         chinese = (ROOT / "README_CN.md").read_text(encoding="utf-8")
 
-        for value in ("24.7089", "63.3523", "57.7176", "50.158", "39.00", "56.06"):
+        for value in (
+            "24.7089",
+            "63.3523",
+            "57.7176",
+            "50.158",
+            "10.2149",
+            "49.6692",
+            "4.862x",
+        ):
             self.assertIn(value, english)
             self.assertIn(value, chinese)
 
@@ -42,12 +50,20 @@ class RepositoryDocumentationTests(unittest.TestCase):
         english = (ROOT / "README.md").read_text(encoding="utf-8")
         chinese = (ROOT / "README_CN.md").read_text(encoding="utf-8")
 
-        self.assertEqual(version, "0.0.13rc2")
-        self.assertIn("0.0.13rc2", english)
-        self.assertIn("0.0.13rc2", chinese)
+        self.assertEqual(version, "0.0.13rc3")
+        self.assertIn("0.0.13rc3", english)
+        self.assertIn("0.0.13rc3", chinese)
+        self.assertTrue((ROOT / "docs/releases/v0.0.13rc3.md").exists())
         self.assertTrue((ROOT / "docs/releases/v0.0.13rc2.md").exists())
         self.assertTrue((ROOT / "docs/releases/v0.0.11rc1.md").exists())
         self.assertTrue((ROOT / "docs/observability.md").exists())
+
+    def test_versioning_distinguishes_release_impact(self):
+        versioning = (ROOT / "docs/versioning.md").read_text(encoding="utf-8")
+        self.assertIn("功能大更新", versioning)
+        self.assertIn("小功能或 Bug 修复", versioning)
+        self.assertIn("0.0.13rc2 -> 0.0.13rc3", versioning)
+        self.assertIn("benchmark 数据与测试脚本", versioning)
 
     def test_core_modules_have_module_docstrings(self):
         modules = (
