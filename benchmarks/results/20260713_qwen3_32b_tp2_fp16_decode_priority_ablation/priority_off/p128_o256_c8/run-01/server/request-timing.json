@@ -1,0 +1,327 @@
+{
+  "schema_version": 1,
+  "source_trace": "request-timing-trace.rank0.jsonl",
+  "request_count": 32,
+  "requests": [
+    {
+      "e2e_ms": 18409.470707178116,
+      "endpoint": "chat",
+      "queue_wait_ms": 1.8343795090913773,
+      "service_to_first_token_ms": 410.97153164446354,
+      "status": "success",
+      "submission_order": 17,
+      "ttft_ms": 412.8059111535549,
+      "formal_submission_order": 1
+    },
+    {
+      "e2e_ms": 18472.61174954474,
+      "endpoint": "chat",
+      "queue_wait_ms": 407.38402865827084,
+      "service_to_first_token_ms": 2248.5746201127768,
+      "status": "success",
+      "submission_order": 18,
+      "ttft_ms": 2655.9586487710476,
+      "formal_submission_order": 2
+    },
+    {
+      "e2e_ms": 18470.960227772593,
+      "endpoint": "chat",
+      "queue_wait_ms": 405.54890781641006,
+      "service_to_first_token_ms": 2248.6637085676193,
+      "status": "success",
+      "submission_order": 19,
+      "ttft_ms": 2654.2126163840294,
+      "formal_submission_order": 3
+    },
+    {
+      "e2e_ms": 18468.058394268155,
+      "endpoint": "chat",
+      "queue_wait_ms": 402.54196524620056,
+      "service_to_first_token_ms": 2248.7083598971367,
+      "status": "success",
+      "submission_order": 20,
+      "ttft_ms": 2651.2503251433372,
+      "formal_submission_order": 4
+    },
+    {
+      "e2e_ms": 18462.779458612204,
+      "endpoint": "chat",
+      "queue_wait_ms": 397.0083985477686,
+      "service_to_first_token_ms": 2248.7489599734545,
+      "status": "success",
+      "submission_order": 21,
+      "ttft_ms": 2645.757358521223,
+      "formal_submission_order": 5
+    },
+    {
+      "e2e_ms": 18460.977727547288,
+      "endpoint": "chat",
+      "queue_wait_ms": 394.99184861779213,
+      "service_to_first_token_ms": 2248.787308111787,
+      "status": "success",
+      "submission_order": 22,
+      "ttft_ms": 2643.779156729579,
+      "formal_submission_order": 6
+    },
+    {
+      "e2e_ms": 18459.405543282628,
+      "endpoint": "chat",
+      "queue_wait_ms": 393.08844320476055,
+      "service_to_first_token_ms": 2248.825840651989,
+      "status": "success",
+      "submission_order": 23,
+      "ttft_ms": 2641.9142838567495,
+      "formal_submission_order": 7
+    },
+    {
+      "e2e_ms": 18458.241214975715,
+      "endpoint": "chat",
+      "queue_wait_ms": 391.8335549533367,
+      "service_to_first_token_ms": 2248.860267922282,
+      "status": "success",
+      "submission_order": 24,
+      "ttft_ms": 2640.693822875619,
+      "formal_submission_order": 8
+    },
+    {
+      "e2e_ms": 18492.818161845207,
+      "endpoint": "chat",
+      "queue_wait_ms": 62.36838921904564,
+      "service_to_first_token_ms": 404.4470265507698,
+      "status": "success",
+      "submission_order": 25,
+      "ttft_ms": 466.81541576981544,
+      "formal_submission_order": 9
+    },
+    {
+      "e2e_ms": 18488.00041526556,
+      "endpoint": "chat",
+      "queue_wait_ms": 394.08718794584274,
+      "service_to_first_token_ms": 2251.381317153573,
+      "status": "success",
+      "submission_order": 26,
+      "ttft_ms": 2645.468505099416,
+      "formal_submission_order": 10
+    },
+    {
+      "e2e_ms": 18485.140796750784,
+      "endpoint": "chat",
+      "queue_wait_ms": 391.05294831097126,
+      "service_to_first_token_ms": 2251.8466282635927,
+      "status": "success",
+      "submission_order": 27,
+      "ttft_ms": 2642.899576574564,
+      "formal_submission_order": 11
+    },
+    {
+      "e2e_ms": 18484.165515750647,
+      "endpoint": "chat",
+      "queue_wait_ms": 389.97491635382175,
+      "service_to_first_token_ms": 2251.916315406561,
+      "status": "success",
+      "submission_order": 28,
+      "ttft_ms": 2641.8912317603827,
+      "formal_submission_order": 12
+    },
+    {
+      "e2e_ms": 18482.198242098093,
+      "endpoint": "chat",
+      "queue_wait_ms": 387.9169747233391,
+      "service_to_first_token_ms": 2251.9636079669,
+      "status": "success",
+      "submission_order": 29,
+      "ttft_ms": 2639.880582690239,
+      "formal_submission_order": 13
+    },
+    {
+      "e2e_ms": 18481.28272406757,
+      "endpoint": "chat",
+      "queue_wait_ms": 386.7000453174114,
+      "service_to_first_token_ms": 2252.0071268081665,
+      "status": "success",
+      "submission_order": 30,
+      "ttft_ms": 2638.707172125578,
+      "formal_submission_order": 14
+    },
+    {
+      "e2e_ms": 18478.980900719762,
+      "endpoint": "chat",
+      "queue_wait_ms": 384.02664102613926,
+      "service_to_first_token_ms": 2252.0502880215645,
+      "status": "success",
+      "submission_order": 31,
+      "ttft_ms": 2636.0769290477037,
+      "formal_submission_order": 15
+    },
+    {
+      "e2e_ms": 18478.13435830176,
+      "endpoint": "chat",
+      "queue_wait_ms": 383.0247391015291,
+      "service_to_first_token_ms": 2252.0895041525364,
+      "status": "success",
+      "submission_order": 32,
+      "ttft_ms": 2635.1142432540655,
+      "formal_submission_order": 16
+    },
+    {
+      "e2e_ms": 18489.876702427864,
+      "endpoint": "chat",
+      "queue_wait_ms": 61.06432527303696,
+      "service_to_first_token_ms": 407.6927974820137,
+      "status": "success",
+      "submission_order": 33,
+      "ttft_ms": 468.75712275505066,
+      "formal_submission_order": 17
+    },
+    {
+      "e2e_ms": 18486.748807132244,
+      "endpoint": "chat",
+      "queue_wait_ms": 398.0284482240677,
+      "service_to_first_token_ms": 2250.6697196513414,
+      "status": "success",
+      "submission_order": 34,
+      "ttft_ms": 2648.698167875409,
+      "formal_submission_order": 18
+    },
+    {
+      "e2e_ms": 18484.602876007557,
+      "endpoint": "chat",
+      "queue_wait_ms": 395.6200424581766,
+      "service_to_first_token_ms": 2250.748360529542,
+      "status": "success",
+      "submission_order": 35,
+      "ttft_ms": 2646.3684029877186,
+      "formal_submission_order": 19
+    },
+    {
+      "e2e_ms": 18483.35791565478,
+      "endpoint": "chat",
+      "queue_wait_ms": 394.02845315635204,
+      "service_to_first_token_ms": 2250.7973313331604,
+      "status": "success",
+      "submission_order": 36,
+      "ttft_ms": 2644.8257844895124,
+      "formal_submission_order": 20
+    },
+    {
+      "e2e_ms": 18478.96220907569,
+      "endpoint": "chat",
+      "queue_wait_ms": 389.53458704054356,
+      "service_to_first_token_ms": 2250.8410401642323,
+      "status": "success",
+      "submission_order": 37,
+      "ttft_ms": 2640.375627204776,
+      "formal_submission_order": 21
+    },
+    {
+      "e2e_ms": 18477.874601259828,
+      "endpoint": "chat",
+      "queue_wait_ms": 388.3571960031986,
+      "service_to_first_token_ms": 2250.881152227521,
+      "status": "success",
+      "submission_order": 38,
+      "ttft_ms": 2639.2383482307196,
+      "formal_submission_order": 22
+    },
+    {
+      "e2e_ms": 18477.061931043863,
+      "endpoint": "chat",
+      "queue_wait_ms": 387.45923712849617,
+      "service_to_first_token_ms": 2250.91871060431,
+      "status": "success",
+      "submission_order": 39,
+      "ttft_ms": 2638.377947732806,
+      "formal_submission_order": 23
+    },
+    {
+      "e2e_ms": 18476.041987538338,
+      "endpoint": "chat",
+      "queue_wait_ms": 386.3374423235655,
+      "service_to_first_token_ms": 2250.9546726942062,
+      "status": "success",
+      "submission_order": 40,
+      "ttft_ms": 2637.2921150177717,
+      "formal_submission_order": 24
+    },
+    {
+      "e2e_ms": 18470.013177022338,
+      "endpoint": "chat",
+      "queue_wait_ms": 61.06595695018768,
+      "service_to_first_token_ms": 406.10805712640285,
+      "status": "success",
+      "submission_order": 41,
+      "ttft_ms": 467.17401407659054,
+      "formal_submission_order": 25
+    },
+    {
+      "e2e_ms": 18468.110516667366,
+      "endpoint": "chat",
+      "queue_wait_ms": 397.6888284087181,
+      "service_to_first_token_ms": 2247.958330437541,
+      "status": "success",
+      "submission_order": 42,
+      "ttft_ms": 2645.647158846259,
+      "formal_submission_order": 26
+    },
+    {
+      "e2e_ms": 18466.76441654563,
+      "endpoint": "chat",
+      "queue_wait_ms": 395.9992565214634,
+      "service_to_first_token_ms": 2248.317312449217,
+      "status": "success",
+      "submission_order": 43,
+      "ttft_ms": 2644.3165689706802,
+      "formal_submission_order": 27
+    },
+    {
+      "e2e_ms": 18464.447654783726,
+      "endpoint": "chat",
+      "queue_wait_ms": 393.3164943009615,
+      "service_to_first_token_ms": 2248.384803533554,
+      "status": "success",
+      "submission_order": 44,
+      "ttft_ms": 2641.7012978345156,
+      "formal_submission_order": 28
+    },
+    {
+      "e2e_ms": 18462.32584118843,
+      "endpoint": "chat",
+      "queue_wait_ms": 391.03686064481735,
+      "service_to_first_token_ms": 2248.4316248446703,
+      "status": "success",
+      "submission_order": 45,
+      "ttft_ms": 2639.4684854894876,
+      "formal_submission_order": 29
+    },
+    {
+      "e2e_ms": 18459.716567769647,
+      "endpoint": "chat",
+      "queue_wait_ms": 388.3338999003172,
+      "service_to_first_token_ms": 2248.472321778536,
+      "status": "success",
+      "submission_order": 46,
+      "ttft_ms": 2636.806221678853,
+      "formal_submission_order": 30
+    },
+    {
+      "e2e_ms": 18458.648869767785,
+      "endpoint": "chat",
+      "queue_wait_ms": 387.17843778431416,
+      "service_to_first_token_ms": 2248.510465025902,
+      "status": "success",
+      "submission_order": 47,
+      "ttft_ms": 2635.688902810216,
+      "formal_submission_order": 31
+    },
+    {
+      "e2e_ms": 18457.203276455402,
+      "endpoint": "chat",
+      "queue_wait_ms": 385.6477364897728,
+      "service_to_first_token_ms": 2248.5483530908823,
+      "status": "success",
+      "submission_order": 48,
+      "ttft_ms": 2634.196089580655,
+      "formal_submission_order": 32
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+python /data/liuke/llama_lite_npu/benchmarks/qwen3_32b_tp2_fp16/sample_runtime_timeseries.py --server-url http://127.0.0.1:8213 --output /data/liuke/llama_lite_npu/benchmark-results/20260713_qwen3_32b_tp2_fp16_decode_priority_ablation/priority_on/p128_o256_c1/run-01/server/timeseries.jsonl --interval 1 --npu-interval 5 --npu-devices 6\,7 

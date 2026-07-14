@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "preregistered_thresholds": {
+    "major_causal_queue_reduction_pct": 80,
+    "decode_interference_cost_pct": 10,
+    "output_throughput_gain_pct": 15
+  },
+  "results": [
+    {
+      "concurrency": 1,
+      "queue_wait_reduction_pct": 8.539939256775,
+      "decode_priority_is_major_causal_factor": false,
+      "tpot_change_off_vs_on_pct": -0.179825312554,
+      "tpot_interference_cost_ge_10pct": false,
+      "itl_change_off_vs_on_pct": -0.180195640982,
+      "itl_interference_cost_ge_10pct": false,
+      "output_throughput_gain_pct": 0.157699630645,
+      "output_throughput_gain_ge_15pct": false
+    },
+    {
+      "concurrency": 2,
+      "queue_wait_reduction_pct": 97.852200594676,
+      "decode_priority_is_major_causal_factor": true,
+      "tpot_change_off_vs_on_pct": 10.111101541643,
+      "tpot_interference_cost_ge_10pct": true,
+      "itl_change_off_vs_on_pct": 10.106153447831,
+      "itl_interference_cost_ge_10pct": true,
+      "output_throughput_gain_pct": 78.799687084202,
+      "output_throughput_gain_ge_15pct": true
+    },
+    {
+      "concurrency": 4,
+      "queue_wait_reduction_pct": 97.09190402974,
+      "decode_priority_is_major_causal_factor": true,
+      "tpot_change_off_vs_on_pct": 13.257720898151,
+      "tpot_interference_cost_ge_10pct": true,
+      "itl_change_off_vs_on_pct": 13.253474621822,
+      "itl_interference_cost_ge_10pct": true,
+      "output_throughput_gain_pct": 66.088021246251,
+      "output_throughput_gain_ge_15pct": true
+    },
+    {
+      "concurrency": 8,
+      "queue_wait_reduction_pct": 96.711292439582,
+      "decode_priority_is_major_causal_factor": true,
+      "tpot_change_off_vs_on_pct": 12.295276525042,
+      "tpot_interference_cost_ge_10pct": true,
+      "itl_change_off_vs_on_pct": 12.302295159948,
+      "itl_interference_cost_ge_10pct": true,
+      "output_throughput_gain_pct": 49.039418227972,
+      "output_throughput_gain_ge_15pct": true
+    },
+    {
+      "concurrency": 16,
+      "queue_wait_reduction_pct": 94.669851381051,
+      "decode_priority_is_major_causal_factor": true,
+      "tpot_change_off_vs_on_pct": 20.454247652326,
+      "tpot_interference_cost_ge_10pct": true,
+      "itl_change_off_vs_on_pct": 20.428790199082,
+      "itl_interference_cost_ge_10pct": true,
+      "output_throughput_gain_pct": 46.748373450428,
+      "output_throughput_gain_ge_15pct": true
+    }
+  ]
+}

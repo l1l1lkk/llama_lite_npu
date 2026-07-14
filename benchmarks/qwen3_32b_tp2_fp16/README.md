@@ -189,3 +189,23 @@ python benchmarks/qwen3_32b_tp2_fp16/analyze_scalability.py \
 python benchmarks/qwen3_32b_tp2_fp16/analyze_scalability.py \
   "benchmarks/results/$CAMPAIGN" --compare
 ```
+
+## Decode Priority strict paired campaigns
+
+Decode Priority ablations reuse one frozen formal JSONL and pair every
+concurrency/repeat across `--decode_priority` and `--no_decode_priority`.
+Only the priority flag and lifecycle evidence paths may differ. Each formal
+run uses a separate server lifecycle and completes `2 * concurrency` warmup
+requests before the formal boundary.
+
+`compare_decode_priority.py` rebuilds per-mode aggregates, all three pair
+ratios, ratio-of-means, submission-order fairness, time-series summaries and
+the preregistered causal thresholds. Server request timing tracing is disabled
+by default and is enabled only by the benchmark scripts.
+
+```bash
+python benchmarks/qwen3_32b_tp2_fp16/compare_decode_priority.py \
+  "benchmark-results/$CAMPAIGN"
+python benchmarks/qwen3_32b_tp2_fp16/compare_decode_priority.py \
+  "benchmarks/results/$CAMPAIGN" --compare
+```

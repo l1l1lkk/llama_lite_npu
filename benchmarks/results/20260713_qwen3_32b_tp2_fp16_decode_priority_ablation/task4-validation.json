@@ -1,0 +1,631 @@
+{
+  "schema_version": 1,
+  "status": "pass",
+  "campaign_id": "20260713_qwen3_32b_tp2_fp16_decode_priority_ablation",
+  "common_checks": {
+    "formal_run_count_30": true,
+    "one_frozen_dataset_sha": true,
+    "all_run_checks_pass": true,
+    "all_15_pairs_match": true,
+    "campaign_plan_matches_runs": true
+  },
+  "runs": [
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_decode_priority_ablation_priority_off_p128_o256_c1_r1",
+      "checks": {
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "server_trace_complete": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_decode_priority_ablation_priority_off_p128_o256_c1_r2",
+      "checks": {
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "server_trace_complete": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_decode_priority_ablation_priority_off_p128_o256_c1_r3",
+      "checks": {
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "server_trace_complete": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_decode_priority_ablation_priority_off_p128_o256_c16_r1",
+      "checks": {
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "server_trace_complete": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_decode_priority_ablation_priority_off_p128_o256_c16_r2",
+      "checks": {
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "server_trace_complete": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_decode_priority_ablation_priority_off_p128_o256_c16_r3",
+      "checks": {
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "server_trace_complete": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_decode_priority_ablation_priority_off_p128_o256_c2_r1",
+      "checks": {
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "server_trace_complete": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_decode_priority_ablation_priority_off_p128_o256_c2_r2",
+      "checks": {
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "server_trace_complete": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_decode_priority_ablation_priority_off_p128_o256_c2_r3",
+      "checks": {
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "server_trace_complete": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_decode_priority_ablation_priority_off_p128_o256_c4_r1",
+      "checks": {
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "server_trace_complete": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_decode_priority_ablation_priority_off_p128_o256_c4_r2",
+      "checks": {
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "server_trace_complete": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_decode_priority_ablation_priority_off_p128_o256_c4_r3",
+      "checks": {
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "server_trace_complete": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_decode_priority_ablation_priority_off_p128_o256_c8_r1",
+      "checks": {
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "server_trace_complete": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_decode_priority_ablation_priority_off_p128_o256_c8_r2",
+      "checks": {
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "server_trace_complete": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_decode_priority_ablation_priority_off_p128_o256_c8_r3",
+      "checks": {
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "server_trace_complete": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_decode_priority_ablation_priority_on_p128_o256_c1_r1",
+      "checks": {
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "server_trace_complete": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_decode_priority_ablation_priority_on_p128_o256_c1_r2",
+      "checks": {
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "server_trace_complete": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_decode_priority_ablation_priority_on_p128_o256_c1_r3",
+      "checks": {
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "server_trace_complete": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_decode_priority_ablation_priority_on_p128_o256_c16_r1",
+      "checks": {
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "server_trace_complete": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_decode_priority_ablation_priority_on_p128_o256_c16_r2",
+      "checks": {
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "server_trace_complete": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_decode_priority_ablation_priority_on_p128_o256_c16_r3",
+      "checks": {
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "server_trace_complete": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_decode_priority_ablation_priority_on_p128_o256_c2_r1",
+      "checks": {
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "server_trace_complete": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_decode_priority_ablation_priority_on_p128_o256_c2_r2",
+      "checks": {
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "server_trace_complete": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_decode_priority_ablation_priority_on_p128_o256_c2_r3",
+      "checks": {
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "server_trace_complete": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_decode_priority_ablation_priority_on_p128_o256_c4_r1",
+      "checks": {
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "server_trace_complete": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_decode_priority_ablation_priority_on_p128_o256_c4_r2",
+      "checks": {
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "server_trace_complete": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_decode_priority_ablation_priority_on_p128_o256_c4_r3",
+      "checks": {
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "server_trace_complete": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_decode_priority_ablation_priority_on_p128_o256_c8_r1",
+      "checks": {
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "server_trace_complete": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_decode_priority_ablation_priority_on_p128_o256_c8_r2",
+      "checks": {
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "server_trace_complete": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260713_qwen3_32b_tp2_fp16_decode_priority_ablation_priority_on_p128_o256_c8_r3",
+      "checks": {
+        "request_count_32": true,
+        "strict_input_128": true,
+        "strict_output_256": true,
+        "zero_failed": true,
+        "server_trace_complete": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    }
+  ],
+  "pairs": [
+    {
+      "pair_id": "c1_r1",
+      "checks": {
+        "metadata_equal_except_mode": true,
+        "evalscope_args_equal": true,
+        "prompt_multiset_equal": true,
+        "server_command_only_flag_differs": true
+      }
+    },
+    {
+      "pair_id": "c1_r2",
+      "checks": {
+        "metadata_equal_except_mode": true,
+        "evalscope_args_equal": true,
+        "prompt_multiset_equal": true,
+        "server_command_only_flag_differs": true
+      }
+    },
+    {
+      "pair_id": "c1_r3",
+      "checks": {
+        "metadata_equal_except_mode": true,
+        "evalscope_args_equal": true,
+        "prompt_multiset_equal": true,
+        "server_command_only_flag_differs": true
+      }
+    },
+    {
+      "pair_id": "c2_r1",
+      "checks": {
+        "metadata_equal_except_mode": true,
+        "evalscope_args_equal": true,
+        "prompt_multiset_equal": true,
+        "server_command_only_flag_differs": true
+      }
+    },
+    {
+      "pair_id": "c2_r2",
+      "checks": {
+        "metadata_equal_except_mode": true,
+        "evalscope_args_equal": true,
+        "prompt_multiset_equal": true,
+        "server_command_only_flag_differs": true
+      }
+    },
+    {
+      "pair_id": "c2_r3",
+      "checks": {
+        "metadata_equal_except_mode": true,
+        "evalscope_args_equal": true,
+        "prompt_multiset_equal": true,
+        "server_command_only_flag_differs": true
+      }
+    },
+    {
+      "pair_id": "c4_r1",
+      "checks": {
+        "metadata_equal_except_mode": true,
+        "evalscope_args_equal": true,
+        "prompt_multiset_equal": true,
+        "server_command_only_flag_differs": true
+      }
+    },
+    {
+      "pair_id": "c4_r2",
+      "checks": {
+        "metadata_equal_except_mode": true,
+        "evalscope_args_equal": true,
+        "prompt_multiset_equal": true,
+        "server_command_only_flag_differs": true
+      }
+    },
+    {
+      "pair_id": "c4_r3",
+      "checks": {
+        "metadata_equal_except_mode": true,
+        "evalscope_args_equal": true,
+        "prompt_multiset_equal": true,
+        "server_command_only_flag_differs": true
+      }
+    },
+    {
+      "pair_id": "c8_r1",
+      "checks": {
+        "metadata_equal_except_mode": true,
+        "evalscope_args_equal": true,
+        "prompt_multiset_equal": true,
+        "server_command_only_flag_differs": true
+      }
+    },
+    {
+      "pair_id": "c8_r2",
+      "checks": {
+        "metadata_equal_except_mode": true,
+        "evalscope_args_equal": true,
+        "prompt_multiset_equal": true,
+        "server_command_only_flag_differs": true
+      }
+    },
+    {
+      "pair_id": "c8_r3",
+      "checks": {
+        "metadata_equal_except_mode": true,
+        "evalscope_args_equal": true,
+        "prompt_multiset_equal": true,
+        "server_command_only_flag_differs": true
+      }
+    },
+    {
+      "pair_id": "c16_r1",
+      "checks": {
+        "metadata_equal_except_mode": true,
+        "evalscope_args_equal": true,
+        "prompt_multiset_equal": true,
+        "server_command_only_flag_differs": true
+      }
+    },
+    {
+      "pair_id": "c16_r2",
+      "checks": {
+        "metadata_equal_except_mode": true,
+        "evalscope_args_equal": true,
+        "prompt_multiset_equal": true,
+        "server_command_only_flag_differs": true
+      }
+    },
+    {
+      "pair_id": "c16_r3",
+      "checks": {
+        "metadata_equal_except_mode": true,
+        "evalscope_args_equal": true,
+        "prompt_multiset_equal": true,
+        "server_command_only_flag_differs": true
+      }
+    }
+  ]
+}

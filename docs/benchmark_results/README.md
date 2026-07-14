@@ -23,3 +23,8 @@
 
 - [`Qwen3-32B TP=2 FP16 Graph-on 并发扩展与排队分析`](20260713_qwen3_32b_tp2_fp16_graph_scalability.md)
 - [`Git-tracked Graph scalability bundle`](../../benchmarks/results/20260713_qwen3_32b_tp2_fp16_graph_scalability/)
+
+任务4 Decode Priority 严格配对消融：
+
+- [`Qwen3-32B TP=2 FP16 Decode Priority 严格配对消融`](20260713_qwen3_32b_tp2_fp16_decode_priority_ablation.md)
+- [`Git-tracked Decode Priority ablation bundle`](../../benchmarks/results/20260713_qwen3_32b_tp2_fp16_decode_priority_ablation/)

@@ -1,0 +1,1 @@
+{"scheduler":{"waiting":0,"prefilling":0,"running":0},"kv_cache":{"used_pages":432,"free_pages":10702},"npu_graph":{"capture_attempts":4,"captures":4,"replays":1536,"fallbacks":0},"requests":{"chat:success":48},"failures":{},"model":"Qwen3-32B","continuous_batching":true,"tensor_parallel":true}
