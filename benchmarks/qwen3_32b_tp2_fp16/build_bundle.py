@@ -30,6 +30,17 @@ OPTIONAL_ROOT_FILES = (
     "decode-priority-fairness.csv",
     "decode-priority-causal.json",
     "task4-validation.json",
+    "length-matrix-run-metrics.csv",
+    "length-matrix-aggregate.csv",
+    "prompt-scaling.csv",
+    "output-scaling.csv",
+    "length-matrix-heatmap.csv",
+    "length-matrix-heatmap.json",
+    "performance-baseline.json",
+    "baseline-self-compare.json",
+    "task5-validation.json",
+    "task4-reference.csv",
+    "task4-sanity.json",
     "campaign-plan.json",
 )
 ENVIRONMENT_FILES = (
@@ -40,6 +51,7 @@ ENVIRONMENT_FILES = (
     "model-config.sha256",
     "npu-smi.txt",
     "runtime.txt",
+    "version.txt",
 )
 LIFECYCLE_FILES = (
     "start-command.txt",
@@ -239,6 +251,15 @@ def main() -> int:
             ],
             check=True,
         )
+    if (output / "task5-validation.json").is_file():
+        subprocess.run(
+            [
+                sys.executable,
+                str(Path(__file__).with_name("analyze_length_matrix.py")),
+                str(output),
+            ],
+            check=True,
+        )
 
     source_files = sorted(path for path in source.rglob("*") if path.is_file())
     omitted = [file_record(path, source) for path in source_files if path.relative_to(source) not in selected]
@@ -295,6 +316,15 @@ def main() -> int:
             "decode_priority_comparison": (
                 "python benchmarks/qwen3_32b_tp2_fp16/compare_decode_priority.py "
                 f"benchmarks/results/{source.name} --compare"
+            ),
+            "length_matrix_analysis": (
+                "python benchmarks/qwen3_32b_tp2_fp16/analyze_length_matrix.py "
+                f"benchmarks/results/{source.name} --compare"
+            ),
+            "performance_baseline_self_compare": (
+                "python benchmarks/qwen3_32b_tp2_fp16/compare_performance_baseline.py "
+                f"benchmarks/results/{source.name}/performance-baseline.json "
+                f"benchmarks/results/{source.name}/performance-baseline.json --expect pass"
             ),
             "bundle_validation": (
                 "python benchmarks/qwen3_32b_tp2_fp16/validate_bundle.py "

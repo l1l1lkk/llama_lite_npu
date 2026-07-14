@@ -171,6 +171,66 @@ class ScalabilityContractTest(unittest.TestCase):
                 first_modes.append(pair[0]["mode"])
             self.assertNotEqual(first_modes[0], first_modes[1])
 
+    def test_length_matrix_plan_and_workloads_are_complete(self):
+        plan = json.loads(
+            (BENCHMARK / "campaigns/20260714_length_matrix.json").read_text(encoding="utf-8")
+        )
+        self.assertTrue(plan["sequence_locked_before_formal_runs"])
+        self.assertEqual(len(plan["sequence"]), 36)
+        self.assertEqual(
+            {(item["prompt"], item["output"], item["repeat"]) for item in plan["sequence"]},
+            {(prompt, output, repeat) for prompt in (128, 512, 1024, 2048)
+             for output in (64, 256, 512) for repeat in (1, 2, 3)},
+        )
+        root = BENCHMARK / "datasets/20260714_length_matrix"
+        manifest = json.loads((root / "workload-manifest.json").read_text(encoding="utf-8"))
+        for workload in manifest["workloads"]:
+            for kind, count in (("formal", 32), ("warmup", 8)):
+                record = workload[kind]
+                path = root / record["path"]
+                self.assertEqual(len(path.read_text(encoding="utf-8").splitlines()), count)
+                self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(), record["sha256"])
+
+
+class PerformanceBaselineCompareTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.module = load("performance_baseline_compare_test", "compare_performance_baseline.py")
+
+    @staticmethod
+    def fixture():
+        metrics = {
+            "client_ttft_ms": {"mean": 100.0, "stdev": 2.0, "cv": 0.02},
+            "client_tpot_ms": {"mean": 10.0, "stdev": 0.2, "cv": 0.02},
+            "client_output_throughput_tok_s": {"mean": 50.0, "stdev": 1.0, "cv": 0.02},
+        }
+        return {
+            "fingerprint": {"hardware": "same", "workload": "same"},
+            "cells": {"p128_o256": {"gates": {
+                "strict_input": True, "strict_output": True,
+                "zero_failed": True, "graph_valid": True,
+            }, "metrics": metrics}},
+        }
+
+    def test_self_compare_passes(self):
+        fixture = self.fixture()
+        self.assertEqual(self.module.compare(fixture, fixture)["status"], "pass")
+
+    def test_regression_and_invalid_are_separate(self):
+        baseline = self.fixture()
+        candidate = json.loads(json.dumps(baseline))
+        candidate["cells"]["p128_o256"]["metrics"]["client_ttft_ms"]["mean"] = 120
+        self.assertEqual(self.module.compare(baseline, candidate)["status"], "regression")
+        candidate = json.loads(json.dumps(baseline))
+        candidate["fingerprint"]["hardware"] = "different"
+        self.assertEqual(self.module.compare(baseline, candidate)["status"], "invalid")
+
+    def test_correctness_failure_is_hard_fail(self):
+        baseline = self.fixture()
+        candidate = json.loads(json.dumps(baseline))
+        candidate["cells"]["p128_o256"]["gates"]["graph_valid"] = False
+        self.assertEqual(self.module.compare(baseline, candidate)["status"], "hard_fail")
+
 
 if __name__ == "__main__":
     unittest.main()

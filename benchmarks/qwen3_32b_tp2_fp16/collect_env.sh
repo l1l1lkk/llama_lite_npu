@@ -24,6 +24,7 @@ mkdir -p "$OUT"
   git status --short --branch
 } > "$OUT/git.txt"
 cp "$ROOT/benchmarks/qwen3_32b_tp2_fp16/baseline.env" "$OUT/baseline.env"
+cp "$ROOT/VERSION" "$OUT/version.txt"
 cp "$MODEL_DIR/config.json" "$OUT/model-config.json"
 sha256sum "$MODEL_DIR/config.json" > "$OUT/model-config.sha256"
 env | grep -E '^(ASCEND|HCCL|NPU|PYTORCH|TORCH)' | sort > "$OUT/ascend-env.txt" || true
