@@ -125,9 +125,15 @@ def build_report(campaign: Path) -> dict[str, object]:
         case["runs"] += 1
         case["passed"] += run["status"] == "pass"
         case["run_ids"].append(run["run_id"])
+    plan_path = campaign / "campaign-plan.json"
+    campaign_id = (
+        json.loads(plan_path.read_text(encoding="utf-8"))["campaign_id"]
+        if plan_path.is_file()
+        else campaign.name
+    )
     return {
         "schema_version": 1,
-        "campaign_id": campaign.name,
+        "campaign_id": campaign_id,
         "status": "pass" if all(run["status"] == "pass" for run in runs) else "fail",
         "formal_run_count": len(runs),
         "cases": cases,

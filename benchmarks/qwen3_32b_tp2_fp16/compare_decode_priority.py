@@ -351,7 +351,7 @@ def build(campaign: Path):
     if not all(common_checks.values()):
         raise ValueError(f"campaign checks failed: {[key for key, value in common_checks.items() if not value]}")
     validation = {
-        "schema_version": 1, "status": "pass", "campaign_id": campaign.name,
+        "schema_version": 1, "status": "pass", "campaign_id": plan["campaign_id"],
         "common_checks": common_checks, "runs": validation_runs, "pairs": pair_checks,
     }
     causal_report = {
