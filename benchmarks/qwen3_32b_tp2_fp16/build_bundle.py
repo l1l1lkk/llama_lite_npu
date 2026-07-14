@@ -42,6 +42,7 @@ OPTIONAL_ROOT_FILES = (
     "task4-reference.csv",
     "task4-sanity.json",
     "campaign-plan.json",
+    "diagnostics-index.json",
 )
 ENVIRONMENT_FILES = (
     "ascend-env.txt",
