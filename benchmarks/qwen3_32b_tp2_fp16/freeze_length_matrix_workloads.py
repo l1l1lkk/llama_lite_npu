@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 from pathlib import Path
 
@@ -21,18 +22,28 @@ def read_jsonl(path: Path) -> list[list[dict]]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
 
 
-def token_count(tokenizer, messages: list[dict]) -> int:
-    encoded = tokenizer.apply_chat_template(messages, tokenize=True, add_generation_prompt=True)
-    if isinstance(encoded, dict):
-        encoded = encoded["input_ids"]
-    if encoded and isinstance(encoded[0], list):
-        encoded = encoded[0]
-    return len(encoded)
+def load_prompt_module(repo_root: Path):
+    path = repo_root / "lite_llama" / "utils" / "prompt_templates.py"
+    spec = importlib.util.spec_from_file_location("benchmark_prompt_templates", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
-def extend_to_target(tokenizer, messages: list[dict], target: int) -> list[dict]:
+def token_count(tokenizer, prompt_module, messages: list[dict]) -> int:
+    prompt = next(
+        str(message.get("content", ""))
+        for message in reversed(messages)
+        if message.get("role") == "user"
+    )
+    prompter = prompt_module.get_prompter("qwen3", "", enable_thinking=True)
+    prompter.insert_prompt(prompt)
+    return len(tokenizer.encode(prompter.model_input, add_special_tokens=True))
+
+
+def extend_to_target(tokenizer, prompt_module, messages: list[dict], target: int) -> list[dict]:
     result = [dict(message) for message in messages]
-    if token_count(tokenizer, result) == target:
+    if token_count(tokenizer, prompt_module, result) == target:
         return result
     user_indexes = [index for index, message in enumerate(result) if message.get("role") == "user"]
     if not user_indexes:
@@ -43,7 +54,7 @@ def extend_to_target(tokenizer, messages: list[dict], target: int) -> list[dict]
     while low <= high:
         count = (low + high) // 2
         result[index]["content"] = original + " x" * count
-        observed = token_count(tokenizer, result)
+        observed = token_count(tokenizer, prompt_module, result)
         if observed == target:
             return result
         if observed < target:
@@ -52,7 +63,7 @@ def extend_to_target(tokenizer, messages: list[dict], target: int) -> list[dict]
             high = count - 1
     for count in range(max(0, high - 4), min(target, low + 4) + 1):
         result[index]["content"] = original + " x" * count
-        if token_count(tokenizer, result) == target:
+        if token_count(tokenizer, prompt_module, result) == target:
             return result
     raise ValueError(f"could not construct exact {target}-token request")
 
@@ -74,6 +85,7 @@ def main() -> int:
     if output_root.exists():
         raise SystemExit(f"refusing to overwrite {output_root}")
     tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_path, trust_remote_code=True)
+    prompt_module = load_prompt_module(Path(__file__).resolve().parents[2])
     formal_source = read_jsonl(args.source_formal)
     warmup_source = read_jsonl(args.source_warmup)[:8]
     if len(formal_source) != 32 or len(warmup_source) != 8:
@@ -81,13 +93,13 @@ def main() -> int:
     output_root.mkdir(parents=True)
     workloads = []
     for prompt in PROMPTS:
-        formal = [extend_to_target(tokenizer, value, prompt) for value in formal_source]
-        warmup = [extend_to_target(tokenizer, value, prompt) for value in warmup_source]
+        formal = [extend_to_target(tokenizer, prompt_module, value, prompt) for value in formal_source]
+        warmup = [extend_to_target(tokenizer, prompt_module, value, prompt) for value in warmup_source]
         formal_path = output_root / f"p{prompt}_n32-formal.jsonl"
         warmup_path = output_root / f"p{prompt}_n8-warmup.jsonl"
         write_jsonl(formal_path, formal)
         write_jsonl(warmup_path, warmup)
-        observed = [token_count(tokenizer, value) for value in formal + warmup]
+        observed = [token_count(tokenizer, prompt_module, value) for value in formal + warmup]
         if observed != [prompt] * 40:
             raise ValueError(f"p{prompt}: strict token validation failed")
         workloads.append({
