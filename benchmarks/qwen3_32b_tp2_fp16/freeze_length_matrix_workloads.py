@@ -22,7 +22,12 @@ def read_jsonl(path: Path) -> list[list[dict]]:
 
 
 def token_count(tokenizer, messages: list[dict]) -> int:
-    return len(tokenizer.apply_chat_template(messages, tokenize=True, add_generation_prompt=True))
+    encoded = tokenizer.apply_chat_template(messages, tokenize=True, add_generation_prompt=True)
+    if isinstance(encoded, dict):
+        encoded = encoded["input_ids"]
+    if encoded and isinstance(encoded[0], list):
+        encoded = encoded[0]
+    return len(encoded)
 
 
 def extend_to_target(tokenizer, messages: list[dict], target: int) -> list[dict]:
