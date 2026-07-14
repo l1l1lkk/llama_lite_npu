@@ -66,6 +66,12 @@ def main() -> int:
         copied = Path(temp) / bundle.name
         shutil.copytree(bundle, copied)
         subprocess.run([sys.executable, str(script), str(copied)], check=True)
+        if (copied / "strict-validation.json").is_file():
+            strict_script = Path(__file__).with_name("validate_strict_workload.py").resolve()
+            subprocess.run(
+                [sys.executable, str(strict_script), str(copied), "--compare"],
+                check=True,
+            )
         if (copied / "pair-validation.json").is_file():
             compare_script = Path(__file__).with_name("compare_graph.py").resolve()
             subprocess.run(
@@ -76,6 +82,35 @@ def main() -> int:
             scalability_script = Path(__file__).with_name("analyze_scalability.py").resolve()
             subprocess.run(
                 [sys.executable, str(scalability_script), str(copied), "--compare"],
+                check=True,
+            )
+        if (copied / "task4-validation.json").is_file():
+            decode_priority_script = Path(__file__).with_name(
+                "compare_decode_priority.py"
+            ).resolve()
+            subprocess.run(
+                [sys.executable, str(decode_priority_script), str(copied), "--compare"],
+                check=True,
+            )
+        if (copied / "task5-validation.json").is_file():
+            matrix_script = Path(__file__).with_name("analyze_length_matrix.py").resolve()
+            subprocess.run(
+                [sys.executable, str(matrix_script), str(copied), "--compare"],
+                check=True,
+            )
+            baseline_script = Path(__file__).with_name(
+                "compare_performance_baseline.py"
+            ).resolve()
+            baseline = copied / "performance-baseline.json"
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(baseline_script),
+                    str(baseline),
+                    str(baseline),
+                    "--expect",
+                    "pass",
+                ],
                 check=True,
             )
         rebuilt_summary = rows(copied / "summary.csv")

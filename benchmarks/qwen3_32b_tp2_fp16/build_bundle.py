@@ -325,6 +325,10 @@ def main() -> int:
                 "python benchmarks/qwen3_32b_tp2_fp16/analyze_length_matrix.py "
                 f"benchmarks/results/{source.name} --compare"
             ),
+            "length_matrix_campaign": (
+                "CAMPAIGN=" + source.name + " bash "
+                "benchmarks/qwen3_32b_tp2_fp16/run_length_matrix_campaign.sh"
+            ),
             "performance_baseline_self_compare": (
                 "python benchmarks/qwen3_32b_tp2_fp16/compare_performance_baseline.py "
                 f"benchmarks/results/{source.name}/performance-baseline.json "
