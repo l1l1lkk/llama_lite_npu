@@ -287,6 +287,19 @@ class LengthMatrixAnalyzerTest(unittest.TestCase):
         self.assertEqual(values["npu_utilization_pct"], [80.0, 82.0])
         self.assertEqual(values["npu_hbm_usage_pct"], [90.0, 91.0])
 
+    def test_prompt_multiset_digest_ignores_concurrent_completion_order(self):
+        first = {
+            "requests": [
+                {"prompt_token_ids_sha256": "prompt-a"},
+                {"prompt_token_ids_sha256": "prompt-b"},
+            ]
+        }
+        second = {"requests": list(reversed(first["requests"]))}
+        self.assertEqual(
+            self.module.prompt_multiset_digest(first),
+            self.module.prompt_multiset_digest(second),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

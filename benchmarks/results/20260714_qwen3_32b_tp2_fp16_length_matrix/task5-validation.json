@@ -1,0 +1,699 @@
+{
+  "schema_version": 1,
+  "status": "pass",
+  "campaign_id": "20260714_qwen3_32b_tp2_fp16_length_matrix",
+  "common_checks": {
+    "formal_run_count_36": true,
+    "all_run_checks_pass": true,
+    "one_frozen_formal_dataset_per_prompt": true,
+    "one_observed_prompt_multiset_per_prompt": true,
+    "single_server_configuration": true,
+    "campaign_plan_matches_runs": true
+  },
+  "runs": [
+    {
+      "run_id": "20260714_qwen3_32b_tp2_fp16_length_matrix_matrix_p1024_o256_c4_r1",
+      "checks": {
+        "request_count_32": true,
+        "warmup_count_8": true,
+        "strict_input": true,
+        "strict_output": true,
+        "zero_failed": true,
+        "fixed_output_args": true,
+        "formal_sha_matches_manifest": true,
+        "warmup_sha_matches_manifest": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260714_qwen3_32b_tp2_fp16_length_matrix_matrix_p1024_o256_c4_r2",
+      "checks": {
+        "request_count_32": true,
+        "warmup_count_8": true,
+        "strict_input": true,
+        "strict_output": true,
+        "zero_failed": true,
+        "fixed_output_args": true,
+        "formal_sha_matches_manifest": true,
+        "warmup_sha_matches_manifest": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260714_qwen3_32b_tp2_fp16_length_matrix_matrix_p1024_o256_c4_r3",
+      "checks": {
+        "request_count_32": true,
+        "warmup_count_8": true,
+        "strict_input": true,
+        "strict_output": true,
+        "zero_failed": true,
+        "fixed_output_args": true,
+        "formal_sha_matches_manifest": true,
+        "warmup_sha_matches_manifest": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260714_qwen3_32b_tp2_fp16_length_matrix_matrix_p1024_o512_c4_r1",
+      "checks": {
+        "request_count_32": true,
+        "warmup_count_8": true,
+        "strict_input": true,
+        "strict_output": true,
+        "zero_failed": true,
+        "fixed_output_args": true,
+        "formal_sha_matches_manifest": true,
+        "warmup_sha_matches_manifest": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260714_qwen3_32b_tp2_fp16_length_matrix_matrix_p1024_o512_c4_r2",
+      "checks": {
+        "request_count_32": true,
+        "warmup_count_8": true,
+        "strict_input": true,
+        "strict_output": true,
+        "zero_failed": true,
+        "fixed_output_args": true,
+        "formal_sha_matches_manifest": true,
+        "warmup_sha_matches_manifest": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260714_qwen3_32b_tp2_fp16_length_matrix_matrix_p1024_o512_c4_r3",
+      "checks": {
+        "request_count_32": true,
+        "warmup_count_8": true,
+        "strict_input": true,
+        "strict_output": true,
+        "zero_failed": true,
+        "fixed_output_args": true,
+        "formal_sha_matches_manifest": true,
+        "warmup_sha_matches_manifest": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260714_qwen3_32b_tp2_fp16_length_matrix_matrix_p1024_o64_c4_r1",
+      "checks": {
+        "request_count_32": true,
+        "warmup_count_8": true,
+        "strict_input": true,
+        "strict_output": true,
+        "zero_failed": true,
+        "fixed_output_args": true,
+        "formal_sha_matches_manifest": true,
+        "warmup_sha_matches_manifest": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260714_qwen3_32b_tp2_fp16_length_matrix_matrix_p1024_o64_c4_r2",
+      "checks": {
+        "request_count_32": true,
+        "warmup_count_8": true,
+        "strict_input": true,
+        "strict_output": true,
+        "zero_failed": true,
+        "fixed_output_args": true,
+        "formal_sha_matches_manifest": true,
+        "warmup_sha_matches_manifest": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260714_qwen3_32b_tp2_fp16_length_matrix_matrix_p1024_o64_c4_r3",
+      "checks": {
+        "request_count_32": true,
+        "warmup_count_8": true,
+        "strict_input": true,
+        "strict_output": true,
+        "zero_failed": true,
+        "fixed_output_args": true,
+        "formal_sha_matches_manifest": true,
+        "warmup_sha_matches_manifest": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260714_qwen3_32b_tp2_fp16_length_matrix_matrix_p128_o256_c4_r1",
+      "checks": {
+        "request_count_32": true,
+        "warmup_count_8": true,
+        "strict_input": true,
+        "strict_output": true,
+        "zero_failed": true,
+        "fixed_output_args": true,
+        "formal_sha_matches_manifest": true,
+        "warmup_sha_matches_manifest": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260714_qwen3_32b_tp2_fp16_length_matrix_matrix_p128_o256_c4_r2",
+      "checks": {
+        "request_count_32": true,
+        "warmup_count_8": true,
+        "strict_input": true,
+        "strict_output": true,
+        "zero_failed": true,
+        "fixed_output_args": true,
+        "formal_sha_matches_manifest": true,
+        "warmup_sha_matches_manifest": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260714_qwen3_32b_tp2_fp16_length_matrix_matrix_p128_o256_c4_r3",
+      "checks": {
+        "request_count_32": true,
+        "warmup_count_8": true,
+        "strict_input": true,
+        "strict_output": true,
+        "zero_failed": true,
+        "fixed_output_args": true,
+        "formal_sha_matches_manifest": true,
+        "warmup_sha_matches_manifest": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260714_qwen3_32b_tp2_fp16_length_matrix_matrix_p128_o512_c4_r1",
+      "checks": {
+        "request_count_32": true,
+        "warmup_count_8": true,
+        "strict_input": true,
+        "strict_output": true,
+        "zero_failed": true,
+        "fixed_output_args": true,
+        "formal_sha_matches_manifest": true,
+        "warmup_sha_matches_manifest": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260714_qwen3_32b_tp2_fp16_length_matrix_matrix_p128_o512_c4_r2",
+      "checks": {
+        "request_count_32": true,
+        "warmup_count_8": true,
+        "strict_input": true,
+        "strict_output": true,
+        "zero_failed": true,
+        "fixed_output_args": true,
+        "formal_sha_matches_manifest": true,
+        "warmup_sha_matches_manifest": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260714_qwen3_32b_tp2_fp16_length_matrix_matrix_p128_o512_c4_r3",
+      "checks": {
+        "request_count_32": true,
+        "warmup_count_8": true,
+        "strict_input": true,
+        "strict_output": true,
+        "zero_failed": true,
+        "fixed_output_args": true,
+        "formal_sha_matches_manifest": true,
+        "warmup_sha_matches_manifest": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260714_qwen3_32b_tp2_fp16_length_matrix_matrix_p128_o64_c4_r1",
+      "checks": {
+        "request_count_32": true,
+        "warmup_count_8": true,
+        "strict_input": true,
+        "strict_output": true,
+        "zero_failed": true,
+        "fixed_output_args": true,
+        "formal_sha_matches_manifest": true,
+        "warmup_sha_matches_manifest": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260714_qwen3_32b_tp2_fp16_length_matrix_matrix_p128_o64_c4_r2",
+      "checks": {
+        "request_count_32": true,
+        "warmup_count_8": true,
+        "strict_input": true,
+        "strict_output": true,
+        "zero_failed": true,
+        "fixed_output_args": true,
+        "formal_sha_matches_manifest": true,
+        "warmup_sha_matches_manifest": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260714_qwen3_32b_tp2_fp16_length_matrix_matrix_p128_o64_c4_r3",
+      "checks": {
+        "request_count_32": true,
+        "warmup_count_8": true,
+        "strict_input": true,
+        "strict_output": true,
+        "zero_failed": true,
+        "fixed_output_args": true,
+        "formal_sha_matches_manifest": true,
+        "warmup_sha_matches_manifest": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260714_qwen3_32b_tp2_fp16_length_matrix_matrix_p2048_o256_c4_r1",
+      "checks": {
+        "request_count_32": true,
+        "warmup_count_8": true,
+        "strict_input": true,
+        "strict_output": true,
+        "zero_failed": true,
+        "fixed_output_args": true,
+        "formal_sha_matches_manifest": true,
+        "warmup_sha_matches_manifest": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260714_qwen3_32b_tp2_fp16_length_matrix_matrix_p2048_o256_c4_r2",
+      "checks": {
+        "request_count_32": true,
+        "warmup_count_8": true,
+        "strict_input": true,
+        "strict_output": true,
+        "zero_failed": true,
+        "fixed_output_args": true,
+        "formal_sha_matches_manifest": true,
+        "warmup_sha_matches_manifest": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260714_qwen3_32b_tp2_fp16_length_matrix_matrix_p2048_o256_c4_r3",
+      "checks": {
+        "request_count_32": true,
+        "warmup_count_8": true,
+        "strict_input": true,
+        "strict_output": true,
+        "zero_failed": true,
+        "fixed_output_args": true,
+        "formal_sha_matches_manifest": true,
+        "warmup_sha_matches_manifest": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260714_qwen3_32b_tp2_fp16_length_matrix_matrix_p2048_o512_c4_r1",
+      "checks": {
+        "request_count_32": true,
+        "warmup_count_8": true,
+        "strict_input": true,
+        "strict_output": true,
+        "zero_failed": true,
+        "fixed_output_args": true,
+        "formal_sha_matches_manifest": true,
+        "warmup_sha_matches_manifest": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260714_qwen3_32b_tp2_fp16_length_matrix_matrix_p2048_o512_c4_r2",
+      "checks": {
+        "request_count_32": true,
+        "warmup_count_8": true,
+        "strict_input": true,
+        "strict_output": true,
+        "zero_failed": true,
+        "fixed_output_args": true,
+        "formal_sha_matches_manifest": true,
+        "warmup_sha_matches_manifest": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260714_qwen3_32b_tp2_fp16_length_matrix_matrix_p2048_o512_c4_r3",
+      "checks": {
+        "request_count_32": true,
+        "warmup_count_8": true,
+        "strict_input": true,
+        "strict_output": true,
+        "zero_failed": true,
+        "fixed_output_args": true,
+        "formal_sha_matches_manifest": true,
+        "warmup_sha_matches_manifest": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260714_qwen3_32b_tp2_fp16_length_matrix_matrix_p2048_o64_c4_r1",
+      "checks": {
+        "request_count_32": true,
+        "warmup_count_8": true,
+        "strict_input": true,
+        "strict_output": true,
+        "zero_failed": true,
+        "fixed_output_args": true,
+        "formal_sha_matches_manifest": true,
+        "warmup_sha_matches_manifest": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260714_qwen3_32b_tp2_fp16_length_matrix_matrix_p2048_o64_c4_r2",
+      "checks": {
+        "request_count_32": true,
+        "warmup_count_8": true,
+        "strict_input": true,
+        "strict_output": true,
+        "zero_failed": true,
+        "fixed_output_args": true,
+        "formal_sha_matches_manifest": true,
+        "warmup_sha_matches_manifest": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260714_qwen3_32b_tp2_fp16_length_matrix_matrix_p2048_o64_c4_r3",
+      "checks": {
+        "request_count_32": true,
+        "warmup_count_8": true,
+        "strict_input": true,
+        "strict_output": true,
+        "zero_failed": true,
+        "fixed_output_args": true,
+        "formal_sha_matches_manifest": true,
+        "warmup_sha_matches_manifest": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260714_qwen3_32b_tp2_fp16_length_matrix_matrix_p512_o256_c4_r1",
+      "checks": {
+        "request_count_32": true,
+        "warmup_count_8": true,
+        "strict_input": true,
+        "strict_output": true,
+        "zero_failed": true,
+        "fixed_output_args": true,
+        "formal_sha_matches_manifest": true,
+        "warmup_sha_matches_manifest": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260714_qwen3_32b_tp2_fp16_length_matrix_matrix_p512_o256_c4_r2",
+      "checks": {
+        "request_count_32": true,
+        "warmup_count_8": true,
+        "strict_input": true,
+        "strict_output": true,
+        "zero_failed": true,
+        "fixed_output_args": true,
+        "formal_sha_matches_manifest": true,
+        "warmup_sha_matches_manifest": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260714_qwen3_32b_tp2_fp16_length_matrix_matrix_p512_o256_c4_r3",
+      "checks": {
+        "request_count_32": true,
+        "warmup_count_8": true,
+        "strict_input": true,
+        "strict_output": true,
+        "zero_failed": true,
+        "fixed_output_args": true,
+        "formal_sha_matches_manifest": true,
+        "warmup_sha_matches_manifest": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260714_qwen3_32b_tp2_fp16_length_matrix_matrix_p512_o512_c4_r1",
+      "checks": {
+        "request_count_32": true,
+        "warmup_count_8": true,
+        "strict_input": true,
+        "strict_output": true,
+        "zero_failed": true,
+        "fixed_output_args": true,
+        "formal_sha_matches_manifest": true,
+        "warmup_sha_matches_manifest": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260714_qwen3_32b_tp2_fp16_length_matrix_matrix_p512_o512_c4_r2",
+      "checks": {
+        "request_count_32": true,
+        "warmup_count_8": true,
+        "strict_input": true,
+        "strict_output": true,
+        "zero_failed": true,
+        "fixed_output_args": true,
+        "formal_sha_matches_manifest": true,
+        "warmup_sha_matches_manifest": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260714_qwen3_32b_tp2_fp16_length_matrix_matrix_p512_o512_c4_r3",
+      "checks": {
+        "request_count_32": true,
+        "warmup_count_8": true,
+        "strict_input": true,
+        "strict_output": true,
+        "zero_failed": true,
+        "fixed_output_args": true,
+        "formal_sha_matches_manifest": true,
+        "warmup_sha_matches_manifest": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260714_qwen3_32b_tp2_fp16_length_matrix_matrix_p512_o64_c4_r1",
+      "checks": {
+        "request_count_32": true,
+        "warmup_count_8": true,
+        "strict_input": true,
+        "strict_output": true,
+        "zero_failed": true,
+        "fixed_output_args": true,
+        "formal_sha_matches_manifest": true,
+        "warmup_sha_matches_manifest": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260714_qwen3_32b_tp2_fp16_length_matrix_matrix_p512_o64_c4_r2",
+      "checks": {
+        "request_count_32": true,
+        "warmup_count_8": true,
+        "strict_input": true,
+        "strict_output": true,
+        "zero_failed": true,
+        "fixed_output_args": true,
+        "formal_sha_matches_manifest": true,
+        "warmup_sha_matches_manifest": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    },
+    {
+      "run_id": "20260714_qwen3_32b_tp2_fp16_length_matrix_matrix_p512_o64_c4_r3",
+      "checks": {
+        "request_count_32": true,
+        "warmup_count_8": true,
+        "strict_input": true,
+        "strict_output": true,
+        "zero_failed": true,
+        "fixed_output_args": true,
+        "formal_sha_matches_manifest": true,
+        "warmup_sha_matches_manifest": true,
+        "graph_captured_before_formal": true,
+        "formal_capture_delta_zero": true,
+        "formal_fallback_zero": true,
+        "formal_replay_grew": true,
+        "timeseries_complete": true
+      },
+      "timeseries_errors": []
+    }
+  ]
+}

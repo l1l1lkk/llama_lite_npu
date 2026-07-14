@@ -1,0 +1,27 @@
+{
+  "status": "checked",
+  "reference": "task4-reference.csv",
+  "comparisons": [
+    {
+      "metric": "client_ttft_ms",
+      "task4_mean": 1153.556666666667,
+      "task5_mean": 1152.523333333333,
+      "relative_difference_pct": -0.089578029688,
+      "difference_gt_10pct": false
+    },
+    {
+      "metric": "client_tpot_ms",
+      "task4_mean": 49.263333333333,
+      "task5_mean": 49.496666666667,
+      "relative_difference_pct": 0.473645036878,
+      "difference_gt_10pct": false
+    },
+    {
+      "metric": "client_output_throughput_tok_s",
+      "task4_mean": 74.649866666667,
+      "task5_mean": 74.332666666667,
+      "relative_difference_pct": -0.424917034904,
+      "difference_gt_10pct": false
+    }
+  ]
+}

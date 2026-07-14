@@ -73,8 +73,19 @@ def normalized_server_command(command: str) -> str:
     return " ".join(command.split())
 
 
-def prompt_sequence(fingerprint: dict) -> list[list[int]]:
-    return [request["prompt_token_ids"] for request in fingerprint["requests"]]
+def prompt_multiset_digest(fingerprint: dict) -> str:
+    """Hash the observed prompts without depending on concurrent completion order.
+
+    EvalScope's SQLite rows are written in completion order, which is not stable for
+    concurrent requests. The frozen JSONL digest proves submission order; this digest
+    independently proves that the server observed the same tokenized prompt multiset.
+    """
+    request_digests = sorted(
+        request["prompt_token_ids_sha256"] for request in fingerprint["requests"]
+    )
+    return hashlib.sha256(
+        json.dumps(request_digests, separators=(",", ":")).encode()
+    ).hexdigest()
 
 
 def timeseries_distributions(path: Path) -> dict[str, list[float]]:
@@ -117,7 +128,8 @@ def build(campaign: Path, task4_reference: Path | None = None):
     run_rows = []
     validations = []
     commands = set()
-    prompt_sequences = defaultdict(set)
+    prompt_multisets = defaultdict(set)
+    formal_dataset_shas = defaultdict(set)
     for metadata_path in metadata_paths:
         root = metadata_path.parent
         metadata = read_json(metadata_path)
@@ -207,8 +219,8 @@ def build(campaign: Path, task4_reference: Path | None = None):
             "timeseries_complete": not timeseries_errors,
         }
         validations.append({"run_id": metadata["run_id"], "checks": checks, "timeseries_errors": timeseries_errors})
-        sequence_digest = hashlib.sha256(json.dumps(prompt_sequence(fingerprint), separators=(",", ":")).encode()).hexdigest()
-        prompt_sequences[prompt].add(sequence_digest)
+        prompt_multisets[prompt].add(prompt_multiset_digest(fingerprint))
+        formal_dataset_shas[prompt].add(metadata["formal_dataset_sha256"])
         items[key] = {
             "metadata": metadata,
             "row": row,
@@ -336,7 +348,12 @@ def build(campaign: Path, task4_reference: Path | None = None):
     common_checks = {
         "formal_run_count_36": len(run_rows) == 36,
         "all_run_checks_pass": all(all(run["checks"].values()) for run in validations),
-        "one_prompt_sequence_per_prompt": all(len(prompt_sequences[prompt]) == 1 for prompt in PROMPTS),
+        "one_frozen_formal_dataset_per_prompt": all(
+            len(formal_dataset_shas[prompt]) == 1 for prompt in PROMPTS
+        ),
+        "one_observed_prompt_multiset_per_prompt": all(
+            len(prompt_multisets[prompt]) == 1 for prompt in PROMPTS
+        ),
         "single_server_configuration": len(commands) == 1 and "--no_decode_priority" in next(iter(commands)),
         "campaign_plan_matches_runs": expected_plan == observed_plan,
     }

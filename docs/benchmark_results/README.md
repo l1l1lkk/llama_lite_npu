@@ -30,3 +30,8 @@
 
 - [`Qwen3-32B TP=2 FP16 Decode Priority 严格配对消融`](20260713_qwen3_32b_tp2_fp16_decode_priority_ablation.md)
 - [`Git-tracked Decode Priority ablation bundle`](../../benchmarks/results/20260713_qwen3_32b_tp2_fp16_decode_priority_ablation/)
+
+任务5 输入/输出长度二维矩阵与回归基线：
+
+- [`Qwen3-32B TP=2 FP16 输入/输出长度二维性能矩阵`](20260714_qwen3_32b_tp2_fp16_length_matrix.md)
+- [`Git-tracked length matrix bundle`](../../benchmarks/results/20260714_qwen3_32b_tp2_fp16_length_matrix/)

@@ -1,0 +1,115 @@
+# HELP process_virtual_memory_bytes Virtual memory size in bytes.
+# TYPE process_virtual_memory_bytes gauge
+process_virtual_memory_bytes 9.902071422976e+012
+# HELP process_resident_memory_bytes Resident memory size in bytes.
+# TYPE process_resident_memory_bytes gauge
+process_resident_memory_bytes 3.623755776e+09
+# HELP process_start_time_seconds Start time of the process since unix epoch in seconds.
+# TYPE process_start_time_seconds gauge
+process_start_time_seconds 1.78402255569e+09
+# HELP process_cpu_seconds_total Total user and system CPU time spent in seconds.
+# TYPE process_cpu_seconds_total counter
+process_cpu_seconds_total 75.91
+# HELP process_open_fds Number of open file descriptors.
+# TYPE process_open_fds gauge
+process_open_fds 51.0
+# HELP process_max_fds Maximum number of open file descriptors.
+# TYPE process_max_fds gauge
+process_max_fds 1024.0
+# HELP python_info Python platform information
+# TYPE python_info gauge
+python_info{implementation="CPython",major="3",minor="10",patchlevel="12",version="3.10.12"} 1.0
+# HELP python_gc_objects_collected_total Objects collected during gc
+# TYPE python_gc_objects_collected_total counter
+python_gc_objects_collected_total{generation="0"} 7662.0
+python_gc_objects_collected_total{generation="1"} 1086.0
+python_gc_objects_collected_total{generation="2"} 487.0
+# HELP python_gc_objects_uncollectable_total Uncollectable objects found during GC
+# TYPE python_gc_objects_uncollectable_total counter
+python_gc_objects_uncollectable_total{generation="0"} 0.0
+python_gc_objects_uncollectable_total{generation="1"} 0.0
+python_gc_objects_uncollectable_total{generation="2"} 0.0
+# HELP python_gc_collections_total Number of times this generation was collected
+# TYPE python_gc_collections_total counter
+python_gc_collections_total{generation="0"} 1798.0
+python_gc_collections_total{generation="1"} 163.0
+python_gc_collections_total{generation="2"} 11.0
+# HELP lite_llama_requests_total Completed inference requests.
+# TYPE lite_llama_requests_total counter
+# HELP lite_llama_request_failures_total Inference request failures by stable root-cause category.
+# TYPE lite_llama_request_failures_total counter
+# HELP lite_llama_request_latency_seconds Time from scheduler submission to terminal request state.
+# TYPE lite_llama_request_latency_seconds histogram
+# HELP lite_llama_queue_wait_seconds Time from scheduler submission to first admission.
+# TYPE lite_llama_queue_wait_seconds histogram
+# HELP lite_llama_time_to_first_token_seconds Time from scheduler submission to first sampled token.
+# TYPE lite_llama_time_to_first_token_seconds histogram
+# HELP lite_llama_inter_token_latency_seconds Time between consecutive sampled tokens.
+# TYPE lite_llama_inter_token_latency_seconds histogram
+# HELP lite_llama_prompt_tokens_total Prompt tokens accepted by the scheduler.
+# TYPE lite_llama_prompt_tokens_total counter
+# HELP lite_llama_generated_tokens_total Tokens sampled by the inference engine.
+# TYPE lite_llama_generated_tokens_total counter
+# HELP lite_llama_waiting_requests Requests waiting for scheduler admission.
+# TYPE lite_llama_waiting_requests gauge
+lite_llama_waiting_requests 0.0
+# HELP lite_llama_prefilling_requests Requests currently in Chunked Prefill.
+# TYPE lite_llama_prefilling_requests gauge
+lite_llama_prefilling_requests 0.0
+# HELP lite_llama_running_requests Requests currently active in Decode.
+# TYPE lite_llama_running_requests gauge
+lite_llama_running_requests 0.0
+# HELP lite_llama_preemptions_total Requests preempted because of KV pressure.
+# TYPE lite_llama_preemptions_total counter
+lite_llama_preemptions_total 0.0
+# HELP lite_llama_preemptions_created Requests preempted because of KV pressure.
+# TYPE lite_llama_preemptions_created gauge
+lite_llama_preemptions_created 1.7840225659401486e+09
+# HELP lite_llama_kv_pages_used Allocated Paged KV cache pages.
+# TYPE lite_llama_kv_pages_used gauge
+lite_llama_kv_pages_used 0.0
+# HELP lite_llama_kv_pages_free Free Paged KV cache pages.
+# TYPE lite_llama_kv_pages_free gauge
+lite_llama_kv_pages_free 11134.0
+# HELP lite_llama_graph_capture_attempts_total NPU Graph capture attempts.
+# TYPE lite_llama_graph_capture_attempts_total counter
+lite_llama_graph_capture_attempts_total 0.0
+# HELP lite_llama_graph_capture_attempts_created NPU Graph capture attempts.
+# TYPE lite_llama_graph_capture_attempts_created gauge
+lite_llama_graph_capture_attempts_created 1.7840225659403381e+09
+# HELP lite_llama_graph_captures_total Successful NPU Graph captures.
+# TYPE lite_llama_graph_captures_total counter
+lite_llama_graph_captures_total 0.0
+# HELP lite_llama_graph_captures_created Successful NPU Graph captures.
+# TYPE lite_llama_graph_captures_created gauge
+lite_llama_graph_captures_created 1.7840225659403548e+09
+# HELP lite_llama_graph_replays_total Successful NPU Graph replays.
+# TYPE lite_llama_graph_replays_total counter
+lite_llama_graph_replays_total 0.0
+# HELP lite_llama_graph_replays_created Successful NPU Graph replays.
+# TYPE lite_llama_graph_replays_created gauge
+lite_llama_graph_replays_created 1.7840225659403698e+09
+# HELP lite_llama_graph_fallbacks_total NPU Graph calls that fell back to eager execution.
+# TYPE lite_llama_graph_fallbacks_total counter
+lite_llama_graph_fallbacks_total 0.0
+# HELP lite_llama_graph_fallbacks_created NPU Graph calls that fell back to eager execution.
+# TYPE lite_llama_graph_fallbacks_created gauge
+lite_llama_graph_fallbacks_created 1.7840225659403849e+09
+# HELP lite_llama_sampling_candidate_rows_total Rows sampled through the vocabulary-parallel candidate path.
+# TYPE lite_llama_sampling_candidate_rows_total counter
+lite_llama_sampling_candidate_rows_total 0.0
+# HELP lite_llama_sampling_candidate_rows_created Rows sampled through the vocabulary-parallel candidate path.
+# TYPE lite_llama_sampling_candidate_rows_created gauge
+lite_llama_sampling_candidate_rows_created 1.784022565940399e+09
+# HELP lite_llama_sampling_fallback_rows_total Rows that fell back to full-logit gather for exact sampling.
+# TYPE lite_llama_sampling_fallback_rows_total counter
+lite_llama_sampling_fallback_rows_total 0.0
+# HELP lite_llama_sampling_fallback_rows_created Rows that fell back to full-logit gather for exact sampling.
+# TYPE lite_llama_sampling_fallback_rows_created gauge
+lite_llama_sampling_fallback_rows_created 1.7840225659404132e+09
+# HELP lite_llama_sampling_full_logit_gather_batches_total Batches that required a full vocabulary gather during sampling.
+# TYPE lite_llama_sampling_full_logit_gather_batches_total counter
+lite_llama_sampling_full_logit_gather_batches_total 0.0
+# HELP lite_llama_sampling_full_logit_gather_batches_created Batches that required a full vocabulary gather during sampling.
+# TYPE lite_llama_sampling_full_logit_gather_batches_created gauge
+lite_llama_sampling_full_logit_gather_batches_created 1.7840225659404275e+09

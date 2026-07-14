@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "campaign_id": "20260714_qwen3_32b_tp2_fp16_length_matrix",
+  "diagnostic_count": 1,
+  "diagnostics": [
+    {
+      "id": "insufficient-watchdog-r1-p2048-o512",
+      "lifecycle_id": "r1-p2048-o512",
+      "reason": "initial 2400-second total wall-clock watchdog interrupted a normally progressing lifecycle",
+      "formal_eligible": false,
+      "aggregate_eligible": false,
+      "baseline_eligible": false,
+      "server_only_path": "server-only-rejected/insufficient-watchdog-r1-p2048-o512",
+      "replacement_protocol": "progress-v2: 1200 seconds without completed requests, generated tokens, or Graph replay growth plus stall evidence; 21600 seconds requires controller review without automatic termination"
+    }
+  ]
+}
