@@ -16,6 +16,23 @@
     "output_tokens": [64, 256, 512]
   },
   "regression_threshold": "max(10 percent, 3 * baseline CV)",
+  "collection_watchdog": {
+    "protocol_revision": "progress-v2",
+    "locked_at": "2026-07-14T12:45:15+08:00",
+    "applies_from_order": 2,
+    "monitor_interval_seconds": 30,
+    "stall_no_progress_seconds": 1200,
+    "progress_signals": ["completed_requests", "generated_tokens", "graph_replays"],
+    "stall_requires": "no progress for 1200 seconds and either AICore idle or waiting > 0 with running = 0",
+    "hard_review_seconds": 21600,
+    "hard_review_action": "preserve progress and request controller review; do not automatically terminate a progressing run",
+    "superseded_protocol": {
+      "type": "total wall-clock timeout",
+      "seconds": 2400,
+      "affected_lifecycle": "r1-p2048-o512",
+      "disposition": "rejected diagnostic; excluded from the 36 formal runs and all aggregate or baseline statistics"
+    }
+  },
   "sequence": [
     {"order":1,"repeat":1,"prompt":128,"output":64,"lifecycle_id":"r1-p128-o64"},
     {"order":2,"repeat":1,"prompt":2048,"output":512,"lifecycle_id":"r1-p2048-o512"},
