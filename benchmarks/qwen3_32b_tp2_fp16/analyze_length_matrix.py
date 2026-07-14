@@ -77,6 +77,35 @@ def prompt_sequence(fingerprint: dict) -> list[list[int]]:
     return [request["prompt_token_ids"] for request in fingerprint["requests"]]
 
 
+def timeseries_distributions(path: Path) -> dict[str, list[float]]:
+    records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
+    values = defaultdict(list)
+    for record in records:
+        server = record.get("server", {})
+        if server.get("status") == "ok":
+            scheduler = server.get("scheduler", {})
+            waiting = float(scheduler.get("waiting", 0))
+            prefilling = float(scheduler.get("prefilling", 0))
+            running = float(scheduler.get("running", 0))
+            values["waiting"].append(waiting)
+            values["prefilling"].append(prefilling)
+            values["running"].append(running)
+            values["system_requests"].append(waiting + prefilling + running)
+            values["kv_used_pages"].append(
+                float(server.get("kv_cache", {}).get("used_pages", 0))
+            )
+        for device in (record.get("npu") or {}).values():
+            if device.get("status") != "ok":
+                continue
+            if device.get("npu_utilization_pct") is not None:
+                values["npu_utilization_pct"].append(
+                    float(device["npu_utilization_pct"])
+                )
+            if device.get("hbm_usage_pct") is not None:
+                values["npu_hbm_usage_pct"].append(float(device["hbm_usage_pct"]))
+    return dict(values)
+
+
 def build(campaign: Path, task4_reference: Path | None = None):
     plan = read_json(campaign / "campaign-plan.json")
     workload = read_json(campaign / "workload/workload-manifest.json")
@@ -110,9 +139,11 @@ def build(campaign: Path, task4_reference: Path | None = None):
         ttft_hist = core.histogram_delta(before_metrics, after_metrics, "lite_llama_time_to_first_token_seconds")
         before_graph = core.graph_stats(root / "server/before-stats.json")
         after_graph = core.graph_stats(root / "server/after-stats.json")
+        timeseries_path = root / "server/timeseries.jsonl"
         timeseries, timeseries_errors = core.summarize_timeseries(
-            root / "server/timeseries.jsonl", timing, float(metadata["timeseries_interval_s"])
+            timeseries_path, timing, float(metadata["timeseries_interval_s"])
         )
+        timeseries_values = timeseries_distributions(timeseries_path)
         lifecycle = metadata["server_lifecycle_id"]
         command_path = campaign / "matrix/lifecycles" / lifecycle / "server/start-command.txt"
         command = normalized_server_command(command_path.read_text(encoding="utf-8"))
@@ -178,7 +209,14 @@ def build(campaign: Path, task4_reference: Path | None = None):
         validations.append({"run_id": metadata["run_id"], "checks": checks, "timeseries_errors": timeseries_errors})
         sequence_digest = hashlib.sha256(json.dumps(prompt_sequence(fingerprint), separators=(",", ":")).encode()).hexdigest()
         prompt_sequences[prompt].add(sequence_digest)
-        items[key] = {"metadata": metadata, "row": row, "client": client_values, "server": server_values, "timeseries": timeseries}
+        items[key] = {
+            "metadata": metadata,
+            "row": row,
+            "client": client_values,
+            "server": server_values,
+            "timeseries": timeseries,
+            "timeseries_values": timeseries_values,
+        }
 
     aggregate_rows = []
     grouped = defaultdict(list)
@@ -207,7 +245,25 @@ def build(campaign: Path, task4_reference: Path | None = None):
             for metric in TIMESERIES_METRICS:
                 values = [float(item["timeseries"][metric]) for item in group if item["timeseries"][metric] is not None]
                 row[f"timeseries_{metric}_mean"] = mean(values) if values else None
+                row[f"timeseries_{metric}_stdev"] = stdev(values) if len(values) > 1 else None
                 row[f"timeseries_{metric}_peak"] = stable(max(values)) if values else None
+            for metric in (
+                "waiting", "prefilling", "running", "system_requests",
+                "kv_used_pages", "npu_utilization_pct", "npu_hbm_usage_pct",
+            ):
+                values = [
+                    value
+                    for item in group
+                    for value in item["timeseries_values"].get(metric, [])
+                ]
+                for q in PERCENTILES:
+                    row[f"timeseries_{metric}_p{int(q * 100)}"] = pct(values, q) if values else None
+            for metric in (
+                "graph_capture_delta", "graph_replay_delta", "graph_fallback_delta"
+            ):
+                values = [float(item["row"][metric]) for item in group]
+                row[f"{metric}_mean"] = mean(values)
+                row[f"{metric}_stdev"] = stdev(values)
             row["graph_capture_delta_sum"] = sum(item["row"]["graph_capture_delta"] for item in group)
             row["graph_replay_delta_sum"] = sum(item["row"]["graph_replay_delta"] for item in group)
             row["graph_fallback_delta_sum"] = sum(item["row"]["graph_fallback_delta"] for item in group)

@@ -255,5 +255,38 @@ class PerformanceBaselineCompareTest(unittest.TestCase):
         self.assertEqual(self.module.compare(baseline, candidate)["status"], "hard_fail")
 
 
+class LengthMatrixAnalyzerTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        sys.path.insert(0, str(BENCHMARK))
+        try:
+            cls.module = load("length_matrix_analyzer_test", "analyze_length_matrix.py")
+        finally:
+            sys.path.pop(0)
+
+    def test_timeseries_distributions_keep_scheduler_kv_and_npu_samples(self):
+        records = [
+            {
+                "server": {
+                    "status": "ok",
+                    "scheduler": {"waiting": 1, "prefilling": 2, "running": 3},
+                    "kv_cache": {"used_pages": 7},
+                },
+                "npu": {
+                    "6": {"status": "ok", "npu_utilization_pct": 80, "hbm_usage_pct": 90},
+                    "7": {"status": "ok", "npu_utilization_pct": 82, "hbm_usage_pct": 91},
+                },
+            }
+        ]
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "timeseries.jsonl"
+            path.write_text(json.dumps(records[0]) + "\n", encoding="utf-8")
+            values = self.module.timeseries_distributions(path)
+        self.assertEqual(values["system_requests"], [6.0])
+        self.assertEqual(values["kv_used_pages"], [7.0])
+        self.assertEqual(values["npu_utilization_pct"], [80.0, 82.0])
+        self.assertEqual(values["npu_hbm_usage_pct"], [90.0, 91.0])
+
+
 if __name__ == "__main__":
     unittest.main()
