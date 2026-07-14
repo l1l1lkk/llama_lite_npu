@@ -51,8 +51,8 @@ ENVIRONMENT_FILES = (
     "model-config.sha256",
     "npu-smi.txt",
     "runtime.txt",
-    "version.txt",
 )
+OPTIONAL_ENVIRONMENT_FILES = ("version.txt",)
 LIFECYCLE_FILES = (
     "start-command.txt",
     "health.json",
@@ -144,6 +144,10 @@ def main() -> int:
             selected.add(Path(name))
     for name in ENVIRONMENT_FILES:
         selected.add(Path("environment") / name)
+    for name in OPTIONAL_ENVIRONMENT_FILES:
+        candidate = Path("environment") / name
+        if (source / candidate).is_file():
+            selected.add(candidate)
     for workload_path in sorted((source / "workload").glob("*")):
         if workload_path.is_file():
             selected.add(workload_path.relative_to(source))

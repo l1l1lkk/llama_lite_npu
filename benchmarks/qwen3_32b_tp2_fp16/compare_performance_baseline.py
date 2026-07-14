@@ -89,6 +89,8 @@ def main() -> int:
         print(serialized, end="")
     if args.expect and report["status"] != args.expect:
         raise SystemExit(f"expected {args.expect}, got {report['status']}")
+    if args.expect:
+        return 0
     return 0 if report["status"] == "pass" else 1
 
 
