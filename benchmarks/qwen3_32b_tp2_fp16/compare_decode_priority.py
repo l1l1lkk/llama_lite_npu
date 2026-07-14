@@ -334,7 +334,7 @@ def build(campaign: Path):
         })
 
     plan_observed = sorted(
-        (int(item["metadata"]["lifecycle_order_index"]), item["mode"], int(item["metadata"]["concurrency"]), int(item["metadata"]["run_order_in_lifecycle"]), item["metadata"]["server_lifecycle_id"])
+        (int(item["metadata"]["lifecycle_order_index"]), item["metadata"]["benchmark_variant"], int(item["metadata"]["concurrency"]), int(item["metadata"]["run_order_in_lifecycle"]), item["metadata"]["server_lifecycle_id"])
         for item in items.values()
     )
     plan_expected = sorted(
