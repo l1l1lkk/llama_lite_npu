@@ -60,6 +60,14 @@ Full gate 用于发布候选、推理路径或调度配置变更，以及 quick 
 
 服务器大文件是可选留存层，不是报告复算依赖。Git bundle 必须在脱离 `benchmark-results/` 的临时目录中通过 SHA 校验和全部 `--compare`。
 
+## 采集异常处理
+
+- 发生 timeout、OOM、strict 失败、Graph fallback 或调度停滞时，先保存进程、端口、NPU、metrics/stats、时间序列和日志尾部，再停止对应客户端与服务；不得覆盖正式 run ID。
+- rejected/diagnostic lifecycle 必须移出正式结果树，并在 metadata 与 manifest omitted 清单中说明原因、原始路径、大小和 SHA256；它不能进入 aggregate、baseline 或配对比较。
+- 长矩阵使用进度型 watchdog：completed requests、generated tokens 或 Graph replay 任一增长即视为有进展。只有连续 20 分钟三类信号均无增长，并同时出现 AICore idle 或 `waiting>0,running=0` 证据，才判定 stall。
+- 单生命周期达到 6 小时仍持续推进时只保存现场并请求人工复核，不自动终止或临时改变请求数、长度、并发和正式顺序。
+- watchdog、采样周期和恢复起点属于采集控制，必须在正式序列继续前一次性锁定；不能看到性能结果后按 cell 选择性调整。
+
 ## 可比性判定
 
 只有以下项目一致才允许计算 ratio、speedup 或回归：模型和 checkpoint/config SHA、精度、TP、硬件、软件栈、代码语义、Graph/Decode Priority、模板、prompt/output token 长度、请求数、并发、seed/offset、prompt token 序列、warmup 和正式边界。
