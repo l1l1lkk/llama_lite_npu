@@ -236,6 +236,18 @@ class PerformanceBaselineCompareTest(unittest.TestCase):
         candidate["fingerprint"]["hardware"] = "different"
         self.assertEqual(self.module.compare(baseline, candidate)["status"], "invalid")
 
+    def test_direction_and_cv_thresholds(self):
+        baseline = self.fixture()
+        baseline["cells"]["p128_o256"]["metrics"]["client_tpot_ms"]["cv"] = 0.05
+        candidate = json.loads(json.dumps(baseline))
+        candidate["cells"]["p128_o256"]["metrics"]["client_tpot_ms"]["mean"] = 11.4
+        self.assertEqual(self.module.compare(baseline, candidate)["status"], "pass")
+        candidate["cells"]["p128_o256"]["metrics"]["client_tpot_ms"]["mean"] = 11.6
+        self.assertEqual(self.module.compare(baseline, candidate)["status"], "regression")
+        candidate = json.loads(json.dumps(baseline))
+        candidate["cells"]["p128_o256"]["metrics"]["client_output_throughput_tok_s"]["mean"] = 44
+        self.assertEqual(self.module.compare(baseline, candidate)["status"], "regression")
+
     def test_correctness_failure_is_hard_fail(self):
         baseline = self.fixture()
         candidate = json.loads(json.dumps(baseline))
