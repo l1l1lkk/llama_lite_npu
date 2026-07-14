@@ -209,3 +209,33 @@ python benchmarks/qwen3_32b_tp2_fp16/compare_decode_priority.py \
 python benchmarks/qwen3_32b_tp2_fp16/compare_decode_priority.py \
   "benchmarks/results/$CAMPAIGN" --compare
 ```
+
+## Input/output length matrix campaigns
+
+The length matrix fixes Graph on, continuous batching,
+`--no_decode_priority`, concurrency 4, 32 formal requests and 8 warmup
+requests while varying prompt and fixed output lengths. Each formal run uses
+an independent server lifecycle. Workloads are frozen per prompt length; all
+output lengths for the same prompt reuse the exact formal prompt sequence.
+
+`run_length_matrix_campaign.sh` executes the preregistered balanced order. Its
+progress watchdog treats completed requests, generated tokens and Graph
+replays as independent progress signals. It declares a stall only after 1200
+seconds without progress and with either an idle AICore or `waiting > 0` plus
+`running = 0`. Reaching 21600 seconds while still progressing records a
+controller-review diagnostic but does not automatically terminate the run.
+`START_ORDER` is only a recovery control; skipped or rejected partial runs
+must be archived outside the formal `matrix/` tree before reuse of a formal
+run ID.
+
+```bash
+CAMPAIGN=20260714_qwen3_32b_tp2_fp16_length_matrix \
+  bash benchmarks/qwen3_32b_tp2_fp16/run_length_matrix_campaign.sh
+python benchmarks/qwen3_32b_tp2_fp16/analyze_length_matrix.py \
+  "benchmark-results/$CAMPAIGN"
+python benchmarks/qwen3_32b_tp2_fp16/analyze_length_matrix.py \
+  "benchmarks/results/$CAMPAIGN" --compare
+python benchmarks/qwen3_32b_tp2_fp16/compare_performance_baseline.py \
+  "benchmarks/results/$CAMPAIGN/performance-baseline.json" \
+  "benchmarks/results/$CAMPAIGN/performance-baseline.json" --expect pass
+```

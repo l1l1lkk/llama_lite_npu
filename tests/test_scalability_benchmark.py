@@ -182,6 +182,17 @@ class ScalabilityContractTest(unittest.TestCase):
             {(prompt, output, repeat) for prompt in (128, 512, 1024, 2048)
              for output in (64, 256, 512) for repeat in (1, 2, 3)},
         )
+        watchdog = plan["collection_watchdog"]
+        self.assertEqual(watchdog["stall_no_progress_seconds"], 1200)
+        self.assertEqual(watchdog["hard_review_seconds"], 21600)
+        self.assertEqual(watchdog["applies_from_order"], 2)
+        self.assertIn("do not automatically terminate", watchdog["hard_review_action"])
+        runner = (BENCHMARK / "run_length_matrix_campaign.sh").read_text(encoding="utf-8")
+        for signal in ("success", "generated", "replays"):
+            self.assertIn(signal, runner)
+        self.assertIn("no_progress_seconds >= stall_no_progress_seconds", runner)
+        self.assertIn("HARD_REVIEW_REQUIRED", runner)
+        self.assertNotIn("timeout --signal", runner)
         root = BENCHMARK / "datasets/20260714_length_matrix"
         manifest = json.loads((root / "workload-manifest.json").read_text(encoding="utf-8"))
         for workload in manifest["workloads"]:
