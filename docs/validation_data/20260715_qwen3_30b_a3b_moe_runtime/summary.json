@@ -1,0 +1,162 @@
+{
+  "schema_version": 1,
+  "artifact_kind": "compact derived evidence",
+  "generated_date": "2026-07-15",
+  "source_commit": "84239ed2e2afd9a277fdc2a5becab8623c1d31c0",
+  "release_baseline": "5595fefe1d6e0c88b6dba00fa6c9c1aee38f4708",
+  "model": {
+    "name": "Qwen3-30B-A3B",
+    "model_type": "qwen3_moe",
+    "hidden_size": 2048,
+    "num_hidden_layers": 48,
+    "num_experts": 128,
+    "top_k": 8,
+    "moe_intermediate_size": 768,
+    "norm_topk_prob": true,
+    "checkpoint_artifact_dtype": "bfloat16",
+    "runtime_dtype": "float16",
+    "checkpoint_sha256": "d9456e599c153a1b62c74ce4da9e796dbe58c683c3335358b6258af737b59fe1",
+    "config_sha256": "2850ddb3bf7aecad20b611e2d44f3077fc8193f4827c93beddd4c02ad63c2297"
+  },
+  "environment": {
+    "accelerator": "Ascend 910B3",
+    "os": "Ubuntu 22.04.5 LTS aarch64",
+    "python": "3.10.12",
+    "torch": "2.7.1+cpu",
+    "torch_npu": "2.7.1",
+    "cann": "8.5.0",
+    "driver": "26.0.rc1"
+  },
+  "source_manifests": {
+    "phase4a_sha256sums_self": "1b3028449c0eb22335013c2e3be3bb4814d2c63fdc6165f219791efbe471ebe0",
+    "phase4b_sha256sums_self": "4304b7c4c8fa744f28853c87cf49e04f60dd64af1a123f62a8a6836dee74169e",
+    "phase4b_d1_sha256sums_self": "92649b6e54fd616d3a469e43ebb68d2caef661da1a7b214a7cf9dedf0a6a843e",
+    "phase4b_d2_sha256sums_self": "ba7be8d6741ff1b50e3f8f9fcb12a7e56c0f0a3e024f27a6c14e86550c011029"
+  },
+  "phase4a": {
+    "historical_suite_before_phase4c1": {
+      "devices": 2,
+      "tests_per_device": 5,
+      "passed_per_device": 5,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "graph_capture_replay_executed": true
+    },
+    "durable_generic_boundary_test": {
+      "expected_suite_tests_per_device": 6,
+      "server_rerun_status": "pending_phase4c2"
+    },
+    "probe": {
+      "shape": {"tokens": 4, "hidden": 64, "experts": 8, "intermediate": 32, "top_k": 2},
+      "dtype": "float16",
+      "oracle_dtype": "float32",
+      "rtol": 0.01,
+      "atol": 0.01,
+      "generic_compat_router_max_abs": 0.0,
+      "generic_compat_executor_max_abs": 0.0,
+      "gmm_vs_oracle_max_abs": 0.00000192132,
+      "routed_gemv_vs_oracle_max_abs": 0.00000174390,
+      "block_vs_oracle_max_abs": 0.00000192132
+    }
+  },
+  "phase4b": {
+    "common_config": {
+      "world_size": 2,
+      "prompt_len": 64,
+      "batch_size": 1,
+      "max_gen_len": 16,
+      "temperature": 0,
+      "top_p": 1,
+      "page_size": 16,
+      "warmup": 0,
+      "iterations": 1,
+      "disable_thinking": true,
+      "seed": 42
+    },
+    "A": {
+      "parallel_mode": "tp",
+      "backend": "eager",
+      "graph": false,
+      "exit_code": 0,
+      "tokens": [9286, 16488, 11229, 320, 15469, 8, 702, 11941, 23507, 12114, 19102, 553, 46494, 15024, 11, 27362],
+      "text_sha256": "b6721ea02c18d50b43fb3ed3f8f493939927b64ded3ef7a545d225962c94aa13"
+    },
+    "B": {
+      "parallel_mode": "ep",
+      "backend": "eager",
+      "graph": false,
+      "exit_code": 0,
+      "tokens": [9286, 16488, 11229, 320, 15469, 8, 702, 11941, 23507, 12114, 19102, 553, 46494, 15024, 11, 17719],
+      "text_sha256": "425bf583761bf10922572dbdbc9950f79cd4ed5584739e06ab090f7b3460d2d8"
+    },
+    "C": {
+      "parallel_mode": "tp",
+      "backend": "auto",
+      "graph": true,
+      "exit_code": 0,
+      "tokens": [9286, 16488, 11229, 320, 15469, 8, 702, 11941, 23507, 12114, 19102, 553, 46494, 15024, 11, 27362],
+      "text_sha256": "b6721ea02c18d50b43fb3ed3f8f493939927b64ded3ef7a545d225962c94aa13",
+      "graph_counters": {"attempts": 1, "captured": 1, "replays": 15, "fallbacks": 0}
+    },
+    "comparisons": {
+      "A_vs_C_token_exact": true,
+      "A_vs_C_text_exact": true,
+      "A_vs_B_token_exact": false,
+      "A_vs_B_first_difference_token_index": 15
+    }
+  },
+  "phase4b_d1": {
+    "initial_classification": "INCONCLUSIVE",
+    "rank_post_exact_layers": 48,
+    "rank_post_total_layers": 48,
+    "cross_mode_post_close_layers": 48,
+    "cross_mode_decoder_hidden_close_layers": 48,
+    "first_residual_not_close_layer": 37,
+    "layer37_residual_relative_l2": 0.0024433664,
+    "near_tie": {
+      "supported": true,
+      "winner_margin": 0.03125,
+      "cross_mode_logit_delta": 0.03125,
+      "first_difference_token_index": 15,
+      "A_token": 27362,
+      "B_token": 17719
+    },
+    "router": {
+      "selected_set_failures": 0,
+      "only_order_difference_layer": 32,
+      "order_difference_experts": [104, 106],
+      "boundary_flip": false
+    }
+  },
+  "phase4b_d2": {
+    "classification": "BOTH_PATHS_REFERENCE_ALIGNED",
+    "independent_oracle": true,
+    "forbidden_production_symbol_hits": 0,
+    "target_layers": [0, 32, 37, 47],
+    "runtime_weight_semantics": "checkpoint BF16 -> FP16 quantized values -> CPU FP32 math",
+    "tolerances": {
+      "local_and_post": {"rtol": 0.01, "atol": 0.01},
+      "partition_sum": {"rtol": 0.00001, "atol": 0.000001}
+    },
+    "gate_counts": {
+      "metrics_rows": 72,
+      "router_rows": 8,
+      "ownership_rows": 128,
+      "local": 16,
+      "strict_partition_sum": 8,
+      "post": 8,
+      "router_selected_set_failures": 0,
+      "ownership_failures": 0,
+      "nonfinite_metric_rows": 0
+    },
+    "tp_partition": {"rank0_intermediate": "[0,384)", "rank1_intermediate": "[384,768)"},
+    "ep_partition": {"rank0_experts": "[0,64)", "rank1_experts": "[64,128)"}
+  },
+  "limitations": [
+    "The full-model smoke covers one frozen prompt and sixteen generated tokens, not a benchmark corpus.",
+    "The independent FP32 oracle validates four captured MoE layers, not the complete decoder stack.",
+    "Runtime kernels use FP16 arithmetic while the independent oracle uses FP32 arithmetic over runtime-quantized values.",
+    "The sixth NPU suite test added in Phase 4C1 is pending a Phase 4C2 server rerun."
+  ]
+}

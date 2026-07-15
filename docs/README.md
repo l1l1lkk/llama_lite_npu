@@ -15,6 +15,10 @@
 - [错误复盘记录](bug_records.md)：记录框架开发中的错误、排查和修复经验。
 - [可观测性与 Prometheus 指标](observability.md)：指标、PromQL 和抓取配置。
 - [Qwen3-VL 支持方案](qwen3vl_support_plan.md)：多模态模型适配说明。
+- [Qwen3 MoE Runtime 设计](qwen3_moe_runtime_design.md)：独立 reference、通用
+  router/executor 边界与连续 TP/EP placement。
+- [Qwen3 MoE Runtime 正确性验证](qwen3_moe_runtime_validation.md)：CPU/NPU、
+  Graph、TP/EP 与独立 FP32 oracle 的分层验证证据。
 
 ## 发布文档
 

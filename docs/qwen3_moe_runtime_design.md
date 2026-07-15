@@ -612,3 +612,53 @@ python -m unittest \
 
 Phase 3 不更新版本；`VERSION` 仍为 `0.0.13rc3`，目标 `0.0.14rc1` 仍只在最终
 发布阶段更新。
+
+## 13. Phase 4：真实 NPU 验证与 Correctness Contract
+
+完整方法、机器数据和限制见
+[Qwen3 MoE Runtime 正确性验证](qwen3_moe_runtime_validation.md)。仓库内精简证据由
+[manifest.json](validation_data/20260715_qwen3_30b_a3b_moe_runtime/manifest.json)
+锁定 size/SHA256，并由 fail-closed 单测检查，不依赖维护者访问内部服务器或 raw
+tensor。
+
+### 13.1 验证结论摘要
+
+Phase 4A 在两张 Ascend 910B3 上分别完成改测试前的 5/5 正式单卡测试，覆盖
+eager/GMM、routed GEMV、EP local contribution 和真实 NPUGraph capture/replay；
+generic/compatibility 边界探针对独立 FP32 reference 对齐。Phase 4C1 新增第 6 项
+durable NPU 回归，但服务器复跑属于后续 Phase 4C2，本文不把历史结果写成 6/6。
+
+Phase 4B 的 TP2 eager 与 TP2 auto+Graph 在冻结 16-token greedy 输入上 exact；TP2
+与 EP2 只在最后一个 token 分叉。D1 证明两模式 48/48 层 post-allreduce rank
+consistency exact，跨模式 post/decoder hidden 通过 `1e-2/1e-2`，但 residual 后段
+absolute gate 失败，因此初判 `INCONCLUSIVE`。
+
+D2 使用 checkpoint runtime-quantized 权重、D1 capture 和独立 CPU FP32 数学重建
+layer 0/32/37/47。16 个 rank-local、8 个严格 partition sum、8 个 post、8 个 router
+selected set 和 128 条 ownership 全部门通过，最终结论为
+`BOTH_PATHS_REFERENCE_ALIGNED`。第 16 token 的两个候选 margin 与跨模式扰动均为
+`0.03125`，支持不同 FP16 分解/累加顺序在近似并列 logits 上放大，而不是已证明的
+placement 或 collective 缺陷。
+
+### 13.2 固化后的正确性门
+
+- TP/EP 各自 local/post 对独立 FP32 oracle：`rtol=1e-2, atol=1e-2`；新 dtype
+  或设备必须重新校准。
+- 独立 partial sum 对 EXEC_ORACLE：`rtol=1e-5, atol=1e-6`。
+- rank post exact、finite、TP coverage/无重叠、EP ownership 唯一是硬门。
+- router 锁 selected set、weights 与 K/K+1 boundary；tie 不锁 selected order。
+- TP eager 与 Graph 可对冻结 greedy 输入要求 exact；TP 与 EP 不要求 token
+  bit-exact。近并列时必须报告 logits、winner margin、扰动和首次差异。
+- residual 同时报 raw 误差、relative L2 和 elementwise close；不把本次约 0.24%
+  固化成通用阈值。
+
+### 13.3 抽象边界仍保持最小
+
+当前通用边界仍只支持 Qwen3 的 softmax top-k routing，以及连续 TP intermediate
+shard/EP expert slice。Phase 4 没有引入 DeepSeek grouped top-k、sigmoid routing、
+route scale/correction bias、shared experts、all-to-all、非连续 expert map、W8A8 或
+其他量化。它们必须在后续阶段分别增加独立 reference、placement/communication 契约
+和真实 NPU 验证，不能从本次结论外推。
+
+本验证是 correctness 工作，不是 benchmark；加载/编译耗时不能用于性能结论。
+Phase 4C1 不更新版本，`VERSION` 仍为 `0.0.13rc3`。

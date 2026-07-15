@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "artifact_kind": "compact derived evidence manifest",
+  "generation": "Values were deterministically selected from checksum-verified Phase 4A, Phase 4B, D1, and D2 diagnostics. Raw tensors, checkpoints, temporary runners, full logs, absolute paths, hosts, and credentials are intentionally excluded.",
+  "source_commit": "84239ed2e2afd9a277fdc2a5becab8623c1d31c0",
+  "source_diagnostics_manifest_sha256": {
+    "phase4a": "1b3028449c0eb22335013c2e3be3bb4814d2c63fdc6165f219791efbe471ebe0",
+    "phase4b": "4304b7c4c8fa744f28853c87cf49e04f60dd64af1a123f62a8a6836dee74169e",
+    "phase4b_d1": "92649b6e54fd616d3a469e43ebb68d2caef661da1a7b214a7cf9dedf0a6a843e",
+    "phase4b_d2": "ba7be8d6741ff1b50e3f8f9fcb12a7e56c0f0a3e024f27a6c14e86550c011029"
+  },
+  "files": [
+    {
+      "path": "layer-oracle-metrics.csv",
+      "size": 18567,
+      "sha256": "87980dce1e5f83e07d28319d5d0f30a06f2dd58e8572f14d02175d0d7bbb5e24",
+      "source": "D2 complete 72-row metric table"
+    },
+    {
+      "path": "router-oracle.csv",
+      "size": 8706,
+      "sha256": "3f6d368c9a1dca54e94f67557185ba1722fbe6b28c51574c179517d02d572110",
+      "source": "D2 complete 8-row router table"
+    },
+    {
+      "path": "selected-expert-ownership.csv",
+      "size": 9937,
+      "sha256": "275218aebd96bc7e829a9813c08baadfc0c7b44a565f317a70990ca4939d1fcd",
+      "source": "D2 complete 128-row ownership table"
+    },
+    {
+      "path": "summary.json",
+      "size": 5760,
+      "sha256": "c67db73940cfc8b1a84132e227a855f90a1d91022b95e303ad03d645e1e16804",
+      "source": "Compact Phase 4A, Phase 4B, D1, and D2 conclusions"
+    }
+  ]
+}

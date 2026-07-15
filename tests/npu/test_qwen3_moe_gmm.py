@@ -77,6 +77,184 @@ class Qwen3MoeGMMNPUTest(unittest.TestCase):
             grouped, eager, rtol=1e-2, atol=1e-2
         )
 
+    def test_generic_runtime_boundaries_match_qwen_compatibility(self):
+        from lite_llama.models.moe import (
+            Qwen3MoeExperts,
+            Qwen3MoeTopKRouter,
+            Qwen3SparseMoeBlock,
+            RoutedExpertExecutor,
+            SoftmaxTopKRouter,
+        )
+        from tests.reference.moe_reference import (
+            expert_forward_reference,
+            route_topk_reference,
+        )
+
+        torch.manual_seed(20260715)
+        hidden_states = torch.randn(
+            4, 64, device="npu", dtype=torch.float16
+        )
+        generic_router = SoftmaxTopKRouter(
+            hidden_size=64,
+            num_experts=8,
+            top_k=2,
+            norm_topk_prob=True,
+            dtype=torch.float16,
+        ).npu()
+        compat_router = Qwen3MoeTopKRouter(
+            hidden_size=64,
+            num_experts=8,
+            top_k=2,
+            norm_topk_prob=True,
+            dtype=torch.float16,
+        ).npu()
+        generic_executor = RoutedExpertExecutor(
+            hidden_size=64,
+            num_experts=8,
+            intermediate_size=32,
+            layer_index=11,
+            dtype=torch.float16,
+        ).npu()
+        compat_executor = Qwen3MoeExperts(
+            hidden_size=64,
+            num_experts=8,
+            intermediate_size=32,
+            layer_index=11,
+            dtype=torch.float16,
+        ).npu()
+        block = Qwen3SparseMoeBlock(
+            hidden_size=64,
+            num_experts=8,
+            top_k=2,
+            intermediate_size=32,
+            layer_index=11,
+            dtype=torch.float16,
+        ).npu()
+
+        with torch.no_grad():
+            generic_router.weight.normal_(mean=0.0, std=0.02)
+            compat_router.weight.copy_(generic_router.weight)
+            generic_executor.gate_up_weight.normal_(mean=0.0, std=0.02)
+            generic_executor.down_weight.normal_(mean=0.0, std=0.02)
+            compat_executor.gate_up_weight.copy_(
+                generic_executor.gate_up_weight
+            )
+            compat_executor.down_weight.copy_(generic_executor.down_weight)
+            block.gate.weight.copy_(generic_router.weight)
+            block.experts.gate_up_weight.copy_(
+                generic_executor.gate_up_weight
+            )
+            block.experts.down_weight.copy_(generic_executor.down_weight)
+
+        with torch.inference_mode():
+            generic_routing = generic_router(hidden_states)
+            compat_routing = compat_router(hidden_states)
+            router_logits, routing_weights, selected_experts = generic_routing
+            generic_grouped = generic_executor._forward_grouped_local(
+                hidden_states, selected_experts, routing_weights
+            )
+            compat_grouped = compat_executor._forward_grouped_local(
+                hidden_states,
+                compat_routing.selected_experts,
+                compat_routing.routing_weights,
+            )
+            generic_forward = generic_executor(
+                hidden_states, selected_experts, routing_weights
+            )
+            block_output = block(hidden_states.reshape(2, 2, 64))
+        torch.npu.synchronize()
+
+        self.assertIs(generic_routing.router_logits, router_logits)
+        self.assertIs(generic_routing.routing_weights, routing_weights)
+        self.assertIs(generic_routing.selected_experts, selected_experts)
+        self.assertEqual(router_logits.shape, (4, 8))
+        self.assertEqual(routing_weights.shape, (4, 2))
+        self.assertEqual(selected_experts.shape, (4, 2))
+        self.assertEqual(router_logits.dtype, torch.float16)
+        self.assertEqual(routing_weights.dtype, torch.float16)
+        self.assertEqual(selected_experts.dtype, torch.int64)
+        for generic_value, compat_value in zip(
+            generic_routing, compat_routing
+        ):
+            torch.testing.assert_close(
+                generic_value, compat_value, rtol=0.0, atol=0.0
+            )
+
+        torch.testing.assert_close(
+            generic_grouped, compat_grouped, rtol=0.0, atol=0.0
+        )
+        torch.testing.assert_close(
+            generic_forward, generic_grouped, rtol=0.0, atol=0.0
+        )
+        torch.testing.assert_close(
+            block_output.reshape(4, 64), generic_grouped, rtol=0.0, atol=0.0
+        )
+
+        placement = generic_executor.placement
+        self.assertEqual(
+            tuple(placement), ("tp", 1, 0, 8, 0, 8, 32)
+        )
+        self.assertEqual(
+            set(generic_executor.state_dict()),
+            {"gate_up_weight", "down_weight"},
+        )
+        self.assertNotIn("placement", generic_executor.state_dict())
+        self.assertEqual(
+            set(block.state_dict()),
+            {
+                "gate.weight",
+                "experts.gate_up_weight",
+                "experts.down_weight",
+            },
+        )
+        torch.testing.assert_close(
+            block.last_router_logits, router_logits, rtol=0.0, atol=0.0
+        )
+
+        hidden_cpu = hidden_states.cpu()
+        router_weight_cpu = generic_router.weight.cpu()
+        gate_up_cpu = generic_executor.gate_up_weight.cpu()
+        down_cpu = generic_executor.down_weight.cpu()
+        reference_logits, reference_weights, reference_experts = (
+            route_topk_reference(
+                hidden_cpu,
+                router_weight_cpu,
+                top_k=2,
+                norm_topk_prob=True,
+            )
+        )
+        reference_output = expert_forward_reference(
+            hidden_cpu,
+            selected_experts.cpu(),
+            routing_weights.cpu(),
+            gate_up_cpu,
+            down_cpu,
+        )
+        torch.testing.assert_close(
+            router_logits.cpu(), reference_logits, rtol=1e-2, atol=1e-2
+        )
+        torch.testing.assert_close(
+            routing_weights.cpu(),
+            reference_weights,
+            rtol=1e-2,
+            atol=1e-2,
+        )
+        torch.testing.assert_close(
+            selected_experts.cpu(), reference_experts, rtol=0.0, atol=0.0
+        )
+        torch.testing.assert_close(
+            generic_grouped.cpu().float(),
+            reference_output,
+            rtol=1e-2,
+            atol=1e-2,
+        )
+        torch.testing.assert_close(
+            block_output.reshape(4, 64).cpu().float(),
+            reference_output,
+            rtol=1e-2,
+            atol=1e-2,
+        )
+
     def test_validation_mode_checks_each_sparse_block(self):
         from lite_llama.models.moe import Qwen3SparseMoeBlock
 
