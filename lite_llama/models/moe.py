@@ -5,14 +5,24 @@ from __future__ import annotations
 import os
 import sys
 import warnings
-from typing import Optional
+from typing import NamedTuple, Optional
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 
-class Qwen3MoeTopKRouter(nn.Module):
+class RoutingResult(NamedTuple):
+    """Tuple-compatible output of a token-to-expert router."""
+
+    router_logits: torch.Tensor
+    routing_weights: torch.Tensor
+    selected_experts: torch.Tensor
+
+
+class SoftmaxTopKRouter(nn.Module):
+    """Softmax top-k router shared by MoE model adapters."""
+
     def __init__(
         self,
         hidden_size: int,
@@ -36,7 +46,7 @@ class Qwen3MoeTopKRouter(nn.Module):
 
     def forward(
         self, hidden_states: torch.Tensor
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> RoutingResult:
         flat_states = hidden_states.reshape(-1, self.hidden_size)
         router_logits = F.linear(flat_states, self.weight)
         router_probs = F.softmax(router_logits.float(), dim=-1)
@@ -47,11 +57,15 @@ class Qwen3MoeTopKRouter(nn.Module):
             routing_weights = routing_weights / routing_weights.sum(
                 dim=-1, keepdim=True
             )
-        return (
-            router_logits,
-            routing_weights.to(router_logits.dtype),
-            selected_experts,
+        return RoutingResult(
+            router_logits=router_logits,
+            routing_weights=routing_weights.to(router_logits.dtype),
+            selected_experts=selected_experts,
         )
+
+
+class Qwen3MoeTopKRouter(SoftmaxTopKRouter):
+    """Compatibility name for the Qwen3 softmax top-k router."""
 
 
 class Qwen3MoeExperts(nn.Module):

@@ -34,6 +34,173 @@ class MoeReferenceContractTest(unittest.TestCase):
     def setUpClass(cls):
         cls.production = _load_production_moe()
 
+    def test_generic_router_boundary_is_tuple_compatible(self):
+        router = self.production.SoftmaxTopKRouter(
+            hidden_size=2,
+            num_experts=2,
+            top_k=1,
+            dtype=torch.float32,
+        )
+        router.weight.data.copy_(torch.eye(2))
+
+        result = router(torch.tensor([[2.0, 1.0]]))
+        logits, weights, selected_experts = result
+
+        self.assertIsInstance(result, self.production.RoutingResult)
+        self.assertIs(result.router_logits, logits)
+        self.assertIs(result.routing_weights, weights)
+        self.assertIs(result.selected_experts, selected_experts)
+        self.assertEqual(
+            result._fields,
+            ("router_logits", "routing_weights", "selected_experts"),
+        )
+
+    def test_qwen3_router_symbol_preserves_constructor_and_result_contract(self):
+        router = self.production.Qwen3MoeTopKRouter(
+            hidden_size=3,
+            num_experts=4,
+            top_k=2,
+            dtype=torch.float32,
+        )
+        router.weight.data.copy_(
+            torch.tensor(
+                [
+                    [2.0, 0.0, 0.0],
+                    [1.0, 0.0, 0.0],
+                    [0.0, 1.0, 0.0],
+                    [0.0, 0.0, 1.0],
+                ]
+            )
+        )
+
+        result = router(torch.tensor([[1.0, 0.0, 0.0]]))
+
+        self.assertIsInstance(router, self.production.SoftmaxTopKRouter)
+        self.assertIsInstance(result, tuple)
+        self.assertIsInstance(result, self.production.RoutingResult)
+        self.assertTrue(router.norm_topk_prob)
+        self.assertEqual(result.router_logits.shape, (1, 4))
+        self.assertEqual(result.routing_weights.shape, (1, 2))
+        self.assertEqual(result.selected_experts.shape, (1, 2))
+        self.assertEqual(result.router_logits.dtype, torch.float32)
+        self.assertEqual(result.routing_weights.dtype, torch.float32)
+        self.assertEqual(result.selected_experts.dtype, torch.int64)
+
+    def test_router_result_preserves_empty_shapes_and_dtypes(self):
+        router = self.production.SoftmaxTopKRouter(
+            hidden_size=3,
+            num_experts=4,
+            top_k=2,
+            norm_topk_prob=False,
+            dtype=torch.bfloat16,
+        )
+
+        result = router(torch.empty(0, 3, dtype=torch.bfloat16))
+
+        self.assertEqual(result.router_logits.shape, (0, 4))
+        self.assertEqual(result.routing_weights.shape, (0, 2))
+        self.assertEqual(result.selected_experts.shape, (0, 2))
+        self.assertEqual(result.router_logits.dtype, torch.bfloat16)
+        self.assertEqual(result.routing_weights.dtype, torch.bfloat16)
+        self.assertEqual(result.selected_experts.dtype, torch.int64)
+
+    def test_sparse_block_state_dict_and_last_logits_remain_compatible(self):
+        block = self._make_block(seed=91)
+        hidden_states = torch.randn(
+            3,
+            4,
+            generator=torch.Generator().manual_seed(92),
+        )
+        captured_results = []
+        original_forward = block.gate.forward
+
+        def capture_result(states):
+            result = original_forward(states)
+            captured_results.append(result)
+            return result
+
+        with mock.patch.object(
+            block.gate,
+            "forward",
+            side_effect=capture_result,
+        ):
+            actual = block(hidden_states)
+        expected, _, _, _ = moe_forward_reference(
+            hidden_states,
+            block.gate.weight.detach(),
+            block.experts.gate_up_weight.detach(),
+            block.experts.down_weight.detach(),
+            top_k=2,
+            norm_topk_prob=True,
+        )
+
+        self.assertEqual(
+            set(block.state_dict()),
+            {
+                "gate.weight",
+                "experts.gate_up_weight",
+                "experts.down_weight",
+            },
+        )
+        self.assertEqual(
+            set(dict(block.named_parameters())),
+            {
+                "gate.weight",
+                "experts.gate_up_weight",
+                "experts.down_weight",
+            },
+        )
+        self.assertEqual(len(captured_results), 1)
+        self.assertIs(
+            block.last_router_logits,
+            captured_results[0].router_logits,
+        )
+        torch.testing.assert_close(actual, expected)
+
+    def test_router_hot_path_has_no_host_visible_tensor_conversion(self):
+        source_path = ROOT / "lite_llama/models/moe.py"
+        source = source_path.read_text(encoding="utf-8")
+        module = ast.parse(source)
+        router_class = next(
+            node
+            for node in module.body
+            if isinstance(node, ast.ClassDef)
+            and node.name == "SoftmaxTopKRouter"
+        )
+        forward = next(
+            node
+            for node in router_class.body
+            if isinstance(node, ast.FunctionDef) and node.name == "forward"
+        )
+        forward_source = ast.get_source_segment(source, forward)
+
+        for forbidden in (
+            ".item(",
+            ".tolist(",
+            ".cpu(",
+            ".numpy(",
+            "print(",
+        ):
+            self.assertNotIn(forbidden, forward_source)
+        branches = [
+            node for node in ast.walk(forward) if isinstance(node, ast.If)
+        ]
+        self.assertEqual(len(branches), 1)
+        self.assertEqual(
+            ast.unparse(branches[0].test),
+            "self.norm_topk_prob",
+        )
+
+    def test_dependency_light_direct_file_loader_exposes_router_boundary(self):
+        self.assertEqual(self.production.__package__, "")
+        self.assertTrue(issubclass(self.production.RoutingResult, tuple))
+        self.assertTrue(
+            issubclass(
+                self.production.Qwen3MoeTopKRouter,
+                self.production.SoftmaxTopKRouter,
+            )
+        )
+
     @staticmethod
     def _make_block(
         *,

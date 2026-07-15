@@ -267,3 +267,155 @@ python -m unittest tests.models.test_moe_reference -v
 单进程 TP/EP 分解语义。Phase 4 才能在记录 CANN、torch_npu、设备、shape、dtype
 的真实环境中校准 FP16/BF16 tolerance，并验证 GMM、routed GEMV、HCCL、full-model
 Graph capture/replay/fallback。任何 NPU 结果都不能由本阶段 CPU 测试推断。
+
+## 11. Phase 2：RoutingResult 与通用 TopK Router 边界
+
+### 11.1 最终模块边界
+
+Phase 2 最终选择在现有 `lite_llama/models/moe.py` 内建立最小路由边界，没有新增
+`moe_runtime.py`：
+
+- `RoutingResult` 是不可变、tuple-compatible 的三字段返回值；
+- `SoftmaxTopKRouter` 持有当前通用 softmax top-k 数学实现；
+- `Qwen3MoeTopKRouter` 是不增加参数或行为的兼容子类；
+- `Qwen3SparseMoeBlock` 仍持有 `gate` 和 `experts`，调用与 combine 路径不变。
+
+选择同文件不是放弃模块化，而是遵循当前 dependency-light 测试约束。现有 CPU
+测试用 `spec_from_file_location` 直接加载 `moe.py`，此时 `__package__` 为空。在
+已有文件内定义边界，不需要相对导入、动态路径加载或 broad `ImportError`
+fallback，也不会为了测试导入整个 `lite_llama` 包及其 `accelerate` 依赖。等未来
+仓库建立稳定的轻量模块加载约定后，可以在不改变 API 的前提下移动定义。
+
+### 11.2 RoutingResult 语义与 tuple 兼容
+
+字段顺序保持原三元返回 ABI：
+
+```text
+router_logits, routing_weights, selected_experts
+```
+
+调用方既可以继续：
+
+```python
+logits, weights, expert_ids = router(hidden_states)
+```
+
+也可以使用属性访问：
+
+```python
+result = router(hidden_states)
+result.router_logits
+result.routing_weights
+result.selected_experts
+```
+
+测试锁定字段和 tuple 行为，不依赖具体 `repr`。`RoutingResult` 不承载排序后的
+token、expert counts、group list 或执行计划，避免把 GMM/GEMV 细节泄漏到 router
+边界。
+
+### 11.3 Router 行为保持
+
+`SoftmaxTopKRouter` 原样保留：
+
+```text
+F.linear
+-> softmax(router_logits.float())
+-> topk
+-> optional selected-weight renormalization
+-> cast weights back to router_logits.dtype
+```
+
+constructor、默认 `norm_topk_prob=True`、weight `[E,H]`、expert id dtype、
+`T=0` shape 和 Qwen3 symbol 均保持。Phase 1 的真实数学矩阵继续对
+`Qwen3MoeTopKRouter` 运行，而不是用 mock 替代路由计算。
+
+本阶段没有加入 sigmoid、grouped top-k、route scale、correction bias、custom
+routing 或 DeepSeek 参数占位；这些行为需要各自的 reference 契约和阶段验收。
+
+### 11.4 兼容证据
+
+`Qwen3SparseMoeBlock.state_dict()` 和 `named_parameters()` 仍精确只有：
+
+```text
+gate.weight
+experts.gate_up_weight
+experts.down_weight
+```
+
+因此没有新增可训练参数或 checkpoint key。测试在一次真实 block 调用中捕获 router
+返回值，确认 `last_router_logits` 与该 `RoutingResult.router_logits` 是同一 tensor，
+并再次比较 block 输出与 Phase 1 独立 FP32 oracle。
+
+dependency-light direct-file loader 继续直接加载 `moe.py`，无需额外模块预加载。
+source contract 对 `SoftmaxTopKRouter.forward` 做 AST 检查：没有 `.item()`、
+`.tolist()`、`.cpu()`、`.numpy()` 或日志；唯一 Python 分支是静态配置
+`self.norm_topk_prob`。没有增加 shape assertion、device copy 或 tensor-value-driven
+控制流。
+
+### 11.5 明确不进入的范围
+
+本阶段没有修改 `Qwen3MoeExperts` 的执行逻辑、backend policy、GMM/GEMV、routing
+kernel、TP/EP placement、all-reduce、Graph 实现或 server flags。ExpertExecutor 与
+placement 属于下一独立阶段；shared experts、DeepSeek routing 和量化不在本阶段。
+
+CPU Graph policy tests 只能证明 eligibility/fallback 源码路径没有回归。没有运行
+NPU Graph capture/replay，因此不能声称 NamedTuple 在真实 Ascend Graph 中已经完成
+验证；热路径无 host sync 的源码契约只是进入后续 NPU 验证的必要条件。
+
+### 11.6 Phase 2 TDD 与真实结果
+
+RED：
+
+```text
+python -m unittest \
+  tests.models.test_moe_reference.MoeReferenceContractTest.\
+test_generic_router_boundary_is_tuple_compatible -v
+```
+
+实现前 exit code `1`，真实失败为 production module 不存在
+`SoftmaxTopKRouter` 的 `AttributeError`。RED 状态未 stage、commit 或 push。
+
+最小 GREEN：同一测试在实现后 1 test 通过，exit `0`。
+
+Phase 2 reference/compatibility：
+
+```text
+python -m unittest tests.models.test_moe_reference -v
+```
+
+22 tests 通过，exit `0`。新增覆盖 tuple/属性访问、Qwen3 兼容符号、空输入
+shape/dtype、state dict/parameter keys、`last_router_logits`、direct-file loader 和
+无 host-visible tensor conversion。
+
+MoE、Graph policy、weight conversion、TP/EP 相关 CPU 回归：
+
+```text
+python -m unittest \
+  tests.models.test_moe_reference \
+  tests.models.test_qwen3_moe \
+  tests.test_decode_p0 \
+  tests.test_graph_ablation \
+  tests.test_observability \
+  tests.test_model_executor_packed_prefill \
+  tests.test_tp_control -v
+```
+
+88 tests 通过，exit `0`。
+
+最终 focused gate：
+
+```text
+python -m unittest \
+  tests.models.test_moe_reference \
+  tests.models.test_qwen3_moe -v
+```
+
+48 tests 通过，exit `0`。其中 22 项是独立 reference/Phase 2 契约，26 项是已有
+Qwen3 MoE 回归；不能只依赖默认 discovery 来代替这条显式命令。
+
+`python scripts/validate_release.py` 的 markdown UTF-8、版本文档、compile、
+`git diff --check` 全部通过，默认 discovery 157 tests 通过，exit `0`。独立执行
+`git diff --check` 也为 exit `0`。
+
+Phase 2 不更新版本；`VERSION` 仍为 `0.0.13rc3`，目标 `0.0.14rc1` 仍只在最终
+发布阶段更新。
