@@ -1,5 +1,44 @@
 # Changelog
 
+## [0.0.14rc1] - 2026-07-15
+
+Generic Qwen3 MoE runtime boundaries and reference-correctness release.
+
+### Added
+
+- Added the tuple-compatible `RoutingResult` contract and generic `SoftmaxTopKRouter`, while retaining `Qwen3MoeTopKRouter` as the Qwen3 compatibility type.
+- Added immutable `ExpertPlacement` metadata for the existing contiguous Tensor Parallel intermediate shards and Expert Parallel expert slices.
+- Added the generic `RoutedExpertExecutor`, while retaining `Qwen3MoeExperts` as a state- and signature-compatible Qwen3 type.
+- Added an independent inference-only CPU FP32 MoE reference and fail-closed tracked evidence checks.
+
+### Changed
+
+- Separated router, placement, and routed-expert execution responsibilities without changing Qwen3 checkpoint layouts, state-dict keys, backend selection, all-reduce placement, or the eager/GMM/routed-GEMV algorithms.
+- Preserved the Qwen3 sparse-block output, `last_router_logits`, tuple unpacking, and existing server/backend behavior.
+
+### Tests
+
+- Ran the explicit six-test NPU MoE suite independently on physical NPU 6 and 7; each device passed 6/6 with zero failures, errors, or skips, including the generic boundary and dynamic NPUGraph capture/replay tests.
+- Ran a Qwen3-30B-A3B FP16 TP2/EP2/Graph triangle: TP eager and TP auto+Graph produced identical frozen greedy output, while TP and EP differed only at the final near-tied token.
+- D1 captured the layerwise router, expert, collective, decoder, and vocabulary evidence and remained `INCONCLUSIVE`; the independent four-layer FP32 D2 oracle classified both paths as `BOTH_PATHS_REFERENCE_ALIGNED`.
+- Kept the CPU release validator separate from the explicit per-device NPU hardware gate and added fail-closed validation for the compact 72/8/128-row evidence tables.
+
+### Documentation
+
+- Added the MoE runtime design, correctness validation, compact evidence manifest, and this Chinese release report.
+
+### Known limitations
+
+- The generic boundary currently covers Qwen3 softmax top-k routing and contiguous TP/EP placement only. DeepSeek grouped or sigmoid routing, shared experts, all-to-all, non-contiguous expert maps, quantized MoE paths, and MLA are not implemented by this release.
+- The full-model smoke covers one frozen prompt and 16 generated tokens; the independent FP32 layer oracle covers four MoE layers rather than the complete decoder.
+- This release makes no new performance claim and does not compare throughput or latency with vLLM or vLLM-Ascend.
+
+### Docs
+
+- [v0.0.14rc1 release report](docs/releases/v0.0.14rc1.md)
+- [Qwen3 MoE runtime design](docs/qwen3_moe_runtime_design.md)
+- [Qwen3 MoE runtime correctness validation](docs/qwen3_moe_runtime_validation.md)
+
 ## [0.0.13rc3] - 2026-07-13
 
 Fixed-output request control and strict benchmark release.

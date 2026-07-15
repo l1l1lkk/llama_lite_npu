@@ -240,4 +240,6 @@ all-to-all、非连续 expert map、W8A8/其他量化、MLA，也没有形成性
 correctness regression 证据，运行耗时不能用于性能结论。CPU release validator 不收集
 `tests/npu`，后续硬件门仍必须显式逐卡执行。
 
-本阶段 `VERSION` 仍为 `0.0.13rc3`；目标 `0.0.14rc1` 只在最终发布阶段更新。
+Phase 4 验证完成时 `VERSION` 仍为 `0.0.13rc3`；本验证作为 `v0.0.14rc1` 发布证据。
+版本元数据更新不改变本文冻结的 commit、diagnostics hash、测试数量或 correctness
+contract。

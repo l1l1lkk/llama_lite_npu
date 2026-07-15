@@ -12,7 +12,7 @@ the core execution path instead of wrapping a high-level inference library.
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.7-orange)
 ![Ascend](https://img.shields.io/badge/Ascend-910B3-red)
-![Version](https://img.shields.io/badge/version-0.0.13rc3-blue)
+![Version](https://img.shields.io/badge/version-0.0.14rc1-blue)
 
 </div>
 
@@ -92,6 +92,28 @@ It is not positioned as a production replacement for vLLM-Ascend or MindIE.
 | Precision | BF16 / W8A8 / W4A8 / FP8 | Not yet stabilized |
 | Distributed | Multi-node TP/EP | Not yet supported |
 
+## MoE Runtime Correctness
+
+v0.0.14rc1 introduces tuple-compatible generic router and routed-expert
+boundaries while preserving Qwen3 parameter names, checkpoint layouts,
+state-dict keys, and default execution behavior. An independent CPU FP32
+reference and fail-closed compact evidence validate the runtime separately from
+the optimized implementation.
+
+The explicit six-test MoE NPU suite passed 6/6 independently on each of two
+Atlas 910B3 devices, including the generic compatibility boundary and dynamic
+NPUGraph capture/replay. A Qwen3-30B-A3B TP2/EP2/Graph triangle and an
+independent four-layer FP32 oracle aligned both parallel paths; a final-token
+TP/EP difference was traced to a near tie rather than a placement or collective
+failure. This is correctness evidence, not a performance claim.
+
+The current abstraction is limited to Qwen3 softmax top-k routing and
+contiguous TP/EP placement. It does not yet implement DeepSeek grouped or
+sigmoid routing, shared experts, all-to-all, non-contiguous expert maps,
+quantized MoE execution, or MLA. See the
+[v0.0.14rc1 release report](docs/releases/v0.0.14rc1.md) and
+[correctness validation](docs/qwen3_moe_runtime_validation.md).
+
 ## Benchmarks
 
 All numbers below were measured on **2 × Atlas 910B3** with Qwen3-32B and
@@ -100,7 +122,7 @@ All numbers below were measured on **2 × Atlas 910B3** with Qwen3-32B and
 
 ### EvalScope service benchmarks
 
-Latest v0.0.13rc3 strict NPU Graph ablation: Qwen3-32B, TP=2, FP16,
+Latest strict NPU Graph benchmark remains the v0.0.13rc3 ablation: Qwen3-32B, TP=2, FP16,
 prompt 128, `min_tokens=max_tokens=256`, greedy sampling. Each on/off pair uses
 the same frozen requests and three formal runs:
 
@@ -140,6 +162,7 @@ tokens:
 
 ## Current Release Notes
 
+- [v0.0.14rc1 Release Report](docs/releases/v0.0.14rc1.md) - generic Qwen3 MoE runtime boundaries and layered reference correctness.
 - [v0.0.13rc3 Release Report](docs/releases/v0.0.13rc3.md) - fixed-output control and strict Graph ablation.
 - [v0.0.13rc2 Release Report](docs/releases/v0.0.13rc2.md) - release-validation compatibility.
 - [v0.0.11rc1 Release Report](docs/releases/v0.0.11rc1.md) - batched vocabulary-parallel Top-P sampling.

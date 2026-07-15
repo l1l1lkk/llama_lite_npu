@@ -4,7 +4,7 @@
 
 [English](README.md) | [中文](README_CN.md)
 
-![Version](https://img.shields.io/badge/version-0.0.13rc3-blue)
+![Version](https://img.shields.io/badge/version-0.0.14rc1-blue)
 
 ## 项目定位
 
@@ -38,11 +38,28 @@ OpenAI 兼容 API -> Continuous Batch Scheduler -> ModelExecutor -> Paged KV / A
 | 采样 | Vocab-parallel Greedy / Top-P | 已支持 |
 | 可观测性 | Prometheus 指标与运行时调试快照 | 已支持 |
 
+## MoE Runtime 正确性
+
+v0.0.14rc1 引入保持 tuple 解包兼容的通用 router 与 routed-expert 边界，同时保持
+Qwen3 参数名、checkpoint layout、state-dict key 和默认执行行为不变。独立 CPU FP32
+reference 与 fail-closed 精简证据将正确性 oracle 和优化实现分离验证。
+
+显式 6 项 MoE NPU suite 在两张 Atlas 910B3 上分别完成 6/6，通过项包括通用兼容边界
+和 dynamic NPUGraph capture/replay。Qwen3-30B-A3B 的 TP2/EP2/Graph 三角验证与独立
+四层 FP32 oracle 均支持两条并行路径符合 reference；TP/EP 最后一个 token 的差异被
+定位为近并列数值翻转，而不是 placement 或 collective 失败。这是正确性证据，不是
+性能结论。
+
+当前通用边界仅覆盖 Qwen3 softmax top-k routing 和连续 TP/EP placement，尚未实现
+DeepSeek grouped/sigmoid routing、shared experts、all-to-all、非连续 expert map、
+MoE 量化执行或 MLA。详见 [v0.0.14rc1 发布记录](docs/releases/v0.0.14rc1.md)和
+[正确性验证](docs/qwen3_moe_runtime_validation.md)。
+
 ## 性能数据
 
 以下结果来自 **2 张 Atlas 910B3、Qwen3-32B、TP=2** 的历史实测。原始上下文见 [`docs/inference_performance_history.md`](docs/inference_performance_history.md)。
 
-### 最新 v0.0.13rc3 严格 NPU Graph 消融
+### 最新严格 NPU Graph benchmark（v0.0.13rc3）
 
 Qwen3-32B、TP=2、FP16、prompt 128、`min_tokens=max_tokens=256`、greedy；每个 on/off 配对使用相同冻结请求并完成三轮正式测试：
 
@@ -64,6 +81,7 @@ v0.0.13rc3 在 Continuous Batching 路径新增逐请求 `min_tokens`，并在�
 
 ## 当前版本说明
 
+- [v0.0.14rc1 发布记录](docs/releases/v0.0.14rc1.md)：通用 Qwen3 MoE runtime 边界与分层 reference correctness。
 - [v0.0.13rc3 发布记录](docs/releases/v0.0.13rc3.md)：固定输出控制与严格 Graph 消融。
 - [v0.0.13rc2 发布记录](docs/releases/v0.0.13rc2.md)：发布验证兼容性。
 - [v0.0.11rc1 发布记录](docs/releases/v0.0.11rc1.md)：批量 vocab-parallel Top-P 采样。

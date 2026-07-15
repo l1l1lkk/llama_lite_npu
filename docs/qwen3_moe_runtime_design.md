@@ -24,9 +24,8 @@ TP/EP 分解、优化后端以及 Graph 风险，而不是只展示“模型能�
 - GitLab 事实源起点：`release/0.0.12rc1`，commit
   `5595fefe1d6e0c88b6dba00fa6c9c1aee38f4708`。
 - 隔离开发分支：`feature/moe-runtime-0.0.14rc1`。
-- 当前 `VERSION` 仍为 `0.0.13rc3`。
-- 通用 MoE runtime 属于功能级更新，目标版本建议为 `0.0.14rc1`，只在最终发布
-  阶段同步 VERSION、CHANGELOG、README、release 文档与 tag。
+- Phase 1-4 实现与验证期间 `VERSION` 保持为 `0.0.13rc3`。通用 MoE runtime 属于
+  功能级更新，发布版本确定为 `0.0.14rc1`；对应 tag 只能在最终验证完成后创建。
 - Phase 1 只新增测试 reference、CPU 测试和本文档。
 
 ## 3. 当前 Qwen3 MoE 调用链与耦合
@@ -666,4 +665,6 @@ route scale/correction bias、shared experts、all-to-all、非连续 expert map
 和真实 NPU 验证，不能从本次结论外推。
 
 本验证是 correctness 工作，不是 benchmark；加载/编译耗时不能用于性能结论。
-Phase 4C2B 不更新版本，`VERSION` 仍为 `0.0.13rc3`。
+Phase 4C2B 完成时 `VERSION` 仍为 `0.0.13rc3`；依据版本规范，功能级发布版本确定为
+`0.0.14rc1`，对应 tag 只在最终门禁通过后创建。版本发布不改变上述历史验证事实和
+correctness contract。

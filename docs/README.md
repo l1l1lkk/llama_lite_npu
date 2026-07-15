@@ -22,6 +22,7 @@
 
 ## 发布文档
 
+- [v0.0.14rc1 发布记录](releases/v0.0.14rc1.md)：通用 Qwen3 MoE runtime 边界与分层 reference correctness。
 - [v0.0.13rc3 发布记录](releases/v0.0.13rc3.md)：`min_tokens` 固定输出控制与严格 NPU Graph 消融。
 - [v0.0.13rc2 发布记录](releases/v0.0.13rc2.md)：发布验证兼容性。
 - [v0.0.13rc1 发布记录](releases/v0.0.13rc1.md)：Decode Priority 调度。
