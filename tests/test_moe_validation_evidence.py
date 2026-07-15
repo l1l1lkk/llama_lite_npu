@@ -5,11 +5,13 @@ import hashlib
 import json
 from collections import Counter
 from pathlib import Path
+import subprocess
 import unittest
 
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
 EVIDENCE_DIR = (
-    Path(__file__).resolve().parents[1]
+    REPO_ROOT
     / "docs"
     / "validation_data"
     / "20260715_qwen3_30b_a3b_moe_runtime"
@@ -36,6 +38,46 @@ def _load_csv(name: str):
 
 class MoeValidationEvidenceTest(unittest.TestCase):
     def test_manifest_covers_every_payload_with_exact_size_and_hash(self):
+        tracked = subprocess.run(
+            ["git", "ls-files", "-z", "--", "docs/validation_data"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+        ).stdout.decode("utf-8").split("\0")
+        evidence_paths = sorted(
+            path for path in tracked if path.endswith((".csv", ".json"))
+        )
+        self.assertEqual(
+            evidence_paths,
+            [
+                "docs/validation_data/20260715_qwen3_30b_a3b_moe_runtime/"
+                "layer-oracle-metrics.csv",
+                "docs/validation_data/20260715_qwen3_30b_a3b_moe_runtime/"
+                "manifest.json",
+                "docs/validation_data/20260715_qwen3_30b_a3b_moe_runtime/"
+                "router-oracle.csv",
+                "docs/validation_data/20260715_qwen3_30b_a3b_moe_runtime/"
+                "selected-expert-ownership.csv",
+                "docs/validation_data/20260715_qwen3_30b_a3b_moe_runtime/"
+                "summary.json",
+            ],
+        )
+
+        for path in evidence_paths:
+            output = subprocess.run(
+                ["git", "check-attr", "text", "eol", "--", path],
+                cwd=REPO_ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+            ).stdout.splitlines()
+            self.assertEqual(
+                output,
+                [f"{path}: text: set", f"{path}: eol: lf"],
+                path,
+            )
+
         manifest = _load_json("manifest.json")
         self.assertEqual(manifest["schema_version"], 1)
         self.assertEqual(

@@ -179,6 +179,10 @@ attention/norm decoder 的 FP32 正确性。
 D2 原始清单 self SHA256 为
 `ba7be8d6741ff1b50e3f8f9fcb12a7e56c0f0a3e024f27a6c14e86550c011029`。
 完整 72/8/128 行表由仓库内 manifest 做 size/SHA256 封闭校验。
+manifest 校验的是原始文件字节；因此 `docs/validation_data/** text eol=lf` 是发布正确性
+契约，覆盖 tracked CSV/JSON 及 manifest 本身，保证 Windows/Linux checkout 的 size 与
+SHA256 一致。测试会通过 Git 属性解析逐文件锁定 `text=set, eol=lf`，不得用本地
+`core.autocrlf` 设置或平台 skip 绕过该门。
 
 ## 8. 最终 Correctness Contract
 

@@ -1,3 +1,6 @@
 # Reproducibility manifests hash exact artifact bytes across platforms.
 benchmarks/results/** -text -whitespace
 benchmarks/qwen3_32b_tp2_fp16/datasets/** -text whitespace=cr-at-eol
+
+# Compact evidence manifests hash raw bytes, so checkout bytes must stay LF.
+docs/validation_data/** text eol=lf

@@ -15,6 +15,7 @@ Generic Qwen3 MoE runtime boundaries and reference-correctness release.
 
 - Separated router, placement, and routed-expert execution responsibilities without changing Qwen3 checkpoint layouts, state-dict keys, backend selection, all-reduce placement, or the eager/GMM/routed-GEMV algorithms.
 - Preserved the Qwen3 sparse-block output, `last_router_logits`, tuple unpacking, and existing server/backend behavior.
+- Protected compact evidence CSV/JSON with a repository-level LF contract so byte-exact manifests reproduce across Windows and Linux checkouts.
 
 ### Tests
 
