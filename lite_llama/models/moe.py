@@ -20,6 +20,62 @@ class RoutingResult(NamedTuple):
     selected_experts: torch.Tensor
 
 
+class ExpertPlacement(NamedTuple):
+    """Immutable metadata describing one rank's routed-expert weights."""
+
+    parallel_mode: str
+    world_size: int
+    rank: int
+    local_num_experts: int
+    expert_start: int
+    expert_end: int
+    local_intermediate_size: int
+
+    @classmethod
+    def from_config(
+        cls,
+        *,
+        num_experts: int,
+        intermediate_size: int,
+        tp_config=None,
+    ) -> "ExpertPlacement":
+        world_size = getattr(tp_config, "world_size", 1)
+        rank = getattr(tp_config, "rank", 0)
+        parallel_mode = getattr(tp_config, "moe_parallel_mode", "tp")
+        if parallel_mode not in {"tp", "ep"}:
+            raise ValueError(
+                "moe_parallel_mode must be 'tp' or 'ep', got "
+                f"{parallel_mode!r}"
+            )
+        if parallel_mode == "tp" and intermediate_size % world_size != 0:
+            raise ValueError(
+                f"moe_intermediate_size={intermediate_size} must be divisible "
+                f"by tensor parallel world_size={world_size}"
+            )
+        if parallel_mode == "ep" and num_experts % world_size != 0:
+            raise ValueError(
+                f"num_experts={num_experts} must be divisible by "
+                f"expert parallel world_size={world_size}"
+            )
+        if parallel_mode == "ep":
+            local_num_experts = num_experts // world_size
+            expert_start = rank * local_num_experts
+            local_intermediate_size = intermediate_size
+        else:
+            local_num_experts = num_experts
+            expert_start = 0
+            local_intermediate_size = intermediate_size // world_size
+        return cls(
+            parallel_mode=parallel_mode,
+            world_size=world_size,
+            rank=rank,
+            local_num_experts=local_num_experts,
+            expert_start=expert_start,
+            expert_end=expert_start + local_num_experts,
+            local_intermediate_size=local_intermediate_size,
+        )
+
+
 class SoftmaxTopKRouter(nn.Module):
     """Softmax top-k router shared by MoE model adapters."""
 
@@ -68,8 +124,8 @@ class Qwen3MoeTopKRouter(SoftmaxTopKRouter):
     """Compatibility name for the Qwen3 softmax top-k router."""
 
 
-class Qwen3MoeExperts(nn.Module):
-    """Tensor-parallel experts with eager and Ascend GMM execution paths."""
+class RoutedExpertExecutor(nn.Module):
+    """Routed experts with eager and Ascend GMM execution paths."""
 
     _warned_gmm_unavailable = False
 
@@ -83,40 +139,20 @@ class Qwen3MoeExperts(nn.Module):
         dtype: torch.dtype = torch.float16,
     ) -> None:
         super().__init__()
-        world_size = getattr(tp_config, "world_size", 1)
-        self.parallel_mode = getattr(
-            tp_config, "moe_parallel_mode", "tp"
+        placement = ExpertPlacement.from_config(
+            num_experts=num_experts,
+            intermediate_size=intermediate_size,
+            tp_config=tp_config,
         )
-        if self.parallel_mode not in {"tp", "ep"}:
-            raise ValueError(
-                "moe_parallel_mode must be 'tp' or 'ep', got "
-                f"{self.parallel_mode!r}"
-            )
-        if self.parallel_mode == "tp" and intermediate_size % world_size != 0:
-            raise ValueError(
-                f"moe_intermediate_size={intermediate_size} must be divisible "
-                f"by tensor parallel world_size={world_size}"
-            )
-        if self.parallel_mode == "ep" and num_experts % world_size != 0:
-            raise ValueError(
-                f"num_experts={num_experts} must be divisible by "
-                f"expert parallel world_size={world_size}"
-            )
         self.hidden_size = hidden_size
         self.num_experts = num_experts
         self.intermediate_size = intermediate_size
-        if self.parallel_mode == "ep":
-            self.local_num_experts = num_experts // world_size
-            self.expert_start = (
-                getattr(tp_config, "rank", 0) * self.local_num_experts
-            )
-            self.expert_end = self.expert_start + self.local_num_experts
-            self.local_intermediate_size = intermediate_size
-        else:
-            self.local_num_experts = num_experts
-            self.expert_start = 0
-            self.expert_end = num_experts
-            self.local_intermediate_size = intermediate_size // world_size
+        self.placement = placement
+        self.parallel_mode = placement.parallel_mode
+        self.local_num_experts = placement.local_num_experts
+        self.expert_start = placement.expert_start
+        self.expert_end = placement.expert_end
+        self.local_intermediate_size = placement.local_intermediate_size
         self.tp_config = tp_config
         self.layer_index = layer_index
         self.backend = os.environ.get(
@@ -433,6 +469,10 @@ class Qwen3MoeExperts(nn.Module):
 
             final_hidden_states = tp_all_reduce(final_hidden_states)
         return final_hidden_states
+
+
+class Qwen3MoeExperts(RoutedExpertExecutor):
+    """Compatibility name for the Qwen3 routed-expert executor."""
 
 
 class Qwen3SparseMoeBlock(nn.Module):

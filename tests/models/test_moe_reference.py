@@ -1,5 +1,7 @@
 import ast
 import importlib.util
+import inspect
+import os
 import sys
 import unittest
 from pathlib import Path
@@ -53,6 +55,275 @@ class MoeReferenceContractTest(unittest.TestCase):
         self.assertEqual(
             result._fields,
             ("router_logits", "routing_weights", "selected_experts"),
+        )
+
+    def test_generic_executor_boundary_exposes_placement(self):
+        tp_config = mock.Mock(
+            world_size=2,
+            rank=1,
+            moe_parallel_mode="tp",
+            enabled=False,
+        )
+
+        placement = self.production.ExpertPlacement.from_config(
+            num_experts=4,
+            intermediate_size=6,
+            tp_config=tp_config,
+        )
+        executor = self.production.RoutedExpertExecutor(
+            hidden_size=3,
+            num_experts=4,
+            intermediate_size=6,
+            tp_config=tp_config,
+            dtype=torch.float32,
+        )
+
+        self.assertEqual(executor.placement, placement)
+        self.assertEqual(placement.local_intermediate_size, 3)
+
+    def test_expert_placement_tensor_parallel_derivation(self):
+        for world_size in (1, 2):
+            for rank in range(world_size):
+                with self.subTest(world_size=world_size, rank=rank):
+                    placement = self.production.ExpertPlacement.from_config(
+                        num_experts=8,
+                        intermediate_size=12,
+                        tp_config=mock.Mock(
+                            world_size=world_size,
+                            rank=rank,
+                            moe_parallel_mode="tp",
+                        ),
+                    )
+
+                    self.assertEqual(placement.parallel_mode, "tp")
+                    self.assertEqual(placement.world_size, world_size)
+                    self.assertEqual(placement.rank, rank)
+                    self.assertEqual(placement.local_num_experts, 8)
+                    self.assertEqual(placement.expert_start, 0)
+                    self.assertEqual(placement.expert_end, 8)
+                    self.assertEqual(
+                        placement.local_intermediate_size,
+                        12 // world_size,
+                    )
+                    self.assertTrue(
+                        all(isinstance(value, (str, int)) for value in placement)
+                    )
+                    with self.assertRaises(AttributeError):
+                        placement.rank = 0
+
+    def test_expert_placement_expert_parallel_derivation(self):
+        for rank, expected_range in ((0, (0, 4)), (1, (4, 8))):
+            with self.subTest(rank=rank):
+                placement = self.production.ExpertPlacement.from_config(
+                    num_experts=8,
+                    intermediate_size=6,
+                    tp_config=mock.Mock(
+                        world_size=2,
+                        rank=rank,
+                        moe_parallel_mode="ep",
+                    ),
+                )
+
+                self.assertEqual(placement.parallel_mode, "ep")
+                self.assertEqual(placement.world_size, 2)
+                self.assertEqual(placement.rank, rank)
+                self.assertEqual(placement.local_num_experts, 4)
+                self.assertEqual(
+                    (placement.expert_start, placement.expert_end),
+                    expected_range,
+                )
+                self.assertEqual(placement.local_intermediate_size, 6)
+
+    def test_expert_placement_preserves_validation_errors(self):
+        cases = (
+            (
+                mock.Mock(
+                    world_size=2,
+                    rank=0,
+                    moe_parallel_mode="unknown",
+                ),
+                4,
+                6,
+                "moe_parallel_mode must be 'tp' or 'ep', got 'unknown'",
+            ),
+            (
+                mock.Mock(world_size=2, rank=0, moe_parallel_mode="tp"),
+                4,
+                5,
+                "moe_intermediate_size=5 must be divisible by "
+                "tensor parallel world_size=2",
+            ),
+            (
+                mock.Mock(world_size=2, rank=0, moe_parallel_mode="ep"),
+                5,
+                6,
+                "num_experts=5 must be divisible by expert parallel "
+                "world_size=2",
+            ),
+        )
+        for tp_config, num_experts, intermediate_size, expected in cases:
+            with self.subTest(expected=expected):
+                with self.assertRaises(ValueError) as placement_error:
+                    self.production.ExpertPlacement.from_config(
+                        num_experts=num_experts,
+                        intermediate_size=intermediate_size,
+                        tp_config=tp_config,
+                    )
+                self.assertEqual(str(placement_error.exception), expected)
+
+                with self.assertRaises(ValueError) as executor_error:
+                    self.production.Qwen3MoeExperts(
+                        hidden_size=3,
+                        num_experts=num_experts,
+                        intermediate_size=intermediate_size,
+                        tp_config=tp_config,
+                        dtype=torch.float32,
+                    )
+                self.assertEqual(str(executor_error.exception), expected)
+
+    def test_qwen3_executor_is_signature_compatible_subclass(self):
+        generic_signature = inspect.signature(
+            self.production.RoutedExpertExecutor
+        )
+        qwen_signature = inspect.signature(self.production.Qwen3MoeExperts)
+
+        self.assertEqual(qwen_signature, generic_signature)
+        self.assertTrue(
+            issubclass(
+                self.production.Qwen3MoeExperts,
+                self.production.RoutedExpertExecutor,
+            )
+        )
+        self.assertNotIn("__init__", self.production.Qwen3MoeExperts.__dict__)
+        self.assertNotIn("forward", self.production.Qwen3MoeExperts.__dict__)
+
+    def test_generic_and_qwen_executors_match_independent_eager_oracle(self):
+        generator = torch.Generator().manual_seed(93)
+        generic = self.production.RoutedExpertExecutor(
+            hidden_size=4,
+            num_experts=4,
+            intermediate_size=3,
+            dtype=torch.float32,
+        )
+        qwen = self.production.Qwen3MoeExperts(
+            hidden_size=4,
+            num_experts=4,
+            intermediate_size=3,
+            dtype=torch.float32,
+        )
+        gate_up_weight = torch.randn(4, 4, 6, generator=generator)
+        down_weight = torch.randn(4, 3, 4, generator=generator)
+        hidden_states = torch.randn(5, 4, generator=generator)
+        selected_experts = torch.tensor(
+            [[0, 1], [2, 3], [1, 2], [3, 0], [2, 0]]
+        )
+        routing_weights = torch.tensor(
+            [[0.7, 0.3], [0.4, 0.6], [0.8, 0.2], [0.5, 0.5], [0.9, 0.1]]
+        )
+        with torch.no_grad():
+            for executor in (generic, qwen):
+                executor.gate_up_weight.copy_(gate_up_weight)
+                executor.down_weight.copy_(down_weight)
+                executor.backend = "eager"
+        expected = expert_forward_reference(
+            hidden_states,
+            selected_experts,
+            routing_weights,
+            gate_up_weight,
+            down_weight,
+        )
+
+        generic_output = generic(
+            hidden_states,
+            selected_experts,
+            routing_weights,
+        )
+        qwen_output = qwen(
+            hidden_states,
+            selected_experts,
+            routing_weights,
+        )
+
+        torch.testing.assert_close(generic_output, expected)
+        torch.testing.assert_close(qwen_output, expected)
+        torch.testing.assert_close(generic_output, qwen_output)
+        self.assertEqual(
+            set(generic.state_dict()),
+            {"gate_up_weight", "down_weight"},
+        )
+        self.assertEqual(
+            set(qwen.state_dict()),
+            {"gate_up_weight", "down_weight"},
+        )
+
+    def test_executor_preserves_public_placement_and_backend_attributes(self):
+        tp_config = mock.Mock(
+            world_size=2,
+            rank=1,
+            moe_parallel_mode="ep",
+            enabled=False,
+        )
+        env = {
+            "LITE_LLAMA_MOE_BACKEND": "eager",
+            "LITE_LLAMA_MOE_GEMV_MAX_ASSIGNMENTS": "17",
+            "LITE_LLAMA_MOE_VALIDATE": "1",
+            "LITE_LLAMA_MOE_ALIGNMENT_RTOL": "0.02",
+            "LITE_LLAMA_MOE_ALIGNMENT_ATOL": "0.03",
+        }
+        with mock.patch.dict(os.environ, env):
+            executor = self.production.RoutedExpertExecutor(
+                hidden_size=4,
+                num_experts=4,
+                intermediate_size=3,
+                tp_config=tp_config,
+                layer_index=7,
+                dtype=torch.float32,
+            )
+
+        self.assertEqual(executor.parallel_mode, "ep")
+        self.assertEqual(executor.local_num_experts, 2)
+        self.assertEqual(executor.expert_start, 2)
+        self.assertEqual(executor.expert_end, 4)
+        self.assertEqual(executor.local_intermediate_size, 3)
+        self.assertIs(executor.tp_config, tp_config)
+        self.assertEqual(executor.layer_index, 7)
+        self.assertEqual(executor.backend, "eager")
+        self.assertEqual(executor.routed_gemv_max_assignments, 17)
+        self.assertTrue(executor.validate_gmm)
+        self.assertEqual(executor.alignment_rtol, 0.02)
+        self.assertEqual(executor.alignment_atol, 0.03)
+
+    def test_executor_forward_contract_has_no_dynamic_routing_adapter(self):
+        source_path = ROOT / "lite_llama/models/moe.py"
+        source = source_path.read_text(encoding="utf-8")
+        module = ast.parse(source)
+        executor_class = next(
+            node
+            for node in module.body
+            if isinstance(node, ast.ClassDef)
+            and node.name == "RoutedExpertExecutor"
+        )
+        forward = next(
+            node
+            for node in executor_class.body
+            if isinstance(node, ast.FunctionDef) and node.name == "forward"
+        )
+        forward_source = ast.get_source_segment(source, forward)
+
+        for forbidden in (
+            "RoutingResult",
+            "isinstance(",
+            ".item(",
+            ".tolist(",
+            ".cpu(",
+            "print(",
+            "logger",
+        ):
+            self.assertNotIn(forbidden, forward_source)
+        self.assertEqual(forward_source.count("tp_all_reduce("), 1)
+        self.assertIn(
+            'getattr(self.tp_config, "enabled", False)',
+            forward_source,
         )
 
     def test_qwen3_router_symbol_preserves_constructor_and_result_contract(self):

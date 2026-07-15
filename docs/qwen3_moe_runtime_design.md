@@ -419,3 +419,196 @@ Qwen3 MoE 回归；不能只依赖默认 discovery 来代替这条显式命令�
 
 Phase 2 不更新版本；`VERSION` 仍为 `0.0.13rc3`，目标 `0.0.14rc1` 仍只在最终
 发布阶段更新。
+
+## 12. Phase 3：ExpertPlacement 与通用 Routed-Expert Executor
+
+### 12.1 ExpertPlacement 字段与推导
+
+`ExpertPlacement` 是位于 `lite_llama/models/moe.py` 的不可变 NamedTuple，只保存
+纯 Python 字符串和整数：
+
+```text
+parallel_mode
+world_size
+rank
+local_num_experts
+expert_start
+expert_end
+local_intermediate_size
+```
+
+它不保存 tensor、`nn.Module`、通信 group、expert map 或执行 plan，因此不会进入
+state dict，也不会给 Graph 热路径增加 tensor 操作。推导入口为：
+
+```python
+ExpertPlacement.from_config(
+    num_experts=...,
+    intermediate_size=...,
+    tp_config=...,
+)
+```
+
+记全局专家数为 `E`、intermediate size 为 `I`、并行 world size 为 `W`、rank 为
+`R`。
+
+TP 保持所有 expert、本 rank 只持有 intermediate shard：
+
+```text
+local_num_experts       = E
+expert_start            = 0
+expert_end              = E
+local_intermediate_size = I / W
+```
+
+约束仍为 `I % W == 0`。TP 的 rank 被记录为元数据，但不改变 expert 范围。
+
+EP 保持连续完整 expert 区间、本 rank 持有完整 intermediate：
+
+```text
+local_num_experts       = E / W
+expert_start            = R * local_num_experts
+expert_end              = expert_start + local_num_experts
+local_intermediate_size = I
+```
+
+约束仍为 `E % W == 0`。模式仍只允许 `tp`/`ep`。invalid mode、TP divisibility、
+EP divisibility 的异常类型和完整消息均由测试锁定，与 Phase 3 前一致。本阶段没有
+新增 rank range、world size 或其他验证，以免无意改变既有行为。
+
+### 12.2 通用 Executor 与 Qwen3 兼容层
+
+原 `Qwen3MoeExperts` 的实现主体提升为 `RoutedExpertExecutor`。constructor 签名、
+weight parameter、public 属性、backend 配置和所有执行方法保留。constructor 仅把
+原地 placement 计算替换为 `ExpertPlacement.from_config`，再从元数据回填原属性：
+
+```text
+parallel_mode
+local_num_experts
+expert_start
+expert_end
+local_intermediate_size
+```
+
+同时继续保留 `tp_config`、`layer_index`、`backend`、GEMV threshold、validation
+开关和 tolerance 等已有属性。新增 `placement` 只是不可变纯 Python 元数据，不是
+parameter/buffer。
+
+`Qwen3MoeExperts` 现在是 `RoutedExpertExecutor` 的无覆盖兼容子类：不定义自己的
+`__init__` 或 `forward`，不增加参数和状态。`inspect.signature` 证实两者 constructor
+一致；`Qwen3SparseMoeBlock` 仍显式构造 `Qwen3MoeExperts`，外部符号和模型结构不变。
+
+### 12.3 保持不变的执行契约
+
+生产 diff 没有修改以下方法体：
+
+- `_forward_eager_local`
+- `_forward_grouped_local`
+- `_forward_routed_local`
+- `_should_use_routed_gemv`
+- `_validate_local_outputs`
+- `_use_grouped_backend`
+- `forward`
+
+因此 expert 数学、EP global/local id 过滤、GMM/GEMV 调用、backend env、threshold、
+fallback/warning、validation tolerance 和最终 reduce 算法均保持。source contract 还
+确认 `forward(hidden_states, selected_experts, routing_weights)` 没有增加
+`RoutingResult`/`isinstance` 动态适配、`.item()`/`.tolist()`/`.cpu()` 或日志；
+`tp_all_reduce` 调用仍只有一次，条件仍为
+`getattr(self.tp_config, "enabled", False)`。
+
+generic executor 与 Qwen3 compatibility executor 在相同真实权重、hidden、routing
+下运行 CPU eager，二者均与 Phase 1 独立 FP32 oracle 对齐。没有用 mock 替代 expert
+数值路径。
+
+executor 自身 state dict 对两种类型都仍精确为：
+
+```text
+gate_up_weight
+down_weight
+```
+
+完整 `Qwen3SparseMoeBlock` 的 state dict/named parameters 继续精确为：
+
+```text
+gate.weight
+experts.gate_up_weight
+experts.down_weight
+```
+
+### 12.4 明确不实现的能力
+
+`ExpertPlacement` 只描述当前连续 TP/EP placement，不实现 all-to-all、非连续 expert
+map、冗余 expert、负载均衡或 EPLB。Phase 3 也不增加 shared expert、DeepSeekMoE、
+quant method、W8A8 参数或未来能力占位大全。
+
+RoutedExpertExecutor 只是清晰命名和兼容边界，不是新执行算法。本阶段不修改 kernel、
+weight converter、executor、Graph、server 或 collective。shared expert combine、
+DeepSeek routing、量化和更通用通信必须在各自阶段建立独立 reference 与验证门。
+
+### 12.5 Direct Loader、Graph 与 NPU 边界
+
+placement 和 executor 继续定义在现有 `moe.py`，dependency-light direct-file loader
+无需新增 import/fallback，也不会导入整个 `lite_llama`/`accelerate` 依赖。
+
+CPU Graph policy tests 只能证明 Qwen3 MoE TP/EP eligibility、capture/fallback policy
+没有源码回归。没有运行真实 NPU Graph、GMM/GEMV 或 HCCL；新增纯 Python placement
+不进入 forward 热路径，但这不能替代后续 Ascend capture/replay 实测。本阶段不声称
+性能变化。
+
+### 12.6 Phase 3 TDD 与真实结果
+
+RED：
+
+```text
+python -m unittest \
+  tests.models.test_moe_reference.MoeReferenceContractTest.\
+test_generic_executor_boundary_exposes_placement -v
+```
+
+实现前 1 test 失败，exit `1`；真实原因是 production module 不存在
+`ExpertPlacement` 的 `AttributeError`。RED 状态未 stage、commit 或 push。
+
+最小 GREEN：同一测试在实现后通过，exit `0`。
+
+Phase 3 reference/compatibility：
+
+```text
+python -m unittest tests.models.test_moe_reference -v
+```
+
+30 tests 通过，exit `0`。新增覆盖 TP world size 1/2、不同 rank；EP rank 0/1 连续
+范围；完整异常消息；constructor signature/MRO；generic/Qwen eager/oracle；executor
+state dict；public backend/placement 属性；forward source/reduce 契约。
+
+MoE、Graph policy、weight conversion、TP/EP 和 backend 相关 CPU 回归：
+
+```text
+python -m unittest \
+  tests.models.test_moe_reference \
+  tests.models.test_qwen3_moe \
+  tests.test_decode_p0 \
+  tests.test_graph_ablation \
+  tests.test_observability \
+  tests.test_model_executor_packed_prefill \
+  tests.test_tp_control -v
+```
+
+96 tests 通过，exit `0`。
+
+最终 focused gate：
+
+```text
+python -m unittest \
+  tests.models.test_moe_reference \
+  tests.models.test_qwen3_moe -v
+```
+
+56 tests 通过，exit `0`，其中 30 项是独立 reference/Phase 2/Phase 3 契约，26 项
+是已有 Qwen3 MoE 回归。
+
+`python scripts/validate_release.py` 的 markdown UTF-8、版本文档、compile、
+`git diff --check` 全部通过，默认 discovery 157 tests 通过，exit `0`。独立执行
+`git diff --check` 也为 exit `0`。
+
+Phase 3 不更新版本；`VERSION` 仍为 `0.0.13rc3`，目标 `0.0.14rc1` 仍只在最终
+发布阶段更新。
