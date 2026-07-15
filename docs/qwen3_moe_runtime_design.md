@@ -626,7 +626,12 @@ tensor。
 Phase 4A 在两张 Ascend 910B3 上分别完成改测试前的 5/5 正式单卡测试，覆盖
 eager/GMM、routed GEMV、EP local contribution 和真实 NPUGraph capture/replay；
 generic/compatibility 边界探针对独立 FP32 reference 对齐。Phase 4C1 新增第 6 项
-durable NPU 回归，但服务器复跑属于后续 Phase 4C2，本文不把历史结果写成 6/6。
+durable NPU 回归，Phase 4C2A 已在包含该测试的 commit 上用物理 NPU 6 和 7 分别完成
+6/6，均为 0 fail/error/skip；generic boundary 与 dynamic Graph 均真实执行。
+
+硬件 correctness 门必须显式逐卡运行 `tests.npu` suite；CPU-friendly release validator
+独立负责 release/UTF-8/version/compile/diff 检查，不收集非 package 的 `tests/npu`，其
+exit 0 不能表述为再次完成 NPU 回归。
 
 Phase 4B 的 TP2 eager 与 TP2 auto+Graph 在冻结 16-token greedy 输入上 exact；TP2
 与 EP2 只在最后一个 token 分叉。D1 证明两模式 48/48 层 post-allreduce rank
@@ -661,4 +666,4 @@ route scale/correction bias、shared experts、all-to-all、非连续 expert map
 和真实 NPU 验证，不能从本次结论外推。
 
 本验证是 correctness 工作，不是 benchmark；加载/编译耗时不能用于性能结论。
-Phase 4C1 不更新版本，`VERSION` 仍为 `0.0.13rc3`。
+Phase 4C2B 不更新版本，`VERSION` 仍为 `0.0.13rc3`。

@@ -43,6 +43,10 @@ class MoeValidationEvidenceTest(unittest.TestCase):
             "84239ed2e2afd9a277fdc2a5becab8623c1d31c0",
         )
         self.assertEqual(
+            manifest["durable_test_commit"],
+            "0beba7de621cc98efc22c22c26a54b426b2bc84d",
+        )
+        self.assertEqual(
             manifest["source_diagnostics_manifest_sha256"],
             {
                 "phase4a": (
@@ -60,6 +64,10 @@ class MoeValidationEvidenceTest(unittest.TestCase):
                 "phase4b_d2": (
                     "ba7be8d6741ff1b50e3f8f9fcb12a7e56c0f0a3e024f27"
                     "a6c14e86550c011029"
+                ),
+                "phase4c2a": (
+                    "e94e27be8717f43d20b43651b830933fe61bac23a78d259f"
+                    "5bf66bb786317a8c"
                 ),
             },
         )
@@ -91,6 +99,13 @@ class MoeValidationEvidenceTest(unittest.TestCase):
             summary["source_commit"],
             "84239ed2e2afd9a277fdc2a5becab8623c1d31c0",
         )
+        self.assertEqual(
+            summary["validation_source_commit"], summary["source_commit"]
+        )
+        self.assertEqual(
+            summary["durable_test_commit"],
+            "0beba7de621cc98efc22c22c26a54b426b2bc84d",
+        )
         source_hashes = summary["source_manifests"]
         manifest_hashes = _load_json("manifest.json")[
             "source_diagnostics_manifest_sha256"
@@ -102,6 +117,7 @@ class MoeValidationEvidenceTest(unittest.TestCase):
                 "phase4b_sha256sums_self": manifest_hashes["phase4b"],
                 "phase4b_d1_sha256sums_self": manifest_hashes["phase4b_d1"],
                 "phase4b_d2_sha256sums_self": manifest_hashes["phase4b_d2"],
+                "phase4c2a_sha256sums_self": manifest_hashes["phase4c2a"],
             },
         )
         model = summary["model"]
@@ -134,7 +150,40 @@ class MoeValidationEvidenceTest(unittest.TestCase):
         self.assertTrue(historical["graph_capture_replay_executed"])
         durable = phase4a["durable_generic_boundary_test"]
         self.assertEqual(durable["expected_suite_tests_per_device"], 6)
-        self.assertEqual(durable["server_rerun_status"], "pending_phase4c2")
+        self.assertEqual(durable["server_rerun_status"], "passed_phase4c2a")
+        self.assertEqual(
+            [
+                durable["devices"],
+                durable["tests_per_device"],
+                durable["passed_per_device"],
+            ],
+            [2, 6, 6],
+        )
+        self.assertEqual(
+            [durable["failed"], durable["errors"], durable["skipped"]],
+            [0, 0, 0],
+        )
+        self.assertTrue(durable["generic_boundary_executed"])
+        self.assertTrue(durable["graph_capture_replay_executed"])
+
+        validator = summary["release_validator"]
+        self.assertEqual(validator["commit"], summary["durable_test_commit"])
+        self.assertEqual(validator["exit_code"], 0)
+        self.assertEqual(validator["discovered_tests"], 161)
+        self.assertEqual(validator["skipped"], 1)
+        self.assertEqual(
+            validator["skip_reason"],
+            "matplotlib is required only for the optional matmul visualization benchmark",
+        )
+        self.assertEqual(validator["npu_test_ids_collected"], 0)
+        self.assertEqual(
+            validator["npu_suite_execution"], "explicit_separate_commands"
+        )
+        self.assertIn(
+            "The CPU-friendly release validator does not collect tests/npu; "
+            "the hardware gate requires explicit per-device NPU suite commands.",
+            summary["limitations"],
+        )
 
         phase4b = summary["phase4b"]
         self.assertTrue(phase4b["comparisons"]["A_vs_C_token_exact"])

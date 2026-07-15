@@ -11,8 +11,9 @@ placement 的正确性证据。它面向维护者和推理引擎面试复盘：�
 
 ## 1. 验证目标与不变量
 
-本轮冻结源码 commit 为
-`84239ed2e2afd9a277fdc2a5becab8623c1d31c0`，验证以下不变量：
+Phase 4A-D2 冻结验证源码 commit 为
+`84239ed2e2afd9a277fdc2a5becab8623c1d31c0`；Phase 4C2A 在包含 durable regression
+test 的 commit `0beba7de621cc98efc22c22c26a54b426b2bc84d` 上复验以下不变量：
 
 - router 仍执行 `linear -> FP32 softmax -> top-k -> optional renorm -> cast back`，
   `RoutingResult` 同时支持字段访问与三元 tuple 解包；
@@ -83,9 +84,26 @@ Graph 测试确实进入 capture/replay，没有 skip 或 correctness fallback�
 `T=4/H=64/E=8/I=32/K=2`、FP16 NPU 与 FP32 CPU oracle；generic/compatibility
 router 和 executor 最大差为 0，GMM/GEMV/block 对 oracle 的最大误差约 `2e-6`。
 
-Phase 4C1 将该探针固化为第 6 项正式 NPU 测试。当前本地没有 NPU，只验证该 suite 可
-发现 6 项并安全 skip；第 6 项尚未在服务器执行，状态为 **待 Phase 4C2 复跑**。因此
-本文不能把历史 5/5 写成新 suite 的 6/6。
+Phase 4C1 将该探针固化为第 6 项正式 NPU 测试。Phase 4C2A 在 commit
+`0beba7de621cc98efc22c22c26a54b426b2bc84d` 上，分别用物理 NPU 6 和 7 显式运行完整
+suite；两张卡均为 **6/6 passed，0 fail/error/skip**。六项范围是：
+
+- dynamic routing NPUGraph capture/replay；
+- generic runtime boundary 与 Qwen3 compatibility；
+- GMM 与 eager local output；
+- routed GEMV 的 EP local contribution；
+- routed GEMV 与 eager local output；
+- validation mode 覆盖每个 sparse block。
+
+generic boundary 与 dynamic NPUGraph 两项均真实执行而非 skip；Graph 测试实际进入
+capture/replay。Phase 4C2A diagnostics 的 `SHA256SUMS` self SHA256 为
+`e94e27be8717f43d20b43651b830933fe61bac23a78d259f5bf66bb786317a8c`。
+
+硬件门与 CPU release validator 职责分离：前者必须用每张目标卡的显式 NPU suite 命令
+执行；后者保持 CPU-friendly，不递归非 package 的 `tests/npu`。服务器 release validator
+在同一 commit 上 exit 0，实际运行 161 项并 skip 1 项可选 matplotlib 可视化测试，收集
+到的 NPU test ID 为 0。该结果证明 release validation 通过，不表示 validator 内再次完成
+NPU 回归。
 
 Phase 4A 原始清单 self SHA256 为
 `1b3028449c0eb22335013c2e3be3bb4814d2c63fdc6165f219791efbe471ebe0`。
@@ -192,10 +210,17 @@ python -m unittest tests.test_moe_validation_evidence -v
 python -m unittest tests.models.test_moe_reference tests.models.test_qwen3_moe -v
 ```
 
-本地无 NPU 时只验证 discover/skip；服务器 NPU 回归必须显式运行并保留真实结果：
+本地无 NPU 时只验证 discover/skip；服务器硬件门必须针对每张目标卡显式运行并保留
+真实结果：
 
 ```bash
-python -m unittest tests.npu.test_qwen3_moe_gmm -v
+ASCEND_RT_VISIBLE_DEVICES=6 python -m unittest tests.npu.test_qwen3_moe_gmm -v
+ASCEND_RT_VISIBLE_DEVICES=7 python -m unittest tests.npu.test_qwen3_moe_gmm -v
+```
+
+CPU-friendly release validator 独立运行，不把其 exit 0 解释为 NPU suite pass：
+
+```bash
 python scripts/validate_release.py
 ```
 
@@ -211,7 +236,8 @@ collective 失败，且符合近似并列 logits 被 FP16 扰动放大的解释�
 
 尚未覆盖 DeepSeek grouped top-k、sigmoid/route scale/correction bias、shared expert、
 all-to-all、非连续 expert map、W8A8/其他量化、MLA，也没有形成性能结论。模型 smoke
-仅一个 prompt 和 16 token；D2 仅四个 MoE 层。新增第 6 项 NPU 回归还必须在
-Phase 4C2 真实复跑后才能更新为服务器通过。
+仅一个 prompt 和 16 token；D2 仅四个 MoE 层。Phase 4C2A 的双卡单次 6/6 是
+correctness regression 证据，运行耗时不能用于性能结论。CPU release validator 不收集
+`tests/npu`，后续硬件门仍必须显式逐卡执行。
 
 本阶段 `VERSION` 仍为 `0.0.13rc3`；目标 `0.0.14rc1` 只在最终发布阶段更新。

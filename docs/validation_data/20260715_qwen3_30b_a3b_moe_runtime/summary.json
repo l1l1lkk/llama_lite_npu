@@ -3,6 +3,8 @@
   "artifact_kind": "compact derived evidence",
   "generated_date": "2026-07-15",
   "source_commit": "84239ed2e2afd9a277fdc2a5becab8623c1d31c0",
+  "validation_source_commit": "84239ed2e2afd9a277fdc2a5becab8623c1d31c0",
+  "durable_test_commit": "0beba7de621cc98efc22c22c26a54b426b2bc84d",
   "release_baseline": "5595fefe1d6e0c88b6dba00fa6c9c1aee38f4708",
   "model": {
     "name": "Qwen3-30B-A3B",
@@ -31,7 +33,8 @@
     "phase4a_sha256sums_self": "1b3028449c0eb22335013c2e3be3bb4814d2c63fdc6165f219791efbe471ebe0",
     "phase4b_sha256sums_self": "4304b7c4c8fa744f28853c87cf49e04f60dd64af1a123f62a8a6836dee74169e",
     "phase4b_d1_sha256sums_self": "92649b6e54fd616d3a469e43ebb68d2caef661da1a7b214a7cf9dedf0a6a843e",
-    "phase4b_d2_sha256sums_self": "ba7be8d6741ff1b50e3f8f9fcb12a7e56c0f0a3e024f27a6c14e86550c011029"
+    "phase4b_d2_sha256sums_self": "ba7be8d6741ff1b50e3f8f9fcb12a7e56c0f0a3e024f27a6c14e86550c011029",
+    "phase4c2a_sha256sums_self": "e94e27be8717f43d20b43651b830933fe61bac23a78d259f5bf66bb786317a8c"
   },
   "phase4a": {
     "historical_suite_before_phase4c1": {
@@ -45,7 +48,15 @@
     },
     "durable_generic_boundary_test": {
       "expected_suite_tests_per_device": 6,
-      "server_rerun_status": "pending_phase4c2"
+      "server_rerun_status": "passed_phase4c2a",
+      "devices": 2,
+      "tests_per_device": 6,
+      "passed_per_device": 6,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "generic_boundary_executed": true,
+      "graph_capture_replay_executed": true
     },
     "probe": {
       "shape": {"tokens": 4, "hidden": 64, "experts": 8, "intermediate": 32, "top_k": 2},
@@ -59,6 +70,15 @@
       "routed_gemv_vs_oracle_max_abs": 0.00000174390,
       "block_vs_oracle_max_abs": 0.00000192132
     }
+  },
+  "release_validator": {
+    "commit": "0beba7de621cc98efc22c22c26a54b426b2bc84d",
+    "exit_code": 0,
+    "discovered_tests": 161,
+    "skipped": 1,
+    "skip_reason": "matplotlib is required only for the optional matmul visualization benchmark",
+    "npu_test_ids_collected": 0,
+    "npu_suite_execution": "explicit_separate_commands"
   },
   "phase4b": {
     "common_config": {
@@ -157,6 +177,6 @@
     "The full-model smoke covers one frozen prompt and sixteen generated tokens, not a benchmark corpus.",
     "The independent FP32 oracle validates four captured MoE layers, not the complete decoder stack.",
     "Runtime kernels use FP16 arithmetic while the independent oracle uses FP32 arithmetic over runtime-quantized values.",
-    "The sixth NPU suite test added in Phase 4C1 is pending a Phase 4C2 server rerun."
+    "The CPU-friendly release validator does not collect tests/npu; the hardware gate requires explicit per-device NPU suite commands."
   ]
 }

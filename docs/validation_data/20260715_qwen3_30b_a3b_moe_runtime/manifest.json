@@ -1,13 +1,15 @@
 {
   "schema_version": 1,
   "artifact_kind": "compact derived evidence manifest",
-  "generation": "Values were deterministically selected from checksum-verified Phase 4A, Phase 4B, D1, and D2 diagnostics. Raw tensors, checkpoints, temporary runners, full logs, absolute paths, hosts, and credentials are intentionally excluded.",
+  "generation": "Values were deterministically selected from checksum-verified Phase 4A, Phase 4B, D1, D2, and Phase 4C2A diagnostics. Raw tensors, checkpoints, temporary runners, full logs, absolute paths, hosts, and credentials are intentionally excluded.",
   "source_commit": "84239ed2e2afd9a277fdc2a5becab8623c1d31c0",
+  "durable_test_commit": "0beba7de621cc98efc22c22c26a54b426b2bc84d",
   "source_diagnostics_manifest_sha256": {
     "phase4a": "1b3028449c0eb22335013c2e3be3bb4814d2c63fdc6165f219791efbe471ebe0",
     "phase4b": "4304b7c4c8fa744f28853c87cf49e04f60dd64af1a123f62a8a6836dee74169e",
     "phase4b_d1": "92649b6e54fd616d3a469e43ebb68d2caef661da1a7b214a7cf9dedf0a6a843e",
-    "phase4b_d2": "ba7be8d6741ff1b50e3f8f9fcb12a7e56c0f0a3e024f27a6c14e86550c011029"
+    "phase4b_d2": "ba7be8d6741ff1b50e3f8f9fcb12a7e56c0f0a3e024f27a6c14e86550c011029",
+    "phase4c2a": "e94e27be8717f43d20b43651b830933fe61bac23a78d259f5bf66bb786317a8c"
   },
   "files": [
     {
@@ -30,9 +32,9 @@
     },
     {
       "path": "summary.json",
-      "size": 5760,
-      "sha256": "c67db73940cfc8b1a84132e227a855f90a1d91022b95e303ad03d645e1e16804",
-      "source": "Compact Phase 4A, Phase 4B, D1, and D2 conclusions"
+      "size": 6618,
+      "sha256": "1557b4e35eb4c866aaa688fad71799ff27b7d26e423d258bf0b7d4a682665766",
+      "source": "Compact Phase 4A, Phase 4B, D1, D2, and Phase 4C2A durable rerun conclusions"
     }
   ]
 }
