@@ -1,10 +1,12 @@
-"""Correctness-first Qwen3 MoE routing and expert execution."""
+"""Correctness-first MoE routing and expert execution."""
 
 from __future__ import annotations
 
+import math
 import os
 import sys
 import warnings
+from dataclasses import dataclass
 from typing import NamedTuple, Optional
 
 import torch
@@ -18,6 +20,52 @@ class RoutingResult(NamedTuple):
     router_logits: torch.Tensor
     routing_weights: torch.Tensor
     selected_experts: torch.Tensor
+
+
+@dataclass(frozen=True)
+class GroupedTopKConfig:
+    """Immutable DeepSeek-V2/V3 grouped-routing policy."""
+
+    num_groups: int
+    topk_groups: int
+    score_func: str
+    topk_method: str
+    norm_topk_prob: bool = True
+    routed_scaling_factor: float = 1.0
+
+    def __post_init__(self) -> None:
+        for name, value in (
+            ("num_groups", self.num_groups),
+            ("topk_groups", self.topk_groups),
+        ):
+            if type(value) is not int or value <= 0:
+                raise ValueError(f"{name} must be a positive integer")
+        if self.topk_groups > self.num_groups:
+            raise ValueError("topk_groups must not exceed num_groups")
+        if self.score_func not in {"softmax", "sigmoid"}:
+            raise ValueError("score_func must be 'softmax' or 'sigmoid'")
+        if self.topk_method not in {"group_limited_greedy", "noaux_tc"}:
+            raise ValueError(
+                "topk_method must be 'group_limited_greedy' or 'noaux_tc'"
+            )
+        if (
+            self.topk_method == "group_limited_greedy"
+            and self.score_func != "softmax"
+        ):
+            raise ValueError(
+                "group_limited_greedy requires score_func='softmax'"
+            )
+        if self.topk_method == "noaux_tc" and self.score_func != "sigmoid":
+            raise ValueError("noaux_tc requires score_func='sigmoid'")
+        if type(self.norm_topk_prob) is not bool:
+            raise TypeError("norm_topk_prob must be bool")
+        if (
+            isinstance(self.routed_scaling_factor, bool)
+            or not isinstance(self.routed_scaling_factor, (int, float))
+            or not math.isfinite(float(self.routed_scaling_factor))
+            or self.routed_scaling_factor <= 0
+        ):
+            raise ValueError("routed_scaling_factor must be finite and positive")
 
 
 class ExpertPlacement(NamedTuple):
@@ -122,6 +170,125 @@ class SoftmaxTopKRouter(nn.Module):
 
 class Qwen3MoeTopKRouter(SoftmaxTopKRouter):
     """Compatibility name for the Qwen3 softmax top-k router."""
+
+
+class DeepSeekGroupedTopKRouter(nn.Module):
+    """Grouped top-k router for the audited DeepSeek-V2/V3 policies."""
+
+    def __init__(
+        self,
+        hidden_size: int,
+        num_experts: int,
+        top_k: int,
+        num_groups: int,
+        topk_groups: int,
+        score_func: str,
+        topk_method: str,
+        norm_topk_prob: bool = True,
+        routed_scaling_factor: float = 1.0,
+        dtype: torch.dtype = torch.float16,
+    ) -> None:
+        super().__init__()
+        if type(hidden_size) is not int or hidden_size <= 0:
+            raise ValueError("hidden_size must be a positive integer")
+        if type(num_experts) is not int or num_experts <= 0:
+            raise ValueError("num_experts must be a positive integer")
+        if type(top_k) is not int or top_k <= 0:
+            raise ValueError("top_k must be a positive integer")
+        grouped_config = GroupedTopKConfig(
+            num_groups=num_groups,
+            topk_groups=topk_groups,
+            score_func=score_func,
+            topk_method=topk_method,
+            norm_topk_prob=norm_topk_prob,
+            routed_scaling_factor=routed_scaling_factor,
+        )
+        if num_experts % grouped_config.num_groups:
+            raise ValueError("num_experts must be divisible by num_groups")
+        experts_per_group = num_experts // grouped_config.num_groups
+        selected_capacity = grouped_config.topk_groups * experts_per_group
+        if top_k > selected_capacity:
+            raise ValueError("top_k exceeds the selected-group capacity")
+        if (
+            grouped_config.topk_method == "noaux_tc"
+            and experts_per_group < 2
+        ):
+            raise ValueError("noaux_tc requires at least two experts per group")
+
+        self.hidden_size = hidden_size
+        self.num_experts = num_experts
+        self.top_k = top_k
+        self.grouped_config = grouped_config
+        self.weight = nn.Parameter(
+            torch.empty(num_experts, hidden_size, dtype=dtype)
+        )
+        if grouped_config.topk_method == "noaux_tc":
+            self.e_score_correction_bias = nn.Parameter(
+                torch.empty(num_experts, dtype=torch.float32)
+            )
+
+    def forward(
+        self, hidden_states: torch.Tensor
+    ) -> RoutingResult:
+        flat_states = hidden_states.reshape(-1, self.hidden_size)
+        router_logits = F.linear(flat_states, self.weight)
+        if self.grouped_config.score_func == "softmax":
+            original_scores = F.softmax(router_logits.float(), dim=-1)
+        else:
+            original_scores = torch.sigmoid(router_logits.float())
+
+        selection_scores = original_scores
+        if self.grouped_config.topk_method == "noaux_tc":
+            selection_scores = (
+                selection_scores + self.e_score_correction_bias
+            )
+
+        experts_per_group = (
+            self.num_experts // self.grouped_config.num_groups
+        )
+        grouped_scores = selection_scores.reshape(
+            flat_states.shape[0],
+            self.grouped_config.num_groups,
+            experts_per_group,
+        )
+        if self.grouped_config.topk_method == "group_limited_greedy":
+            group_scores = grouped_scores.max(dim=-1).values
+        else:
+            group_scores = grouped_scores.topk(2, dim=-1).values.sum(dim=-1)
+
+        selected_groups = group_scores.topk(
+            self.grouped_config.topk_groups,
+            dim=-1,
+        ).indices
+        group_mask = torch.zeros_like(group_scores, dtype=torch.bool)
+        group_mask.scatter_(1, selected_groups, True)
+        expert_mask = group_mask.unsqueeze(-1).expand_as(grouped_scores).reshape(
+            flat_states.shape[0],
+            self.num_experts,
+        )
+        masked_selection_scores = selection_scores.masked_fill(
+            ~expert_mask,
+            -torch.inf,
+        )
+        selected_experts = masked_selection_scores.topk(
+            self.top_k,
+            dim=-1,
+        ).indices
+
+        routing_weights = original_scores.gather(1, selected_experts)
+        if self.grouped_config.norm_topk_prob:
+            routing_weights = routing_weights / routing_weights.sum(
+                dim=-1,
+                keepdim=True,
+            )
+        routing_weights = (
+            routing_weights * self.grouped_config.routed_scaling_factor
+        )
+        return RoutingResult(
+            router_logits=router_logits,
+            routing_weights=routing_weights.to(router_logits.dtype),
+            selected_experts=selected_experts,
+        )
 
 
 class RoutedExpertExecutor(nn.Module):

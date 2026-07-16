@@ -488,3 +488,222 @@ Phase 6B 明确不实现或验证：
 Phase 6B 完成后必须先由控制任务审查 reference、测试和本文档。本阶段不进入
 Phase 6C。若后续授权 Phase 6C，才可以建立生产 grouped router policy，并以
 本reference作为独立oracle，同时继续锁定Qwen默认行为与state dict。
+
+## 12. Phase 6C：生产 Grouped Router 边界
+
+### 12.1 本阶段目标与API
+
+Phase 6C只把Phase 6B已经冻结的V2/V3 valid-domain routing数学接入生产侧，
+没有创建DeepSeek MoE block、shared expert、模型配置、checkpoint loader或模型
+注册。新增生产API仍位于依赖轻的`lite_llama/models/moe.py`：
+
+```python
+@dataclass(frozen=True)
+class GroupedTopKConfig:
+    num_groups: int
+    topk_groups: int
+    score_func: str
+    topk_method: str
+    norm_topk_prob: bool = True
+    routed_scaling_factor: float = 1.0
+
+class DeepSeekGroupedTopKRouter(nn.Module):
+    ...
+```
+
+router constructor显式接收：
+
+```text
+hidden_size, num_experts, top_k,
+num_groups, topk_groups, score_func, topk_method,
+norm_topk_prob, routed_scaling_factor, dtype
+```
+
+构造时会把grouped policy冻结为`GroupedTopKConfig`。该配置只保存Python标量，
+不进入state dict，也不会在forward中产生tensor值驱动控制流。只接受已审计的
+两个组合：
+
+```text
+softmax + group_limited_greedy
+sigmoid + noaux_tc
+```
+
+`sqrtsoftplus`、static hash、未知score/method、非法group划分、K超过已选组
+容量及noaux组内不足两个expert均fail-closed。
+
+### 12.2 参数与state dict
+
+两个router都持有：
+
+```text
+weight [E,H]，dtype由constructor指定
+```
+
+V2 `group_limited_greedy` state dict精确为：
+
+```text
+weight
+```
+
+V3 `noaux_tc`额外创建可加载的FP32参数：
+
+```text
+e_score_correction_bias [E]
+```
+
+因此V3 router state dict精确为：
+
+```text
+weight
+e_score_correction_bias
+```
+
+本阶段没有创建上层DeepSeek block。未来嵌套为`gate`后才会自然形成
+`gate.weight`和`gate.e_score_correction_bias`；这里不能写成当前checkpoint
+loader已经支持这些key。
+
+### 12.3 valid-domain生产数学
+
+forward先把任意前导维输入flatten为`[-1,H]`：
+
+```text
+router_logits = F.linear(flat_hidden, weight)
+```
+
+selection内部统一FP32：
+
+```text
+V2 original_scores = softmax(router_logits.float())
+V3 original_scores = sigmoid(router_logits.float())
+```
+
+V3 correction bias只构造：
+
+```text
+selection_scores = original_scores + e_score_correction_bias
+```
+
+组选择和expert选择使用selection scores；最终combine仍从未加bias的
+`original_scores`按selected IDs gather。V2组分数为组内max；V3/noaux组分数
+为修正后组内top-2之和。选择top groups后再选择K个global expert。随后按静态
+配置执行optional normalization和route scale。
+
+返回值继续是既有三字段ABI：
+
+```text
+RoutingResult(router_logits, routing_weights, selected_experts)
+```
+
+`routing_weights`最终cast回`router_logits.dtype`，public expert IDs保持
+`torch.int64`。`T=0`返回`[0,E]`与两个`[0,K]`；tie测试只锁合法集合和等权
+性质，不锁内部顺序。
+
+### 12.4 Reference与production职责差异
+
+Phase 6B reference是CPU FP32、fail-closed oracle，负责定义非法数值域；它在
+sigmoid归一化分母为0/非有限或route scale产生非有限weights时抛出明确错误。
+
+生产router只覆盖本阶段已验证的valid domain。为保持设备热路径无host sync，
+没有把reference的`.item()`式异常判断搬进forward，也没有用epsilon/clamp改变
+公式。极端sigmoid下溢仍由reference定向测试锁定；后续若设备侧需要异常遥测，
+必须另立不破坏Graph的设计，不能在当前hot path加入tensor值驱动Python分支。
+
+FP32生产结果对独立reference使用严格对齐。FP16稳定margin样本使用
+`rtol=atol=2e-3`，BF16使用`rtol=atol=1e-2`；这些仅是本地CPU测试容差，不是
+NPU或跨设备最终ABI。
+
+### 12.5 Qwen与既有执行路径兼容
+
+Phase 6C没有修改以下既有类的AST：
+
+```text
+RoutingResult
+SoftmaxTopKRouter
+Qwen3MoeTopKRouter
+ExpertPlacement
+RoutedExpertExecutor
+Qwen3MoeExperts
+```
+
+Qwen router constructor signature、`weight` state dict、softmax/normalization输出、
+tuple ABI均继续由独立Qwen reference验证。既有Qwen block的`gate.weight`、
+`experts.gate_up_weight`、`experts.down_weight`和`last_router_logits`继续由原回归
+套件锁定。executor、GMM/GEMV、TP/EP reduce、Graph policy和server flag没有
+修改。
+
+新增router继续支持`spec_from_file_location`直接加载`moe.py`，没有导入完整
+`lite_llama`包或新增第三方依赖。forward源码AST检查证明只存在基于冻结配置的
+静态分支，并禁止`.item/.tolist/.cpu/.numpy`、日志、warning、动态adapter或
+hidden/logits/weights驱动的Python `if`。
+
+### 12.6 TDD与真实结果
+
+RED命令：
+
+```text
+python -m unittest \
+  tests.models.test_deepseek_moe_router.\
+DeepSeekMoeRouterContractTest.\
+test_grouped_topk_config_is_available -v
+```
+
+实现前真实结果：1 test error，
+`AttributeError: module ... has no attribute 'GroupedTopKConfig'`，exit code `1`；
+RED状态未stage、commit或push。
+
+最小API加入后同一定向测试1/1通过，exit code `0`。完整Phase 6C focused命令：
+
+```text
+python -m unittest tests.models.test_deepseek_moe_router -v
+```
+
+真实结果：12 tests全部通过，exit code `0`。覆盖immutable config、非法组合/V4
+拒绝、V2/V3 FP32 oracle矩阵、bias selection-only、norm/scale、T=0/1/multi、
+FP16/BF16稳定margin、tie集合、state dict/dtype/load、Qwen兼容、direct loader
+与hot-path AST。
+
+独立reference回归：
+
+```text
+python -m unittest tests.models.test_deepseek_moe_reference -v
+```
+
+真实结果：24 tests全部通过，exit code `0`；两个Phase 6B文件SHA256保持不变。
+
+Qwen reference/runtime兼容回归：
+
+```text
+python -m unittest \
+  tests.models.test_moe_reference \
+  tests.models.test_qwen3_moe -v
+```
+
+真实结果：56 tests全部通过，exit code `0`。
+
+版本文档与既有MoE evidence门：
+
+```text
+python -m unittest \
+  tests.test_repository_docs \
+  tests.test_moe_validation_evidence -v
+```
+
+真实结果：8 tests全部通过，exit code `0`。
+
+```text
+python scripts/validate_release.py
+```
+
+真实结果：Markdown UTF-8、VERSION文档同步、compile和diff-check通过；默认
+discovery运行160 tests并全部通过，exit code `0`。独立`git diff --check`也为
+exit code `0`。本阶段没有运行服务器或NPU。
+
+### 12.7 明确不包含的能力与版本
+
+Phase 6C不包含shared expert、DeepSeek MoE block、layer schedule、配置/模型注册、
+checkpoint转换或加载、all-to-all/EPLB、非连续expert map、MLA、量化、NPU、
+Graph或性能优化。新增router单独通过CPU测试，不能据此声称完整DeepSeek模型或
+checkpoint可用。
+
+`VERSION`仍为`0.0.14rc1`；目标`0.0.15rc1`只在所有后续生产、checkpoint、
+CPU/NPU和发布门通过后的最终发布阶段更新。
