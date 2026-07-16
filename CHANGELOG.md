@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.0.14rc1] - 2026-07-15
+## [0.0.14rc1] - 2026-07-16
 
 Generic Qwen3 MoE runtime boundaries and reference-correctness release.
 
