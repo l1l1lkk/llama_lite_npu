@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field, fields
 from typing import Any, Mapping, Type, TypeVar, Optional
 import json
+import math
 import os
 
 T = TypeVar("T", bound="BaseConfig")
@@ -246,6 +247,255 @@ class Qwen3MoeConfig(Qwen3Config):
                     f"{name}={value} must be divisible by tensor parallel "
                     f"world_size={world_size}"
                 )
+
+
+# ---------------------------------------------------------------------------- #
+@dataclass
+class DeepSeekMoeConfig(BaseConfig):
+    """Validated DeepSeek-V2/V3 MoE component configuration.
+
+    This intentionally excludes attention, MLA, vocabulary, and full-model
+    registration fields.  It only describes the audited routed-plus-shared
+    MoE component.
+    """
+
+    architectures: list[str] = field(
+        default_factory=lambda: ["DeepseekV2ForCausalLM"]
+    )
+    model_type: str = "deepseek_v2"
+    hidden_size: int = 2048
+    num_layers: int = 27
+    intermediate_size: int = 10944
+    num_experts: int = 64
+    num_experts_per_tok: int = 6
+    moe_intermediate_size: int = 1408
+    num_shared_experts: int = 2
+    score_func: str = "softmax"
+    topk_method: str = "group_limited_greedy"
+    num_groups: int = 1
+    topk_groups: int = 1
+    norm_topk_prob: bool = False
+    routed_scaling_factor: float = 1.0
+    first_k_dense_replace: int = 1
+    moe_layer_freq: int = 1
+    torch_dtype: str = "bfloat16"
+
+    _ALIASES = {
+        "num_hidden_layers": "num_layers",
+        "n_routed_experts": "num_experts",
+        "n_shared_experts": "num_shared_experts",
+        "scoring_func": "score_func",
+        "n_group": "num_groups",
+        "topk_group": "topk_groups",
+    }
+    _UNSUPPORTED_ROUTING_FIELDS = frozenset(
+        {
+            "static_hash",
+            "static_hash_routing",
+            "hash_routing",
+            "hash_router",
+        }
+    )
+    _OFFICIAL_ARCHITECTURES = {
+        "deepseek_v2": ["DeepseekV2ForCausalLM"],
+        "deepseek_v3": ["DeepseekV3ForCausalLM"],
+    }
+    _REQUIRED_SOURCE_FIELDS = (
+        "architectures",
+        "model_type",
+        "hidden_size",
+        "intermediate_size",
+        "num_experts_per_tok",
+        "moe_intermediate_size",
+        "topk_method",
+        "norm_topk_prob",
+        "routed_scaling_factor",
+        "first_k_dense_replace",
+        "moe_layer_freq",
+        "torch_dtype",
+    )
+
+    @classmethod
+    def _validate_source_identity(
+        cls,
+        model_type: Any,
+        architectures: Any,
+    ) -> None:
+        if model_type == "deepseek_v4":
+            raise ValueError("DeepSeek-V4 MoE routing is not supported")
+        if model_type not in cls._OFFICIAL_ARCHITECTURES:
+            raise ValueError(
+                "model_type must be 'deepseek_v2' or 'deepseek_v3'"
+            )
+        expected = cls._OFFICIAL_ARCHITECTURES[model_type]
+        if architectures != expected:
+            raise ValueError(
+                f"architectures for {model_type} must exactly equal {expected!r}"
+            )
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "DeepSeekMoeConfig":
+        if not isinstance(data, Mapping):
+            raise TypeError("DeepSeek MoE config data must be a mapping")
+        for required_source_field in cls._REQUIRED_SOURCE_FIELDS:
+            if required_source_field not in data:
+                raise ValueError(
+                    f"{required_source_field} is required for DeepSeek MoE "
+                    "source validation"
+                )
+        for alias, canonical in cls._ALIASES.items():
+            has_alias = alias in data
+            has_canonical = canonical in data
+            if not has_alias and not has_canonical:
+                raise ValueError(
+                    "DeepSeek MoE source config requires at least one of "
+                    f"{alias} or {canonical}"
+                )
+            if (
+                has_alias
+                and has_canonical
+                and data[alias] != data[canonical]
+            ):
+                raise ValueError(
+                    f"conflicting DeepSeek MoE source fields {alias} and "
+                    f"{canonical}"
+                )
+        cls._validate_source_identity(
+            data["model_type"],
+            data["architectures"],
+        )
+        unsupported = sorted(cls._UNSUPPORTED_ROUTING_FIELDS.intersection(data))
+        if unsupported:
+            raise ValueError(
+                "unsupported DeepSeek-V4/hash routing config fields: "
+                + ", ".join(unsupported)
+            )
+        model_type = data["model_type"]
+
+        normalized = dict(data)
+        if (
+            model_type == "deepseek_v2"
+            and normalized.get("topk_method") == "greedy"
+        ):
+            # The frozen V2-Lite HF config uses ``greedy`` for the audited
+            # one-group policy.  Production names that policy explicitly.
+            normalized["topk_method"] = "group_limited_greedy"
+        return super().from_dict(normalized)
+
+    def __post_init__(self) -> None:
+        type(self)._validate_source_identity(
+            self.model_type,
+            self.architectures,
+        )
+
+        positive_integer_fields = (
+            "hidden_size",
+            "num_layers",
+            "intermediate_size",
+            "num_experts",
+            "num_experts_per_tok",
+            "moe_intermediate_size",
+            "num_shared_experts",
+            "num_groups",
+            "topk_groups",
+            "moe_layer_freq",
+        )
+        for name in positive_integer_fields:
+            value = getattr(self, name)
+            if type(value) is not int or value <= 0:
+                raise ValueError(f"{name} must be a positive integer")
+        if (
+            type(self.first_k_dense_replace) is not int
+            or self.first_k_dense_replace < 0
+            or self.first_k_dense_replace >= self.num_layers
+        ):
+            raise ValueError(
+                "first_k_dense_replace must be an integer in [0, num_layers)"
+            )
+        if type(self.norm_topk_prob) is not bool:
+            raise TypeError("norm_topk_prob must be bool")
+        if not isinstance(self.torch_dtype, str) or not self.torch_dtype:
+            raise TypeError("torch_dtype must be a non-empty string")
+        if (
+            isinstance(self.routed_scaling_factor, bool)
+            or not isinstance(self.routed_scaling_factor, (int, float))
+            or not math.isfinite(float(self.routed_scaling_factor))
+            or self.routed_scaling_factor <= 0
+        ):
+            raise ValueError(
+                "routed_scaling_factor must be finite and positive"
+            )
+
+        expected_policy = {
+            "deepseek_v2": ("softmax", "group_limited_greedy"),
+            "deepseek_v3": ("sigmoid", "noaux_tc"),
+        }[self.model_type]
+        if (self.score_func, self.topk_method) != expected_policy:
+            raise ValueError(
+                f"{self.model_type} requires score_func={expected_policy[0]!r} "
+                f"and topk_method={expected_policy[1]!r}"
+            )
+        if self.num_experts_per_tok > self.num_experts:
+            raise ValueError("num_experts_per_tok must not exceed num_experts")
+        if self.num_experts % self.num_groups:
+            raise ValueError("num_experts must be divisible by num_groups")
+        if self.topk_groups > self.num_groups:
+            raise ValueError("topk_groups must not exceed num_groups")
+        experts_per_group = self.num_experts // self.num_groups
+        if self.num_experts_per_tok > self.topk_groups * experts_per_group:
+            raise ValueError(
+                "num_experts_per_tok exceeds selected-group capacity"
+            )
+        if self.topk_method == "noaux_tc" and experts_per_group < 2:
+            raise ValueError("noaux_tc requires at least two experts per group")
+        if not self.moe_layer_indices():
+            raise ValueError("layer schedule must contain at least one MoE layer")
+
+    @property
+    def shared_intermediate_size(self) -> int:
+        return self.num_shared_experts * self.moe_intermediate_size
+
+    @property
+    def uses_correction_bias(self) -> bool:
+        return (
+            self.score_func == "sigmoid" and self.topk_method == "noaux_tc"
+        )
+
+    def is_moe_layer(self, layer_index: int) -> bool:
+        return (
+            type(layer_index) is int
+            and 0 <= layer_index < self.num_layers
+            and layer_index >= self.first_k_dense_replace
+            and layer_index % self.moe_layer_freq == 0
+        )
+
+    def moe_layer_indices(self) -> tuple[int, ...]:
+        return tuple(
+            layer_index
+            for layer_index in range(self.num_layers)
+            if self.is_moe_layer(layer_index)
+        )
+
+    def validate_moe_parallel(self, world_size: int, mode: str) -> None:
+        if type(world_size) is not int or world_size <= 0:
+            raise ValueError("world_size must be a positive integer")
+        if mode not in {"tp", "ep"}:
+            raise ValueError("mode must be 'tp' or 'ep'")
+        if mode == "tp":
+            for name, value in (
+                ("moe_intermediate_size", self.moe_intermediate_size),
+                ("shared_intermediate_size", self.shared_intermediate_size),
+            ):
+                if value % world_size:
+                    raise ValueError(
+                        f"{name}={value} must be divisible by tensor "
+                        f"parallel world_size={world_size}"
+                    )
+        elif self.num_experts % world_size:
+            raise ValueError(
+                f"num_experts={self.num_experts} must be divisible by "
+                f"expert parallel world_size={world_size}"
+            )
 
 
 # ---------------------------------------------------------------------------- #

@@ -1073,3 +1073,255 @@ Graph或性能优化。TP/EP测试仅验证单进程layout decomposition，不�
 
 `VERSION`仍为`0.0.14rc1`；目标`0.0.15rc1`只在后续完整集成、真实NPU/并行与
 发布门全部完成后的最终发布阶段更新。
+
+## 15. Phase 6E1：配置驱动的MoE组件与CPU层状态装载
+
+### 15.1 阶段目标与严格边界
+
+Phase 6E1把已经独立验收的三段能力串成一个仍可单独测试的CPU组件：
+
+```text
+官方V2/V3 MoE字段子集
+  -> DeepSeekMoeConfig（只描述MoE组件）
+  -> build_deepseek_moe_block（只构造命中的MoE层）
+
+HF MoE tensors
+  -> Phase 6D2 canonical state
+  -> prepare_deepseek_moe_layer_state（单层、单rank runtime state）
+  -> Phase 6D1 DeepSeekMoeBlock.load_state_dict(strict=True)
+```
+
+该链路没有定义`DeepSeekModel`、decoder或CausalLM，也没有构造dense MLP、attention、
+MLA、KV cache、RoPE、embedding、LM head或采样器。`DeepSeekMoeConfig`没有加入
+`CONFIG_CLASS_MAP`，`ModelExecutor`也不会把`deepseek_v2/deepseek_v3`识别为可运行
+完整模型。由此，组件级strict-load不能被表述为完整DeepSeek checkpoint已经可加载。
+
+### 15.2 冻结官方字段与规范化映射
+
+字段证据继续冻结在Phase 6A确定的官方来源，不跟随main漂移：
+
+- DeepSeek-V2-Lite `604d5664dddd88a0433dbae533b7fe9472482de0`：
+  <https://huggingface.co/deepseek-ai/DeepSeek-V2-Lite/commit/604d5664dddd88a0433dbae533b7fe9472482de0>
+- DeepSeek-V3 `9b4e9788e4a3a731f7567338ed15d3ec549ce03b`：
+  <https://github.com/deepseek-ai/DeepSeek-V3/commit/9b4e9788e4a3a731f7567338ed15d3ec549ce03b>
+
+组件配置映射如下：
+
+| 官方字段 | 组件字段 | V2-Lite冻结值 | V3冻结值 |
+| --- | --- | ---: | ---: |
+| `hidden_size` | `hidden_size` | 2048 | 7168 |
+| `num_hidden_layers` | `num_layers` | 27 | 61 |
+| `intermediate_size` | `intermediate_size` | 10944 | 18432 |
+| `n_routed_experts` | `num_experts` | 64 | 256 |
+| `num_experts_per_tok` | 同名 | 6 | 8 |
+| `moe_intermediate_size` | 同名 | 1408 | 2048 |
+| `n_shared_experts` | `num_shared_experts` | 2 | 1 |
+| `scoring_func` | `score_func` | `softmax` | `sigmoid` |
+| `topk_method` | `topk_method` | `greedy` | `noaux_tc` |
+| `n_group` | `num_groups` | 1 | 8 |
+| `topk_group` | `topk_groups` | 1 | 4 |
+| `norm_topk_prob` | 同名 | false | true |
+| `routed_scaling_factor` | 同名 | 1.0 | 2.5 |
+| `first_k_dense_replace` | 同名 | 1 | 3 |
+| `moe_layer_freq` | 同名 | 1 | 1 |
+| `torch_dtype` | 同名（仅记录） | `bfloat16` | `bfloat16` |
+
+V2-Lite冻结HF配置使用`topk_method="greedy"`。本项目已审计的生产router把同一
+one-group/group-limited数学明确命名为`group_limited_greedy`，所以`from_dict`只在
+`model_type="deepseek_v2"`时执行这一个显式别名规范化。其他score/method组合不会
+被静默改写：V2只接受`softmax + group_limited_greedy`，V3只接受
+`sigmoid + noaux_tc`。V4、`sqrtsoftplus`、`static_hash`和hash-routing字段均
+fail-closed。
+
+派生值为：
+
+```text
+shared_intermediate_size = num_shared_experts * moe_intermediate_size
+uses_correction_bias = (score_func == sigmoid and topk_method == noaux_tc)
+```
+
+未知attention等extra字段仍由现有`from_dict`过滤；测试逐一锁定上表关键字段，防止
+它们因过滤而静默丢失。官方配置入口同时实行三层来源门：
+
+1. `deepseek_v2`只接受精确列表`["DeepseekV2ForCausalLM"]`，`deepseek_v3`只接受
+   精确列表`["DeepseekV3ForCausalLM"]`；缺失、交叉、混合、额外或未知architecture
+   均fail-closed。该检查也位于dataclass公共校验门，因此直接构造不能绕过。
+2. `from_dict`要求上表全部直接字段显式存在，并要求六组官方alias/canonical字段
+   （层数、routed/shared expert数、score、group数、top-k group数）每组至少出现一个；
+   不允许借V2 dataclass默认值补齐shape、schedule、scale或ownership。直接构造的默认
+   V2配置仍然有效，因为这项“来源完整性”门只作用于外部mapping解析。
+3. alias与canonical同时出现时，相同值可接受，异值明确拒绝；该规则只在
+   `DeepSeekMoeConfig.from_dict`内生效，不改变`BaseConfig`或Qwen解析。
+
+V2的`greedy`规范化只在来源字段完整、alias无冲突且model/architecture精确配对后执行。
+`model_type`与`architectures`只保存来源事实，不触发完整模型注册。
+
+### 15.3 0-based层调度与并行校验
+
+层调度严格使用用户可见的0-based公式：
+
+```text
+0 <= layer_index < num_layers
+layer_index >= first_k_dense_replace
+layer_index % moe_layer_freq == 0
+```
+
+`is_moe_layer`对负数、越界和非整数返回false；`moe_layer_indices()`按升序稳定列出
+所有命中层。V2-Lite因此只有layer 0是dense，V3只有layer 0/1/2是dense。frequency
+大于1时仍按全局0-based层号取模，而不是相对`first_k_dense_replace`重新编号。
+空MoE调度、非正层数/frequency、越界dense前缀均被拒绝。本阶段只拒绝dense层构造，
+不替它创建dense MLP。
+
+`validate_moe_parallel(world_size, mode)`只验证MoE ownership：
+
+| 模式 | 必须整除 | shared语义 |
+| --- | --- | --- |
+| TP | routed `I % W == 0`且shared `I_s % W == 0` | shared intermediate切片 |
+| EP | `E % W == 0` | shared完整复制，不要求`I_s % W == 0` |
+
+mode、world size和rank在factory/adapter入口再次fail-closed。这里不验证attention heads、
+KV heads或vocab，因为它们不属于MoE组件契约。
+
+### 15.4 Component factory
+
+新增dependency-light API：
+
+```python
+build_deepseek_moe_block(
+    config,
+    layer_index,
+    tp_config=None,
+    dtype=torch.float16,
+)
+```
+
+factory只在`config.is_moe_layer(layer_index)`为true时构造Phase 6D1
+`DeepSeekMoeBlock`，并从config完整传入H/E/K、routed/shared I、group策略、norm、
+route scale、layer index和TP/EP配置。dense、不命中frequency及越界层均清晰拒绝。
+V2/V3 state dict继续保持Phase 6D1的五key/六key契约；factory没有新增参数、buffer或
+checkpoint key。
+
+直接文件测试为`model_config.py`、`moe.py`和`tp_utils.py`安装三个明确别名，然后加载
+component模块；没有`try/except ImportError`宽泛降级，也没有引入`transformers`、
+`accelerate`或完整包初始化。
+
+### 15.5 Canonical整层状态到rank-local block状态
+
+第二个API为：
+
+```python
+prepare_deepseek_moe_layer_state(
+    canonical_state,
+    config,
+    layer_index,
+    tp_config=None,
+)
+```
+
+它只读取`layers.L.mlp.`下的目标MoE层，返回去掉单层前缀、可直接strict-load的block
+state。另一MoE层、dense层和无关key不会进入输出。输入mapping的key、tensor identity
+和内容前后保持不变；函数不消费、不`torch.load`、不搬设备、不通信。
+
+转换关系为：
+
+| canonical | runtime local key | world1/TP | EP |
+| --- | --- | --- | --- |
+| `gate.weight [E,H]` | `gate.weight` | 沿用identity | 沿用identity |
+| V3 bias `[E] FP32` | `gate.e_score_correction_bias` | 沿用identity | 沿用identity |
+| routed gate/up `[E,2I,H]` | `experts.gate_up_weight` | I切片后`[E,H,2I_local]` | expert切片后`[E_local,H,2I]` |
+| routed down `[E,H,I]` | `experts.down_weight` | I切片后`[E,I_local,H]` | expert切片后`[E_local,I,H]` |
+| shared gate/up `[2I_s,H]` | `shared_experts.gate_up_weight` | I_s切片后`[H,2I_s_local]` | 完整`[H,2I_s]` |
+| shared down `[H,I_s]` | `shared_experts.down_weight` | I_s切片后`[I_s_local,H]` | 完整`[I_s,H]` |
+
+world size 1也必须执行canonical到runtime的transpose。V3 bias必须存在、shape为`[E]`、
+保持FP32；V2即使canonical mapping含额外bias也不输出、不消费。所有普通权重必须是
+同dtype/device的floating CPU tensor，并与config H/E/I严格一致；bias只允许FP32且
+device一致。
+
+### 15.6 Strict-load、TP/EP decomposition与独立oracle
+
+测试先使用Phase 6D2 converter产生多层canonical state，再调用本阶段adapter。world1
+的V2/V3 runtime mapping均对factory block实现`load_state_dict(strict=True)`零missing、
+零unexpected，随后完整block输出对齐Phase 6B `deepseek_moe_reference`。
+
+TP2为rank0/1分别构造block并strict-load：routed和shared intermediate各持有连续一半；
+测试使用独立reference产生的selected IDs/weights，分别调用rank-local routed/shared数学，
+两个rank的四个partial相加后对齐完整oracle。EP2为rank0/1分别持有连续且唯一的两名
+routed experts，shared在每rank完整复制；正确组合是：
+
+```text
+routed_rank0 + routed_rank1 + one_copy_of_shared
+```
+
+测试显式证明把两份shared相加不会等于完整oracle。以上只验证单进程layout与ownership，
+没有执行或模拟HCCL collective，也不构成NPU正确性证据。
+
+### 15.7 TDD与真实结果
+
+RED命令：
+
+```text
+python -m unittest \
+  tests.models.test_deepseek_moe_component.\
+DeepSeekMoeComponentContractTest.\
+test_component_config_api_exists -v
+```
+
+实现前真实结果：1 test error，`AttributeError: module ... has no attribute
+'DeepSeekMoeConfig'`，exit code `1`；RED未stage、commit或push。
+
+完整focused命令：
+
+```text
+python -m unittest tests.models.test_deepseek_moe_component -v
+```
+
+首轮14项功能测试通过；冻结AST审计因Windows `subprocess`默认GBK解码UTF-8 Git blob而
+产生9个subtest error。测试改为对Git输出显式UTF-8解码，并把正则改为raw string；
+没有修改生产数学。最终15 tests全部通过，exit code `0`。
+
+Phase 6E1-R1补充了三类真实fail-closed RED：
+
+- architecture来源：V2/V3交叉、缺失、混合与未知architecture此前会被接受（空列表还
+  触发了非契约`TypeError`）；定向命令运行1 test，出现8 failures和1 error，exit code
+  `1`；
+- required source fields：逐项删除shape、schedule、scale直接字段及六组alias后，配置
+  会静默继承V2默认值或只在后续策略校验偶然失败；
+- alias冲突：六组alias/canonical异值双写均被静默覆盖。
+
+后两类合并定向命令运行2 tests，共22 failures，exit code `1`。加入统一来源门后，三类
+定向命令运行3 tests全部通过，exit code `0`；完整component suite增至18 tests并继续
+作为最终GREEN门。R1全过程未stage、commit或push。
+
+冻结DeepSeek回归：
+
+```text
+python -m unittest \
+  tests.models.test_deepseek_moe_weights \
+  tests.models.test_deepseek_moe_block \
+  tests.models.test_deepseek_moe_router \
+  tests.models.test_deepseek_moe_reference -v
+```
+
+真实结果：63 tests全部通过，exit code `0`。Qwen回归命令
+`python -m unittest tests.models.test_moe_reference tests.models.test_qwen3_moe -v`
+真实结果为56 tests全部通过，exit code `0`。仓库文档/evidence 8项、release validator、
+`git diff --check`和自定义config/schedule/strict-load/frozen-AST probe也作为最终独立门
+复跑；结果只代表本地CPU。
+
+### 15.8 冻结兼容、许可证与后续阻塞
+
+测试把当前`model_config.py`与HEAD中的既有Base/Llama/Qwen/Llava配置类逐类AST比较，
+并对`moe.py`、`tp_utils.py`、Phase 6B/C/D reference、router、block、weights文件执行
+`git diff --exit-code`；这些冻结边界均保持不变。新增配置也明确不出现在
+`executor_struct.py`的`CONFIG_CLASS_MAP`。
+
+本阶段依据冻结公开字段、数学和既有项目接口独立实现，没有复制DeepSeek、vLLM或
+vLLM-Ascend非平凡源码。仓库仍缺顶层LICENSE/NOTICE，正式对外复用前必须单独解决
+许可证和attribution边界。
+
+仍不支持：DeepSeek-V4、完整checkpoint/file loader、`apply_weight_convert` CLI、
+`ModelExecutor`、config/model registry、dense layer实现、完整decoder/CausalLM、MLA、
+attention/KV/RoPE、all-to-all/EPLB、非连续expert map、量化、服务器/NPU、Graph及性能
+优化。`VERSION`仍为`0.0.14rc1`；目标`0.0.15rc1`只在后续完整模型边界、真实并行/NPU
+与发布门全部完成后的最终发布阶段更新。
