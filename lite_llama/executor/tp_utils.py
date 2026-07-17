@@ -256,6 +256,98 @@ def prepare_moe_down_for_ep(
     return shard_moe_experts(weight, tp).transpose(1, 2).contiguous()
 
 
+def _validate_shared_expert_layout_config(
+    tp: TPConfig,
+    *,
+    shared_intermediate_size: int,
+) -> str:
+    mode = getattr(tp, "moe_parallel_mode", None)
+    world_size = getattr(tp, "world_size", None)
+    rank = getattr(tp, "rank", None)
+    if mode not in {"tp", "ep"}:
+        raise ValueError(
+            "moe_parallel_mode must be 'tp' or 'ep', got "
+            f"{mode!r}"
+        )
+    if type(world_size) is not int or world_size <= 0:
+        raise ValueError("world_size must be a positive integer")
+    if type(rank) is not int or not 0 <= rank < world_size:
+        raise ValueError("rank must be an integer in [0, world_size)")
+    if (
+        type(shared_intermediate_size) is not int
+        or shared_intermediate_size <= 0
+    ):
+        raise ValueError(
+            "shared_intermediate_size must be a positive integer"
+        )
+    if mode == "tp" and shared_intermediate_size % world_size != 0:
+        raise ValueError(
+            f"shared_intermediate_size={shared_intermediate_size} must be "
+            f"divisible by tensor parallel world_size={world_size}"
+        )
+    return mode
+
+
+def prepare_shared_expert_gate_up(
+    weight: torch.Tensor,
+    shared_intermediate_size: int,
+    tp: TPConfig,
+) -> torch.Tensor:
+    """Convert canonical ``[2I, H]`` shared gate/up to local runtime layout."""
+
+    mode = _validate_shared_expert_layout_config(
+        tp,
+        shared_intermediate_size=shared_intermediate_size,
+    )
+    if not isinstance(weight, torch.Tensor):
+        raise TypeError("shared gate/up weight must be a torch.Tensor")
+    if weight.device.type != "cpu" or not weight.is_floating_point():
+        raise ValueError("shared gate/up weight must be a floating CPU tensor")
+    expected_rows = 2 * shared_intermediate_size
+    if weight.ndim != 2 or weight.shape[0] != expected_rows or weight.shape[1] <= 0:
+        raise ValueError(
+            "shared gate/up weight must have shape "
+            f"[{expected_rows}, hidden], got {tuple(weight.shape)}"
+        )
+    if mode == "tp" and tp.world_size > 1:
+        local_size = shared_intermediate_size // tp.world_size
+        start = tp.rank * local_size
+        end = start + local_size
+        gate = weight[start:end]
+        up = weight[
+            shared_intermediate_size + start : shared_intermediate_size + end
+        ]
+        weight = torch.cat((gate, up), dim=0)
+    return weight.transpose(0, 1).contiguous()
+
+
+def prepare_shared_expert_down(
+    weight: torch.Tensor,
+    tp: TPConfig,
+) -> torch.Tensor:
+    """Convert canonical ``[H, I]`` shared down to local runtime layout."""
+
+    if not isinstance(weight, torch.Tensor):
+        raise TypeError("shared down weight must be a torch.Tensor")
+    if weight.device.type != "cpu" or not weight.is_floating_point():
+        raise ValueError("shared down weight must be a floating CPU tensor")
+    if weight.ndim != 2 or weight.shape[0] <= 0 or weight.shape[1] <= 0:
+        raise ValueError(
+            "shared down weight must have shape [hidden, shared_intermediate], "
+            f"got {tuple(weight.shape)}"
+        )
+    shared_intermediate_size = weight.shape[1]
+    mode = _validate_shared_expert_layout_config(
+        tp,
+        shared_intermediate_size=shared_intermediate_size,
+    )
+    if mode == "tp" and tp.world_size > 1:
+        local_size = shared_intermediate_size // tp.world_size
+        start = tp.rank * local_size
+        weight = weight[:, start : start + local_size]
+    return weight.transpose(0, 1).contiguous()
+
+
 def shard_lm_head(
     weight: torch.Tensor, tp: TPConfig
 ) -> torch.Tensor:

@@ -897,3 +897,179 @@ layer schedule、完整CausalLM、MLA、all-to-all/EPLB、非连续expert map、
 
 `VERSION`仍为`0.0.14rc1`；目标`0.0.15rc1`只在后续checkpoint、模型集成、
 CPU/NPU与发布门全部完成后的最终发布阶段更新。
+
+## 14. Phase 6D2：Checkpoint Canonicalizer与Shared布局Adapter
+
+### 14.1 阶段边界
+
+Phase 6D2只提供两个可以独立测试的纯转换边界：
+
+1. `stack_deepseek_moe_weights`把显式指定的DeepSeek-V2/V3 HF MoE层转换为
+   canonical checkpoint key/layout；
+2. `prepare_shared_expert_gate_up/down`把canonical shared权重转换为Phase 6D1
+   `SharedExpertMLP`的本rank runtime布局。
+
+本阶段没有把它们接入`apply_weight_convert.py`、ModelExecutor、model config/registry、
+完整checkpoint loader或完整模型。helper只依赖stdlib与PyTorch；不导入模型、
+kernel、transformers或上游实现。
+
+### 14.2 HF key到canonical checkpoint
+
+对每个显式MoE层`L`，转换关系为：
+
+| HF输入 | canonical输出 | canonical形状/所有权 |
+| --- | --- | --- |
+| `model.layers.L.mlp.gate.weight` | `layers.L.mlp.gate.weight` | `[E,H]`，沿用tensor identity |
+| `...gate.e_score_correction_bias` | `layers.L.mlp.gate.e_score_correction_bias` | `[E]`，规范为FP32 |
+| `experts.e.gate_proj.weight` + `up_proj.weight` | `experts.gate_up_weight` | numeric expert order的`[E,2I,H]`，gate rows后up rows |
+| `experts.e.down_proj.weight` | `experts.down_weight` | numeric expert order的`[E,H,I]` |
+| `shared_experts.gate_proj.weight` + `up_proj.weight` | `shared_experts.gate_up_weight` | `[2I_s,H]`，gate rows后up rows |
+| `shared_experts.down_proj.weight` | `shared_experts.down_weight` | `[H,I_s]`，沿用tensor identity |
+
+router和shared down无需改layout，直接沿用源tensor；bias只在必要时执行FP32 cast。
+expert stack与gate/up cat必然产生新tensor。转换不会clone未发生layout变化的大权重，
+也不读取、转换或消费未列入`moe_layer_indices`的dense层及其他checkpoint内容。
+
+`moe_layer_indices`保持调用方给出的稳定顺序，并拒绝空集合、重复、负数和非整数；
+expert按`0..E-1`显式numeric顺序收集。缺key、非tensor、非浮点、rank/shape、
+hidden/intermediate、expert count、dtype或device不一致均fail-closed，错误包含layer、
+expert和key上下文。普通权重要求全转换范围dtype/device一致；correction bias允许源
+dtype不同，但device必须一致，canonical结果统一FP32。
+
+V2调用`use_correction_bias=False`时不要求、不输出也不消费bias，即使源dict中存在
+bias也保持原样。V3调用`True`时bias是必需key。该布尔API不接受`sqrtsoftplus`
+等字符串或静默fallback，因此没有把DeepSeek-V4 static-hash路由伪装为V3。
+
+### 14.3 consume原子性与大权重ownership
+
+`consume=False`保持源dict的key顺序、tensor identity和内容不变。`consume=True`
+采用“先完整验证并构造全部目标，再统一删除”的两阶段语义：
+
+```text
+validate every requested layer/key/layout
+build complete converted mapping
+only after success: delete exact consumed HF keys
+```
+
+因此后续层缺key、shape或dtype失败时，较早层也不会留下partial pop。成功时只删除
+显式MoE层实际消费的router、routed expert、shared expert和可选bias keys；dense层、
+未列层和其他权重保持不变。这个原子性是Python dict所有权契约，不声称解决真实
+61GB checkpoint加载时的峰值内存；后续loader仍需在同一语义下设计分层释放。
+
+### 14.4 Canonical shared到TP/EP runtime
+
+shared canonical输入与D1 runtime输出：
+
+| 权重 | canonical | runtime |
+| --- | --- | --- |
+| gate/up | `[2I_s,H]` | `[H,2I_local]` |
+| down | `[H,I_s]` | `[I_local,H]` |
+
+world size 1只执行transpose+contiguous：
+
+```text
+gate_up_runtime = gate_up_checkpoint.T
+down_runtime = down_checkpoint.T
+```
+
+TP令`slice_r=[r*I_s/W,(r+1)*I_s/W)`，gate和up必须使用同一个连续切片：
+
+```text
+local_gate = canonical_gate[slice_r]
+local_up   = canonical_up[slice_r]
+runtime_gate_up = cat(local_gate, local_up).T
+runtime_down = canonical_down[:, slice_r].T
+```
+
+测试把rank0/rank1 runtime转回canonical方向后，分别重组gate、up和down，必须逐元素
+恢复完整canonical权重。EP不做intermediate切片，每个rank都只transpose完整shared
+权重，各rank结果分别等于world size 1，不能把两rank相加或乘world size。
+
+两个helper只接受floating CPU tensor，只做layout，不通信、不all-reduce，也不导入
+`SharedExpertPlacement`/`SharedExpertMLP`。mode/world/rank/divisibility/shape均独立
+fail-closed。既有routed `shard_moe_*`、`prepare_moe_*`、`tp_all_reduce`和错误契约
+保持AST不变。
+
+### 14.5 Canonical到D1 strict-load
+
+single-rank集成测试把canonical routed权重交给既有：
+
+```text
+prepare_moe_gate_up_for_gmm: [E,2I,H] -> [E,H,2I]
+prepare_moe_down_for_gmm:    [E,H,I]  -> [E,I,H]
+```
+
+并把canonical shared权重交给本阶段新增helper：
+
+```text
+[2I_s,H] -> [H,2I_s]
+[H,I_s]  -> [I_s,H]
+```
+
+去除单层`layers.L.mlp.`前缀后，V2/V3 mapping均对Phase 6D1
+`DeepSeekMoeBlock.load_state_dict(strict=True)`实现零missing/zero unexpected；V3
+最终`gate.e_score_correction_bias`参数保持FP32。加载后的single-rank block输出继续
+对齐Phase 6B独立`deepseek_moe_reference`。expected canonical与数值oracle在测试中
+使用直接cat/stack/transpose公式构造，没有调用production converter自证。
+
+### 14.6 TDD与真实结果
+
+RED命令：
+
+```text
+python -m unittest \
+  tests.models.test_deepseek_moe_weights.\
+DeepSeekMoeWeightContractTest.\
+test_shared_gate_up_layout_helper_is_available -v
+```
+
+实现前真实结果：1 test error，`AttributeError: module ... has no attribute
+'prepare_shared_expert_gate_up'`，exit code `1`；RED未stage、commit或push。最小helper
+加入后同一测试1/1通过，exit code `0`。
+
+完整focused命令：
+
+```text
+python -m unittest tests.models.test_deepseek_moe_weights -v
+```
+
+扩展矩阵首轮14项通过、1项error：strict-load V3数值样本沿用了为检查布局顺序而
+加入`layer_id*1000`的权重标记，随机hidden导致sigmoid全零，按Phase 6B契约正确
+触发normalization fail-closed。该问题不属于converter差异；定向数值样本缩放到
+稳定valid domain后，最终15 tests全部通过，exit code `0`。布局/顺序测试仍保留
+原始大标记值。
+
+DeepSeek 6B/6C/6D1联合回归：
+
+```text
+python -m unittest \
+  tests.models.test_deepseek_moe_block \
+  tests.models.test_deepseek_moe_router \
+  tests.models.test_deepseek_moe_reference -v
+```
+
+真实结果：48 tests全部通过，exit code `0`。Qwen回归：
+
+```text
+python -m unittest \
+  tests.models.test_moe_reference \
+  tests.models.test_qwen3_moe -v
+```
+
+真实结果：56 tests全部通过，exit code `0`。最终仓库文档/evidence 8项、release
+validator和`git diff --check`也作为独立门复跑；这些结果均为本地CPU，不包含
+真实TP/EP collective、服务器、NPU或Graph。
+
+### 14.7 许可证、限制与版本
+
+本阶段依据已冻结公开数学、checkpoint key和接口契约独立实现，没有复制DeepSeek、
+vLLM或vLLM-Ascend非平凡源码。仓库当前仍缺顶层LICENSE/NOTICE；正式对外复用前
+必须单独解决许可证与attribution边界。
+
+Phase 6D2不包含DeepSeek-V4、MLA、all-to-all/EPLB、非连续expert map、量化、
+CLI、ModelExecutor、config/model registry、完整loader/full model、服务器/NPU、
+Graph或性能优化。TP/EP测试仅验证单进程layout decomposition，不能冒充collective
+正确性。
+
+`VERSION`仍为`0.0.14rc1`；目标`0.0.15rc1`只在后续完整集成、真实NPU/并行与
+发布门全部完成后的最终发布阶段更新。
