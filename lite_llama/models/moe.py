@@ -124,6 +124,74 @@ class ExpertPlacement(NamedTuple):
         )
 
 
+class SharedExpertPlacement(NamedTuple):
+    """Immutable ownership metadata for one combined shared expert."""
+
+    parallel_mode: str
+    world_size: int
+    rank: int
+    shared_intermediate_size: int
+    local_intermediate_size: int
+    intermediate_start: int
+    intermediate_end: int
+    reduce_output: bool
+
+    @classmethod
+    def from_config(
+        cls,
+        *,
+        shared_intermediate_size: int,
+        tp_config=None,
+    ) -> "SharedExpertPlacement":
+        world_size = getattr(tp_config, "world_size", 1)
+        rank = getattr(tp_config, "rank", 0)
+        parallel_mode = getattr(tp_config, "moe_parallel_mode", "tp")
+        if parallel_mode not in {"tp", "ep"}:
+            raise ValueError(
+                "moe_parallel_mode must be 'tp' or 'ep', got "
+                f"{parallel_mode!r}"
+            )
+        if type(world_size) is not int or world_size <= 0:
+            raise ValueError("world_size must be a positive integer")
+        if type(rank) is not int or not 0 <= rank < world_size:
+            raise ValueError("rank must be an integer in [0, world_size)")
+        if (
+            type(shared_intermediate_size) is not int
+            or shared_intermediate_size <= 0
+        ):
+            raise ValueError(
+                "shared_intermediate_size must be a positive integer"
+            )
+        if (
+            parallel_mode == "tp"
+            and shared_intermediate_size % world_size != 0
+        ):
+            raise ValueError(
+                "shared_intermediate_size="
+                f"{shared_intermediate_size} must be divisible by tensor "
+                f"parallel world_size={world_size}"
+            )
+
+        if parallel_mode == "tp":
+            local_intermediate_size = shared_intermediate_size // world_size
+            intermediate_start = rank * local_intermediate_size
+            reduce_output = world_size > 1
+        else:
+            local_intermediate_size = shared_intermediate_size
+            intermediate_start = 0
+            reduce_output = False
+        return cls(
+            parallel_mode=parallel_mode,
+            world_size=world_size,
+            rank=rank,
+            shared_intermediate_size=shared_intermediate_size,
+            local_intermediate_size=local_intermediate_size,
+            intermediate_start=intermediate_start,
+            intermediate_end=intermediate_start + local_intermediate_size,
+            reduce_output=reduce_output,
+        )
+
+
 class SoftmaxTopKRouter(nn.Module):
     """Softmax top-k router shared by MoE model adapters."""
 
@@ -636,6 +704,128 @@ class RoutedExpertExecutor(nn.Module):
 
             final_hidden_states = tp_all_reduce(final_hidden_states)
         return final_hidden_states
+
+
+def _shared_expert_all_reduce(output: torch.Tensor) -> torch.Tensor:
+    """Reduce a TP shared-expert partial through the existing process group."""
+
+    from ..executor.tp_utils import tp_all_reduce
+
+    return tp_all_reduce(output)
+
+
+class SharedExpertMLP(nn.Module):
+    """One combined shared SwiGLU expert with explicit reduce ownership."""
+
+    def __init__(
+        self,
+        hidden_size: int,
+        shared_intermediate_size: int,
+        tp_config=None,
+        dtype: torch.dtype = torch.float16,
+    ) -> None:
+        super().__init__()
+        if type(hidden_size) is not int or hidden_size <= 0:
+            raise ValueError("hidden_size must be a positive integer")
+        placement = SharedExpertPlacement.from_config(
+            shared_intermediate_size=shared_intermediate_size,
+            tp_config=tp_config,
+        )
+        self.hidden_size = hidden_size
+        self.shared_intermediate_size = shared_intermediate_size
+        self.local_intermediate_size = placement.local_intermediate_size
+        self.tp_config = tp_config
+        self.placement = placement
+        self.gate_up_weight = nn.Parameter(
+            torch.empty(
+                hidden_size,
+                2 * self.local_intermediate_size,
+                dtype=dtype,
+            )
+        )
+        self.down_weight = nn.Parameter(
+            torch.empty(
+                self.local_intermediate_size,
+                hidden_size,
+                dtype=dtype,
+            )
+        )
+
+    def _forward_local(self, hidden_states: torch.Tensor) -> torch.Tensor:
+        gate_up = hidden_states @ self.gate_up_weight
+        gate, up = gate_up.chunk(2, dim=-1)
+        activated = RoutedExpertExecutor._swiglu(gate, up)
+        return activated @ self.down_weight
+
+    def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
+        output = self._forward_local(hidden_states)
+        if self.placement.reduce_output:
+            output = _shared_expert_all_reduce(output)
+        return output
+
+
+class DeepSeekMoeBlock(nn.Module):
+    """Minimal routed-plus-shared DeepSeek-V2/V3 MoE orchestration."""
+
+    def __init__(
+        self,
+        hidden_size: int,
+        num_experts: int,
+        top_k: int,
+        intermediate_size: int,
+        shared_intermediate_size: int,
+        num_groups: int,
+        topk_groups: int,
+        score_func: str,
+        topk_method: str,
+        norm_topk_prob: bool = True,
+        routed_scaling_factor: float = 1.0,
+        tp_config=None,
+        layer_index: int | None = None,
+        dtype: torch.dtype = torch.float16,
+    ) -> None:
+        super().__init__()
+        self.hidden_size = hidden_size
+        self.gate = DeepSeekGroupedTopKRouter(
+            hidden_size=hidden_size,
+            num_experts=num_experts,
+            top_k=top_k,
+            num_groups=num_groups,
+            topk_groups=topk_groups,
+            score_func=score_func,
+            topk_method=topk_method,
+            norm_topk_prob=norm_topk_prob,
+            routed_scaling_factor=routed_scaling_factor,
+            dtype=dtype,
+        )
+        self.experts = RoutedExpertExecutor(
+            hidden_size=hidden_size,
+            num_experts=num_experts,
+            intermediate_size=intermediate_size,
+            tp_config=tp_config,
+            layer_index=layer_index,
+            dtype=dtype,
+        )
+        self.shared_experts = SharedExpertMLP(
+            hidden_size=hidden_size,
+            shared_intermediate_size=shared_intermediate_size,
+            tp_config=tp_config,
+            dtype=dtype,
+        )
+        self.last_router_logits: Optional[torch.Tensor] = None
+
+    def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
+        original_shape = hidden_states.shape
+        flat_states = hidden_states.reshape(-1, self.hidden_size)
+        routing = self.gate(flat_states)
+        self.last_router_logits = routing.router_logits
+        routed_output = self.experts(
+            flat_states,
+            routing.selected_experts,
+            routing.routing_weights,
+        )
+        shared_output = self.shared_experts(flat_states)
+        return (routed_output + shared_output).reshape(original_shape)
 
 
 class Qwen3MoeExperts(RoutedExpertExecutor):

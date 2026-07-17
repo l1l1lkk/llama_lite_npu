@@ -707,3 +707,193 @@ checkpoint可用。
 
 `VERSION`仍为`0.0.14rc1`；目标`0.0.15rc1`只在所有后续生产、checkpoint、
 CPU/NPU和发布门通过后的最终发布阶段更新。
+
+## 13. Phase 6D1：Shared Expert与最小Block编排
+
+### 13.1 范围与API
+
+Phase 6D1只建立shared expert的权重/归约所有权，以及把Phase 6C router、既有
+routed executor和shared MLP组合起来的最小block。本阶段新增：
+
+```python
+class SharedExpertPlacement(NamedTuple): ...
+class SharedExpertMLP(nn.Module): ...
+class DeepSeekMoeBlock(nn.Module): ...
+```
+
+`SharedExpertPlacement`是不可变纯Python元数据，不持有tensor或module，也不进入
+state dict。字段为：
+
+```text
+parallel_mode, world_size, rank,
+shared_intermediate_size, local_intermediate_size,
+intermediate_start, intermediate_end, reduce_output
+```
+
+它独立于routed `ExpertPlacement`，shared expert不占用global routed expert ID。
+非法mode、非正world size、越界rank、非正shared intermediate，以及TP不能整除
+均在构造时fail-closed。
+
+### 13.2 TP/EP ownership与归约
+
+设完整shared intermediate宽度为`I_s`：
+
+| 模式 | 本rank参数 | local区间 | local output后的动作 |
+| --- | --- | --- | --- |
+| world size 1 | 完整`I_s` | `[0,I_s)` | 不归约 |
+| TP，world size `W` | `I_s/W`连续切片 | `[r*I_s/W,(r+1)*I_s/W)` | 恰好一次sum all-reduce |
+| EP，world size `W` | 每rank完整复制`I_s` | `[0,I_s)` | 不归约 |
+
+TP中每个rank只计算一个intermediate partial，两个rank的FP32 partial之和必须对齐
+Phase 6B完整shared oracle，因此需要一次reduce。EP中每个rank都拥有同一个完整
+shared expert；routed experts虽然按global expert slice产生不同partial并由既有
+executor归约，shared output却已经完整，若再按EP rank求和会得到`W`倍放大。
+所以EP shared禁止reduce，也禁止把各rank shared结果相加当oracle。
+
+归约调用封装在窄范围module helper `_shared_expert_all_reduce`中，真实包加载路径
+仍调用现有`tp_all_reduce`。`SharedExpertMLP.forward`只在冻结placement的
+`reduce_output=True`时调用helper；测试可patch helper精确锁定调用次数，不需要
+引入完整`lite_llama`包或修改`tp_utils`。真实collective不属于本阶段结论。
+
+### 13.3 SharedExpertMLP数学与布局
+
+本rank runtime参数布局为：
+
+```text
+gate_up_weight [H, 2*I_local]  # gate后up
+down_weight    [I_local, H]
+```
+
+local数学为：
+
+```text
+gate_up = hidden @ gate_up_weight
+gate, up = split(gate_up)
+activated = silu(gate) * up
+local_output = activated @ down_weight
+```
+
+CPU FP32结果直接与Phase 6B独立`deepseek_shared_expert_reference`比较。TP测试从
+完整oracle权重独立切出gate、up和down的连续区间，再验证两个生产local partial
+之和；没有用生产shared函数同时充当full oracle和partial oracle。NPU tensor未来
+可复用既有SwiGLU策略，但D1没有运行或声称NPU、Graph或性能结果。
+
+单独`SharedExpertMLP` state dict精确为：
+
+```text
+gate_up_weight
+down_weight
+```
+
+placement与reduce ownership均不产生额外参数或buffer。
+
+### 13.4 最小DeepSeekMoeBlock
+
+block只执行以下编排：
+
+```text
+保存original shape并flatten
+RoutingResult = gate(flat)
+last_router_logits = RoutingResult.router_logits
+routed_output = experts(flat, selected_experts, routing_weights)
+shared_output = shared_experts(flat)
+output = routed_output + shared_output
+reshape回original shape
+```
+
+`RoutedExpertExecutor`继续独占routed TP/EP partial的reduce，`SharedExpertMLP`独占
+shared TP partial的reduce；block源码不调用`tp_all_reduce`或shared reduce helper，
+避免double reduce。2D、3D和`T=0`均保持shape语义，`last_router_logits`保留router
+返回tensor的identity。
+
+V2 block state dict精确为：
+
+```text
+gate.weight
+experts.gate_up_weight
+experts.down_weight
+shared_experts.gate_up_weight
+shared_experts.down_weight
+```
+
+V3额外包含：
+
+```text
+gate.e_score_correction_bias
+```
+
+未来checkpoint adapter负责把官方gate/up/down与shared参数转换到上述runtime布局；
+当前key契约不能写成checkpoint loader已经支持DeepSeek。
+
+### 13.5 Reference、mock collective与兼容门
+
+Phase 6B reference仍是完整routed/shared FP32 oracle，并保持字节不变。D1生产测试
+分别验证：single-rank V2/V3 block对完整oracle、TP shared partial sum、EP每rank
+完整shared输出，以及mock reduce调用次数：
+
+```text
+TP world size 2: 1次
+EP world size 2: 0次
+world size 1:    0次
+```
+
+mock只验证调用ownership，不冒充HCCL/NPU collective。AST门锁定既有
+`RoutingResult`、router、`ExpertPlacement`、`RoutedExpertExecutor`及Qwen类未改，
+尤其既有executor `forward`中的all-reduce位置没有移动。新block无block级reduce，
+shared forward无`.item()`/`.tolist()`等host sync。dependency-light direct-file
+loader继续可构造并运行single-rank CPU block。
+
+### 13.6 TDD与真实结果
+
+RED命令：
+
+```text
+python -m unittest \
+  tests.models.test_deepseek_moe_block.\
+DeepSeekMoeBlockContractTest.\
+test_shared_expert_placement_is_available -v
+```
+
+实现前真实结果：1 test error，`AttributeError: module ... has no attribute
+'SharedExpertPlacement'`，exit code `1`。RED未stage、commit或push。最小API加入后
+同一定向测试1/1通过，exit code `0`。
+
+完整D1 focused命令：
+
+```text
+python -m unittest tests.models.test_deepseek_moe_block -v
+```
+
+真实结果：12 tests全部通过，exit code `0`。覆盖placement公式/错误、shared
+FP32 oracle、TP/EP ownership、reduce call-count、V2/V3 block、2D/3D/T=0、
+last logits identity、state dict、AST与direct loader。
+
+Phase 6C router和Phase 6B reference联合回归：
+
+```text
+python -m unittest \
+  tests.models.test_deepseek_moe_router \
+  tests.models.test_deepseek_moe_reference -v
+```
+
+真实结果：36 tests全部通过，exit code `0`。Qwen回归：
+
+```text
+python -m unittest \
+  tests.models.test_moe_reference \
+  tests.models.test_qwen3_moe -v
+```
+
+真实结果：56 tests全部通过，exit code `0`。仓库文档/evidence门仍为8 tests，
+release validator默认discovery仍为160 tests；最终复验均通过，exit code `0`，
+独立`git diff --check`也为`0`。这些均为本地CPU结果。
+
+### 13.7 明确不包含的能力与版本
+
+Phase 6D1不包含checkpoint adapter、DeepSeek config/model registry、dense-vs-MoE
+layer schedule、完整CausalLM、MLA、all-to-all/EPLB、非连续expert map、量化、
+服务器/NPU、真实collective、Graph或性能优化。D1 block只是可独立验证的最小编排，
+不能据此加载官方checkpoint或声称完整模型可用。
+
+`VERSION`仍为`0.0.14rc1`；目标`0.0.15rc1`只在后续checkpoint、模型集成、
+CPU/NPU与发布门全部完成后的最终发布阶段更新。
