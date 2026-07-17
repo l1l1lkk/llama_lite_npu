@@ -1325,3 +1325,168 @@ vLLM-Ascend非平凡源码。仓库仍缺顶层LICENSE/NOTICE，正式对外复�
 attention/KV/RoPE、all-to-all/EPLB、非连续expert map、量化、服务器/NPU、Graph及性能
 优化。`VERSION`仍为`0.0.14rc1`；目标`0.0.15rc1`只在后续完整模型边界、真实并行/NPU
 与发布门全部完成后的最终发布阶段更新。
+
+## 16. Phase 6E2：单层流式safetensors MoE checkpoint reader
+
+### 16.1 目标、API与非目标
+
+Phase 6E2只把真实HF safetensors文件布局连接到已经验收的6D2 canonicalizer和6E1
+MoE component，新增两个dependency-light API：
+
+```python
+load_deepseek_moe_checkpoint_config(checkpoints_dir)
+load_deepseek_moe_canonical_layer(checkpoints_dir, config, layer_index)
+```
+
+第一个API只用stdlib `json`/`pathlib`读取`config.json`，然后调用
+`DeepSeekMoeConfig.from_dict`，所以required source fields、architecture/model精确配对、
+alias冲突和V4拒绝仍由同一公共契约负责。它不使用`AutoConfig`、`transformers`或
+`trust_remote_code`。
+
+第二个API只接受`config.is_moe_layer(layer_index)`为true的明确层号；bool、越界、dense
+或未命中frequency的层均fail-closed。它返回该层6D2 canonical keys，不构造decoder、
+attention、MLA、KV、RoPE、CausalLM或完整checkpoint state。
+
+### 16.2 单文件与标准index布局
+
+reader只接受两种互斥布局：
+
+| 布局 | 契约 |
+| --- | --- |
+| 单文件 | 目录中恰好一个`*.safetensors`，且没有index |
+| 分片 | 唯一且精确命名为`model.safetensors.index.json`的标准index |
+
+多个safetensors但没有index、多个index、非标准index名、缺失`weight_map`、空或非mapping
+的`weight_map`、非字符串key/value均明确拒绝。config和index都使用duplicate-key
+检测；重复JSON key不会按JSON解析器默认行为静默覆盖。
+
+index中的每个shard值必须是非空相对路径、以`.safetensors`结尾、不能含绝对路径、
+Windows drive或`..`父级逃逸；resolve后必须仍位于checkpoint目录内且文件存在。
+required key必须全部出现在index，映射的真实shard也必须包含对应tensor。以上门不能用
+本地路径重写或silent fallback绕过。
+
+### 16.3 Target-only读取与canonical委托
+
+一个V2目标层只读取：router、`E`组gate/up/down和shared gate/up/down；V3额外读取
+`e_score_correction_bias`。V2即使文件中有bias也不会请求它。另一MoE层、dense层及
+unrelated tensor只存在于safetensors metadata/index时不会调用`get_tensor`。
+
+required keys先按shard分组，每个相关shard在一个`safe_open(..., framework="pt",
+device="cpu")` context中最多打开一次；纯unrelated shard不打开。任一缺tensor或后续
+shape/dtype验证失败时context仍关闭，函数不返回partial state。读取出的原始mapping原样
+交给`stack_deepseek_moe_weights`：reader不复制gate/up融合、expert排序或bias转换数学。
+返回tensor均在CPU，普通权重保持源dtype，V3 bias继续由6D2契约规范化为FP32。
+
+这里的“流式”只表示不读取完整checkpoint、只逐相关shard获取一个目标层。峰值内存仍
+可能同时包含该层的HF源tensor和stack/cat产生的canonical tensor；本阶段没有证明整模型
+峰值、异步IO、mmap生命周期或性能收益。
+
+### 16.4 Strict-load与独立correctness
+
+V2与V3真实临时safetensors测试分别把reader输出交给
+`prepare_deepseek_moe_layer_state`，再对`build_deepseek_moe_block`执行
+`load_state_dict(strict=True)`。小shape的`T=0`与多token输出继续对齐Phase 6B独立
+`deepseek_moe_reference`，而不是用reader或6D2 converter自身充当数值oracle。
+
+分片V3测试把目标keys分布到两个真实shard，并放置第三个只含另一层/unrelated tensors
+的shard；记录证明两个相关shard各打开一次、第三个不打开、`get_tensor`集合精确等于
+目标层required keys。单文件V2测试同样证明另一层、dense tensor、unrelated tensor与
+额外bias均未读取。
+
+### 16.5 TDD与真实结果
+
+RED命令：
+
+```text
+python -m unittest \
+  tests.models.test_deepseek_moe_checkpoint.\
+DeepSeekMoeCheckpointContractTest.test_checkpoint_reader_api_exists -v
+```
+
+实现前真实结果：1 test error，缺少
+`lite_llama/utils/deepseek_moe_checkpoint.py`，`FileNotFoundError`，exit code `1`；
+RED未stage、commit或push。
+
+focused GREEN命令：
+
+```text
+python -m unittest tests.models.test_deepseek_moe_checkpoint -v
+```
+
+真实结果：14 tests全部通过，exit code `0`。覆盖真实单文件/分片safetensors、配置与
+index JSON、重复key、路径安全、target-only读取/open count、异常context关闭、6D2
+shape/dtype fail-closed、strict-load、`T=0`和独立reference。完整回归中，Phase 6E1
+component 18 tests、冻结DeepSeek 63 tests、Qwen 56 tests、repository docs/evidence
+8 tests全部通过；release validator discover 160 tests通过，所有命令exit code `0`。
+结果仅代表本地CPU。
+
+### 16.6 冻结边界与后续阻塞
+
+本阶段不修改`model_config.py`、`deepseek_moe.py`、`deepseek_moe_weights.py`、`moe.py`、
+`tp_utils.py`、`apply_weight_convert.py`、executor/registry或Phase 6B-E1测试。reader只依赖
+stdlib、PyTorch、safetensors及当前DeepSeek config/weight helper；direct-file测试使用
+明确alias，没有broad `ImportError` fallback。
+
+不接入`apply_weight_convert` CLI：该工具面向完整模型保存，而当前DeepSeek MLA、
+attention、完整decoder/model与CausalLM仍未实现，接入会制造“完整checkpoint可运行”的
+错误能力表述。仍不支持V4、全模型loader/registry、all-to-all/EPLB、量化、服务器/NPU、
+Graph或性能优化。仓库缺顶层LICENSE/NOTICE的既有风险不变。本阶段不访问真实权重、
+服务器或NPU；`VERSION`仍为`0.0.14rc1`。
+
+### 16.7 Phase 6E2-R1：配置provenance与自动发现文件containment
+
+R1把`config.json`确定为单层checkpoint reader的配置事实源。每次调用
+`load_deepseek_moe_canonical_layer`都会从同一个resolved checkpoint root重新读取并通过
+`DeepSeekMoeConfig.from_dict`审计`config.json`；不跨调用缓存配置。随后比较文件配置与
+调用者传入配置的全部`init=True` dataclass字段，包括architecture/model/policy、H、层数、
+dense I、E/K、routed/shared I、group/top-k group、norm/scale、层调度和dtype。BaseConfig
+内部`init=False`的alias解析元数据不属于MoE语义，不参与比较。
+
+任一语义字段不一致都会列出differing fields并抛出`ValueError`，且发生在
+`_layer_file_mapping`、`safe_open`和`get_tensor`之前。由此，V3目录配V2调用配置不能再
+静默忽略correction bias，反向错配也不会先打开权重再以“缺bias”失败；调用者加载配置
+后若`config.json`被替换或shape/schedule/scale等关键字段漂移，同样fail-closed。直接
+dataclass构造但语义完全相同的配置，以及官方alias/canonical输入经过规范化后得到的等价
+配置继续接受。
+
+R1同时为三类自动发现文件统一增加resolved-root containment：
+
+- `config.json`；
+- 自动发现的唯一标准`model.safetensors.index.json`；
+- 无index时自动发现的唯一single safetensors文件。
+
+发现路径必须存在、resolve后仍位于resolved checkpoint root内且是普通文件。指向root外
+的symlink或受控outside path会被拒绝；指向root内的symlink不因symlink身份被禁止。
+indexed shard原有的absolute/drive/`..`/resolve containment契约保持不变。测试不依赖
+Windows symlink权限：窄内部helper用真实outside Path锁定escape拒绝，并通过mock记录证明
+config/index/single三个生产调用点都经过该helper。
+
+R1真实RED命令运行4个定向tests：V3/V2双向错配、加载后配置替换与15组语义漂移、outside
+containment以及三个自动发现调用点。修复前结果为16 failures、3 errors，exit code `1`：
+V3目录+V2配置仍返回，反向错配打开权重后才缺bias，全部语义漂移均未在IO前拒绝，且
+containment helper尚不存在。RED未stage、commit或push。
+
+最终定向GREEN为5 tests全部通过，exit code `0`；mismatch测试明确验证file mapping、
+`safe_open`与`get_tensor`调用数均为0。完整checkpoint focused suite增至19 tests；完整回归
+仍包括component 18、冻结DeepSeek 63、Qwen 56、docs/evidence 8和release validator 160。
+所有结论仅限本地CPU和单层reader；full loader、MLA、服务器/NPU/Graph边界不变。
+
+### 16.8 Phase 6E2-R2：拒绝行为覆盖型配置子类
+
+R1虽然比较了`DeepSeekMoeConfig`的全部公开初始化字段，但原入口使用`isinstance`接受
+子类，随后仍调用传入对象的`is_moe_layer`与`uses_correction_bias`。字段完全相等的行为
+覆盖型子类因此可以改变层调度，或者让V3层省略correction bias，而不触发字段provenance
+差异。这不是合法的配置扩展点。
+
+R2将public layer loader的输入门收紧为`type(config) is DeepSeekMoeConfig`。子类和代理
+在重新解析weight mapping、打开safetensors或读取tensor之前即以`TypeError`拒绝。完成
+文件配置与调用者配置的逐字段相等检查后，层范围、MoE调度、required key集合、expert数
+以及是否需要correction bias均统一使用从同一个checkpoint root当次重新构造的
+`file_config`。调用签名和返回结构不变，也不缓存跨调用配置。
+
+真实RED覆盖两个独立攻击面：一个子类覆盖`uses_correction_bias=False`，另一个覆盖
+`is_moe_layer=True`并请求原配置中的dense层。修复前命令运行2 tests，两个都完成真实
+权重读取且未抛预期`TypeError`，结果为2 failures、exit code `1`。最小修复后同一命令
+2 tests全部通过、exit code `0`，并锁定`_layer_file_mapping`、`safe_open`和`get_tensor`
+调用数均为0。R1的config/index/single containment调用点与indexed-shard路径契约保持
+不变；R2不扩展TOCTOU威胁模型，也不引入full loader、服务器/NPU、Graph或完整模型能力。
