@@ -43,6 +43,10 @@ def supports_decode_graph(
     model_type = model_type.lower()
     if model_type in {"qwen3_vl", "llava"}:
         return False
+    # DeepSeek support is currently limited to the MoE component boundary.
+    # Full-model decode and Graph correctness have not been validated yet.
+    if model_type in {"deepseek_v2", "deepseek_v3"}:
+        return False
     # EP compacts locally-owned assignments with torch.nonzero. Ascend's
     # aclnnNonzero synchronizes its stream and cannot run while that stream is
     # being captured; the failed capture may poison the stream instead of

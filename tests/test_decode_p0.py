@@ -114,6 +114,16 @@ class PagedKvIncrementalUpdateTest(unittest.TestCase):
 
 
 class NpuGraphBucketTest(unittest.TestCase):
+    def test_deepseek_moe_decode_graph_is_fail_closed(self):
+        for model_type in (
+            "deepseek_v2",
+            "DeepSeek_V2",
+            "deepseek_v3",
+            "DeepSeek_V3",
+        ):
+            with self.subTest(model_type=model_type):
+                self.assertFalse(npu_graph.supports_decode_graph(model_type))
+
     def test_qwen3_moe_can_attempt_decode_graph_capture(self):
         self.assertTrue(npu_graph.supports_decode_graph("qwen3"))
         self.assertTrue(npu_graph.supports_decode_graph("qwen3_moe"))

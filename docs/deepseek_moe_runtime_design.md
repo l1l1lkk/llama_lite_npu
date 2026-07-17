@@ -1490,3 +1490,105 @@ R2将public layer loader的输入门收紧为`type(config) is DeepSeekMoeConfig`
 2 tests全部通过、exit code `0`，并锁定`_layer_file_mapping`、`safe_open`和`get_tensor`
 调用数均为0。R1的config/index/single containment调用点与indexed-shard路径契约保持
 不变；R2不扩展TOCTOU威胁模型，也不引入full loader、服务器/NPU、Graph或完整模型能力。
+
+## 17. Phase 6F1：单卡NPU reference correctness与durable门禁
+
+### 17.1 Phase 6F1A-R5真实硬件结论
+
+冻结commit `75c5e68e8186e603ee5ec13d6900248b0ee30bb1`在物理NPU 6（Ascend
+910B3）上完成一次且仅一次正式probe，最终分类为
+`SINGLE_CARD_DEEPSEEK_MOE_REFERENCE_ALIGNED`。测试矩阵为V2/V3乘FP16/BF16，固定
+`T=4, H=64, E=8, K=2, I=32, shared_I=32, groups=2, topk_groups=1`；基础seed为
+`20260717`，四个case按冻结脚本使用`20260717/20260818/20260919/20261020`。
+
+四组均使用目标dtype在CPU先量化的输入与权重，Phase 6B独立FP32 reference作为唯一
+oracle。router logits、routing weights、direct routed local、public executor、shared
+local与完整block统一通过`rtol=1e-2, atol=1e-2`；selected expert IDs全部exact，所有
+tensor finite，strict-load的missing/unexpected均为0，`last_router_logits` identity与
+V2五key/V3六key state dict契约保持。每个case真实调用GMM 6次、进入grouped local 3次，
+R5 probe的派生审计字段记录`fallback_count=0`；该字段属于repo外probe结果，不是
+`RoutedExpertExecutor`的运行时属性。
+
+`LITE_LLAMA_MOE_VALIDATE=1`使public executor与完整block各执行一次eager数值对照，所以
+每个case记录2次eager validation call；这些调用是显式校验，不是backend fallback。V3
+correction bias保持FP32，确实改变selected set；最终combine weights仍从未加bias的原始
+sigmoid score gather并归一，和错误的biased combine存在稳定非零差异。group边界与K/K+1
+边界均严格大于0，不依赖tie顺序。
+
+完整repo外证据的`SHA256SUMS` self SHA为
+`200e8c0e04f60e8ad2bec45fc2520f5082994961586bb378377a82c1204406fb`。日志中的
+ArgSort AiCPU提示与`custom_fwd` FutureWarning只作为环境告警记录；本阶段不据此给出性能
+结论。该证据仍只覆盖单卡、小shape MoE component，不覆盖TP2/EP2、checkpoint file
+reader、完整模型、生成或性能。
+
+### 17.2 Phase 6F1B durable NPU regression
+
+新增`tests.npu.test_deepseek_moe`把上述合同固化为显式硬件门。测试通过真实
+`torch_npu.npu_grouped_matmul`与`_forward_grouped_local`计数证明GMM路径实际进入，并把
+validation eager计数与fallback语义分开。GMM、grouped、backend decision和eager validation
+计数必须分别精确等于6、3、2、2；计数精确匹配时表述为“未观察到backend fallback”，测试
+不会读取不存在的`fallback_count`属性。CPU fixture只负责构造稳定非tie输入与canonical
+权重布局；routing、routed/shared expert及完整block的expected output全部来自Phase 6B
+reference，不使用production路径自证。router ABI还显式锁定logits为`[T,E]`/case dtype、
+weights为`[T,K]`/case dtype、IDs为`[T,K]`/`int64`，并要求logits/weights有限。
+
+显式服务器命令为：
+
+```text
+ASCEND_RT_VISIBLE_DEVICES=6 LITE_LLAMA_MOE_BACKEND=gmm \
+  LITE_LLAMA_MOE_VALIDATE=1 python -m unittest \
+  tests.npu.test_deepseek_moe -v
+```
+
+Phase 6F1B只形成本地候选；本地没有NPU时该测试会被`skipUnless`清晰跳过，不能写成硬件
+pass。只有本候选经审查、提交后在910B3上显式复跑成功，才能升级为durable hardware
+pass证据。本阶段不访问服务器或NPU。
+
+### 17.3 DeepSeek decode Graph fail-closed
+
+DeepSeek当前只完成MoE component边界，完整decoder/CausalLM与decode Graph correctness尚未
+验收。因此`supports_decode_graph`对`deepseek_v2`和`deepseek_v3`（含大小写规范化输入）
+显式返回false。该最小policy变更不影响Qwen3/Qwen3-MoE TP允许、Qwen3-MoE EP拒绝以及
+其他既有策略，也不表示已经执行DeepSeek NPUGraph测试。
+
+定向RED命令为：
+
+```text
+python -m unittest \
+  tests.test_decode_p0.NpuGraphBucketTest.\
+test_deepseek_moe_decode_graph_is_fail_closed -v
+```
+
+修改policy前运行1 test、4个subtests均因当前返回true失败，exit code `1`；最小修复后同一
+命令1 test通过，exit code `0`。本阶段仍不覆盖T=0、routed GEMV、NPUGraph、TP/EP
+collective、checkpoint file reader、完整模型或性能；`VERSION`仍为`0.0.14rc1`。
+
+### 17.4 Phase 6F1B-R1 fixture信号强度门
+
+初版fixture把普通routed/shared expert随机权重缩放为`0.02`，导致四case的routed、shared
+和full独立oracle最大绝对值只有约`5.02e-5`到`1.22e-4`；错误的全零输出也会被
+`atol=1e-2`吞没。R1新增不依赖NPU的长期CPU contract test，要求每条oracle信号满足
+`abs().max() > 2 * ATOL`，并显式证明`zeros_like(expected)`在冻结
+`rtol=1e-2, atol=1e-2`下必须触发`assert_close`失败。
+
+真实RED命令为：
+
+```text
+python -m unittest \
+  tests.npu.test_deepseek_moe.DeepSeekMoeFixtureContractTest.\
+test_reference_signals_exceed_absolute_tolerance -v
+```
+
+调整前1 test包含12个失败subtests，exit code `1`。唯一fixture数值修复是把普通expert随机
+权重缩放从`0.02`改为`0.2`；router logits构造、correction bias、seed、shape、dtype与
+容差均保持不变。相同focused命令随后1 test通过，exit code `0`。四case的
+`routed/shared/full`最大绝对值分别为：
+
+- V2 FP16：`0.046630 / 0.090662 / 0.085116`；
+- V2 BF16：`0.063886 / 0.096232 / 0.129344`；
+- V3 FP16：`0.050432 / 0.097019 / 0.093645`；
+- V3 BF16：`0.050206 / 0.066679 / 0.084512`。
+
+所有12条zero-output负对照均被拒绝。该门只修复fixture可辨识度，不改变生产MoE数学、
+Graph policy、correctness容差或R5历史硬件结论；放大后的durable NPU case仍需在910B3上
+显式复跑后才能称为硬件通过。
