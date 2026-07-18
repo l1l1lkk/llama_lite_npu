@@ -1592,3 +1592,73 @@ test_reference_signals_exceed_absolute_tolerance -v
 所有12条zero-output负对照均被拒绝。该门只修复fixture可辨识度，不改变生产MoE数学、
 Graph policy、correctness容差或R5历史硬件结论；放大后的durable NPU case仍需在910B3上
 显式复跑后才能称为硬件通过。
+
+## 18. v0.0.15rc1 持久化发布与硬件证据
+
+### 18.1 版本能力边界
+
+`v0.0.15rc1`把Phase 6B到6F形成的接口和证据固化为DeepSeek V2/V3 MoE组件兼容能力。
+版本范围包括独立CPU FP32 reference、生产grouped router、routed/shared expert block、
+连续TP与replicated-token EP ownership、HF到canonical再到runtime的权重布局、官方字段驱动
+的组件配置与单层bounded safetensors reader。`RoutingResult`三元tuple ABI和既有Qwen3
+默认行为保持不变。
+
+该组件不是完整`DeepSeekModel`或CausalLM。MLA、attention、KV cache、RoPE、完整decoder、
+完整checkpoint/model loader、生成链路与模型registry仍未实现。W8A8和其他量化kernel、
+all-to-all、EPLB、非连续expert map以及DeepSeek-V4 `sqrtsoftplus`/static-hash routing均不在
+版本能力内。EP只表达token replicated、global expert连续slice的现有语义；真实TP2/EP2
+NPU collective尚未验证。
+
+DeepSeek decode Graph correctness同样没有完成。`supports_decode_graph`对
+`deepseek_v2`/`deepseek_v3`继续显式返回false，不能把Qwen dynamic Graph保护回归外推为
+DeepSeek Graph pass。本版本没有性能benchmark，不报告吞吐、TTFT、TPOT、时延或显存收益。
+
+### 18.2 Durable DeepSeek NPU门
+
+包含durable测试的提交`4c51eb88b5a7aeabf3f22fb72db7bb0c59f13ec5`在物理Atlas
+910B3 NPU 6执行一次正式命令：
+
+```text
+ASCEND_RT_VISIBLE_DEVICES=6 LITE_LLAMA_MOE_BACKEND=gmm \
+  LITE_LLAMA_MOE_VALIDATE=1 python -m unittest \
+  tests.npu.test_deepseek_moe -v
+```
+
+底层unittest命令exit code为`0`，`Ran 2`，2 passed、0 failed/error/skip。CPU fixture
+强度门和V2/V3乘FP16/BF16硬件门均真实执行；硬件case保持selected IDs exact、
+`rtol=1e-2, atol=1e-2`数值门、V3 correction bias selection-only、strict-load零
+missing/unexpected以及GMM/grouped/backend/validation计数契约。运行进程被物理NPU 6监控捕获，
+结束后设备恢复空闲。封存证据`SHA256SUMS` self SHA为
+`d9653d06d66de41a2a4207aada348c357054be138c276abd808825dee914d316`。
+
+repo外runner在底层命令成功后错误检查了不存在的测试类名，因此runner终态仍是失败；
+该false-negative不被改写成runner GO。硬件结论直接来自原始unittest exit、Ran/OK、
+零skip、negative scan与物理卡PID证据。
+
+### 18.3 Qwen保护门
+
+同一exact提交在物理Atlas 910B3 NPU 7执行一次Qwen保护命令：
+
+```text
+ASCEND_RT_VISIBLE_DEVICES=7 python -m unittest \
+  tests.npu.test_qwen3_moe_gmm -v
+```
+
+底层unittest命令exit code为`0`，`Ran 6`，6 passed、0 failed/error/skip。六项包括
+dynamic routing NPUGraph replay、通用边界/Qwen兼容、GMM local、两项routed GEMV以及
+validation-mode sparse-block检查。运行进程被物理NPU 7监控捕获，结束后设备恢复空闲；
+negative scan没有FAILED、ERROR、Traceback、OOM、HCCL、unexpected skip或positive
+fallback。封存证据`SHA256SUMS` self SHA为
+`81cbfe0581136ca84602cd694a9893c0122217ca41476b90592556fc6bcd441b`。
+
+repo外runner错误假设测试ID与最终`ok`必须位于同一日志行；首个Graph测试在ID与`ok`之间
+打印多行说明和告警，导致附加正则false-negative。runner终态仍按失败保留，不能表述为
+wrapper pass；六项硬件通过结论来自原始命令exit、unittest summary、六个实际test ID、
+negative scan与PID映射。
+
+### 18.4 证据解释限制
+
+DeepSeek 2/2与Qwen 6/6共同形成单卡组件级durable NPU correctness保护。它们不证明完整
+DeepSeek模型、完整checkpoint reader、DeepSeek Graph、TP2/EP2 collective或性能。repo外
+probe、runner和monitor只提供硬件证据，不是仓库生产能力；告警中的ArgSort AiCPU与
+FutureWarning只作环境记录，不转换为correctness失败或性能结论。

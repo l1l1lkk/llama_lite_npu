@@ -12,7 +12,7 @@ the core execution path instead of wrapping a high-level inference library.
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.7-orange)
 ![Ascend](https://img.shields.io/badge/Ascend-910B3-red)
-![Version](https://img.shields.io/badge/version-0.0.14rc1-blue)
+![Version](https://img.shields.io/badge/version-0.0.15rc1-blue)
 
 </div>
 
@@ -94,25 +94,27 @@ It is not positioned as a production replacement for vLLM-Ascend or MindIE.
 
 ## MoE Runtime Correctness
 
-v0.0.14rc1 introduces tuple-compatible generic router and routed-expert
-boundaries while preserving Qwen3 parameter names, checkpoint layouts,
-state-dict keys, and default execution behavior. An independent CPU FP32
-reference and fail-closed compact evidence validate the runtime separately from
-the optimized implementation.
+v0.0.15rc1 extends the tuple-compatible generic MoE boundary with
+DeepSeek V2/V3 component compatibility. It adds softmax/sigmoid grouped top-k,
+selection-only V3 correction bias, routed and shared experts, official-field
+configuration, HF-to-canonical-to-runtime weight layouts, and bounded
+single-layer safetensors loading. The existing Qwen3 parameter names,
+checkpoint layouts, state-dict keys, and default execution behavior remain
+unchanged.
 
-The explicit six-test MoE NPU suite passed 6/6 independently on each of two
-Atlas 910B3 devices, including the generic compatibility boundary and dynamic
-NPUGraph capture/replay. A Qwen3-30B-A3B TP2/EP2/Graph triangle and an
-independent four-layer FP32 oracle aligned both parallel paths; a final-token
-TP/EP difference was traced to a near tie rather than a placement or collective
-failure. This is correctness evidence, not a performance claim.
+An independent CPU FP32 reference is the numerical oracle. On Atlas 910B3,
+the explicit DeepSeek component command passed 2/2 on physical NPU 6 with no
+skips, covering V2/V3 × FP16/BF16 and real GMM execution. The Qwen protection
+suite passed 6/6 on physical NPU 7 with no skips. These results are component
+correctness evidence, not full-model or performance claims.
 
-The current abstraction is limited to Qwen3 softmax top-k routing and
-contiguous TP/EP placement. It does not yet implement DeepSeek grouped or
-sigmoid routing, shared experts, all-to-all, non-contiguous expert maps,
-quantized MoE execution, or MLA. See the
-[v0.0.14rc1 release report](docs/releases/v0.0.14rc1.md) and
-[correctness validation](docs/qwen3_moe_runtime_validation.md).
+The DeepSeek boundary does not implement MLA, attention, KV/RoPE, a full
+decoder/CausalLM, W8A8, all-to-all/EPLB, or non-contiguous expert maps. EP is
+limited to replicated-token contiguous expert slices; real TP2/EP2 NPU
+collectives are not yet validated. DeepSeek decode Graph remains explicitly
+fail-closed, and DeepSeek-V4 routing is unsupported. See the
+[v0.0.15rc1 release report](docs/releases/v0.0.15rc1.md) and
+[DeepSeekMoE runtime design](docs/deepseek_moe_runtime_design.md).
 
 ## Benchmarks
 
@@ -162,6 +164,7 @@ tokens:
 
 ## Current Release Notes
 
+- [v0.0.15rc1 Release Report](docs/releases/v0.0.15rc1.md) - DeepSeek V2/V3 MoE component compatibility and single-card NPU correctness.
 - [v0.0.14rc1 Release Report](docs/releases/v0.0.14rc1.md) - generic Qwen3 MoE runtime boundaries and layered reference correctness.
 - [v0.0.13rc3 Release Report](docs/releases/v0.0.13rc3.md) - fixed-output control and strict Graph ablation.
 - [v0.0.13rc2 Release Report](docs/releases/v0.0.13rc2.md) - release-validation compatibility.

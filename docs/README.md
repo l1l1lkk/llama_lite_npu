@@ -19,9 +19,12 @@
   router/executor 边界与连续 TP/EP placement。
 - [Qwen3 MoE Runtime 正确性验证](qwen3_moe_runtime_validation.md)：CPU/NPU、
   Graph、TP/EP 与独立 FP32 oracle 的分层验证证据。
+- [DeepSeekMoE Runtime 设计](deepseek_moe_runtime_design.md)：V2/V3 grouped routing、
+  shared expert、权重布局、单层 checkpoint reader 与组件级 NPU 正确性契约。
 
 ## 发布文档
 
+- [v0.0.15rc1 发布记录](releases/v0.0.15rc1.md)：DeepSeek V2/V3 MoE 组件兼容与单卡 NPU correctness。
 - [v0.0.14rc1 发布记录](releases/v0.0.14rc1.md)：通用 Qwen3 MoE runtime 边界与分层 reference correctness。
 - [v0.0.13rc3 发布记录](releases/v0.0.13rc3.md)：`min_tokens` 固定输出控制与严格 NPU Graph 消融。
 - [v0.0.13rc2 发布记录](releases/v0.0.13rc2.md)：发布验证兼容性。

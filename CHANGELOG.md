@@ -1,5 +1,49 @@
 # Changelog
 
+## [0.0.15rc1] - 2026-07-18
+
+DeepSeek V2/V3 MoE component compatibility and single-card NPU correctness release.
+
+### Added
+
+- Added an independent CPU FP32 DeepSeekMoE reference covering V2 softmax and V3 sigmoid grouped top-k routing, selection-only correction bias, routed experts, shared experts, TP intermediate partials, and replicated-token EP ownership (`1890b509`).
+- Added `GroupedTopKConfig` and `DeepSeekGroupedTopKRouter` while preserving the existing `RoutingResult` tuple ABI and Qwen3 state-dict behavior (`52a2eeaf`).
+- Added `SharedExpertPlacement`, `SharedExpertMLP`, and `DeepSeekMoeBlock` with explicit routed/shared reduction ownership (`025301a8`).
+- Added HF-to-canonical DeepSeek MoE weight conversion and TP/EP runtime layout helpers (`40b8f8a7`).
+- Added an official-field-driven `DeepSeekMoeConfig`, MoE-layer factory, and strict canonical-state adapter without registering an incomplete full model (`ff0866b8`).
+- Added a bounded single-layer safetensors reader with strict configuration provenance, target-only shard access, duplicate-key rejection, and path-containment checks (`75c5e68e`).
+- Added a durable DeepSeek NPU component suite and explicit fail-closed decode-Graph policy for DeepSeek model types (`4c51eb88`).
+
+### Changed
+
+- Extended the generic MoE runtime from Qwen3 softmax top-k compatibility to DeepSeek V2/V3 component-level grouped routing and shared-expert composition without changing Qwen3 defaults.
+- Kept correction bias in FP32 and restricted it to expert selection; combine weights continue to gather the original unmodified routing scores.
+- Kept public selected expert IDs as global `int64` values and retained contiguous TP/EP placement semantics.
+
+### Tests
+
+- Kept the DeepSeek production path aligned with an implementation-independent CPU FP32 oracle across routing, routed experts, shared experts, world-size-one, TP partials, and replicated-token EP ownership.
+- On physical Atlas 910B3 NPU 6, the explicit durable DeepSeek command exited 0 and passed 2/2 with zero skips, covering V2/V3 × FP16/BF16 and real GMM execution.
+- On physical Atlas 910B3 NPU 7, the explicit Qwen protection command exited 0 and passed 6/6 with zero skips, including dynamic NPUGraph replay and the existing GMM/GEMV correctness gates.
+- Two repository-external orchestration wrappers reported false negatives after the underlying unittest commands had succeeded: one checked an incorrect class name and one assumed each test ID and `ok` appeared on the same log line. The wrapper results remain recorded as failures and are not represented as wrapper passes.
+
+### Documentation
+
+- Added the DeepSeekMoE runtime design and the v0.0.15rc1 release report with frozen reference, layout, checkpoint-reader, Graph-policy, and hardware-evidence contracts.
+
+### Known limitations
+
+- Compatibility is limited to DeepSeek V2/V3 MoE components. MLA, attention, KV cache, RoPE, the full decoder, complete checkpoint/model loading, and `DeepSeekModel`/CausalLM integration are not implemented.
+- W8A8 and other quantized kernels are not implemented. DeepSeek-V4 `sqrtsoftplus` and static-hash routing are rejected.
+- EP remains replicated-token execution with contiguous expert slices; all-to-all, EPLB, and non-contiguous expert maps are not implemented. Real TP2/EP2 NPU collectives have not been validated for this component.
+- DeepSeek decode Graph correctness has not been validated and remains explicitly fail-closed.
+- This release adds no performance benchmark and makes no throughput, TTFT, TPOT, latency, or memory claim.
+
+### Docs
+
+- [v0.0.15rc1 release report](docs/releases/v0.0.15rc1.md)
+- [DeepSeekMoE runtime design](docs/deepseek_moe_runtime_design.md)
+
 ## [0.0.14rc1] - 2026-07-16
 
 Generic Qwen3 MoE runtime boundaries and reference-correctness release.
