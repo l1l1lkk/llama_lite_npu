@@ -11,6 +11,12 @@ import re
 from typing import Any, Mapping
 
 from .adapters import get_adapter
+from .client_profile import (
+    CLIENT_PROFILE_REQUIRED,
+    load_client_profile,
+    profile_for_plan,
+    validate_profile_file_path,
+)
 from .evalscope_client import build_evalscope_command
 from .schema import (
     CANONICAL_ENDPOINT_PATH,
@@ -199,6 +205,7 @@ def build_campaign_plan(
     base_url_override: str | None = None,
     output_root: str | Path | None = None,
     runtime_values: Mapping[str, str] | None = None,
+    client_profile: str | Path | None = None,
 ) -> dict[str, Any]:
     spec: CampaignSpec = load_campaign(campaign)
     if framework not in spec.frameworks:
@@ -208,6 +215,13 @@ def build_campaign_plan(
     )
     adapter = get_adapter(framework)
     runtime = validate_base_url(base_url_override or adapter.base_url)
+    loaded_client_profile = load_client_profile(client_profile) if client_profile is not None else None
+    client_environment = dict(spec.client_environment)
+    if loaded_client_profile is not None:
+        for name, value in loaded_client_profile["required_environment"].items():
+            if name in client_environment and client_environment[name] != value:
+                raise ValueError(f"client environment conflict for {name}")
+            client_environment[name] = value
     workload = spec.workload
     dataset_contract = _load_workload_contract(dict(workload))
     contract = {
@@ -225,6 +239,14 @@ def build_campaign_plan(
         "fixed_output": dict(spec.fixed_output),
         "total_timeout_s": spec.total_timeout_s,
     }
+    if loaded_client_profile is not None and not unresolved_runtime_values:
+        if contract["tokenizer"] != loaded_client_profile["tokenizer"]["resolved_path"]:
+            raise ValueError("model tokenizer binding does not match verified client profile tokenizer identity")
+    client_executable = (
+        loaded_client_profile["evalscope_executable"]
+        if loaded_client_profile is not None
+        else CLIENT_PROFILE_REQUIRED
+    )
     result_root = (
         Path(output_root)
         if output_root is not None
@@ -256,6 +278,7 @@ def build_campaign_plan(
                 run,
                 base_url=runtime["base_url"],
                 output_dir=(result_root / relative / "client/warmup/evalscope").as_posix(),
+                client_executable=client_executable,
                 phase="warmup",
             )
             run["formal_command"] = build_evalscope_command(
@@ -263,6 +286,7 @@ def build_campaign_plan(
                 run,
                 base_url=runtime["base_url"],
                 output_dir=(result_root / relative / "client/evalscope").as_posix(),
+                client_executable=client_executable,
             )
             runs.append(run)
     performance_eligible, eligibility_reasons = _eligibility(
@@ -271,6 +295,25 @@ def build_campaign_plan(
         model,
         dict(adapter.config["runtime_environment"]),
     )
+    readiness_reasons: list[str] = []
+    if unresolved_runtime_values:
+        readiness_reasons.append("model_runtime_values_unresolved")
+    if loaded_client_profile is None:
+        readiness_reasons.append("client_profile_missing")
+    profile_plan = profile_for_plan(loaded_client_profile) if loaded_client_profile is not None else None
+    preflight_command = None
+    if loaded_client_profile is not None:
+        profile_path = validate_profile_file_path(client_profile)
+        preflight_command = {
+            "argv": [
+                loaded_client_profile["python_executable"],
+                "-m",
+                "benchmarks.serving.client_preflight",
+                "--verify-profile",
+                str(profile_path),
+            ],
+            "environment": dict(client_environment),
+        }
     return {
         "schema_version": 2,
         "mode": "dry-run",
@@ -286,11 +329,16 @@ def build_campaign_plan(
         "result_namespace": spec.result_namespace,
         "runtime_bindings": resolved_runtime_values,
         "unresolved_runtime_values": unresolved_runtime_values,
-        "capability_execution_ready": not unresolved_runtime_values,
+        "client_profile_required": spec.client_profile_required,
+        "client_profile_status": "verified" if loaded_client_profile is not None else "unresolved",
+        "client_profile": profile_plan,
+        "client_preflight_command": preflight_command,
+        "execution_readiness_reasons": readiness_reasons,
+        "capability_execution_ready": not readiness_reasons,
         "framework": framework,
         "model": _model_plan(model, framework),
         "client_contract": contract,
-        "client_environment": dict(spec.client_environment),
+        "client_environment": client_environment,
         "runtime": runtime,
         "environment_contract": dict(adapter.config["runtime_environment"]),
         "graph_contract": dict(spec.graph),
@@ -308,6 +356,10 @@ def main() -> int:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--base-url", help="Override the framework server origin for this plan")
     parser.add_argument("--output-root", help="Override the exact diagnostic/result root without creating it")
+    parser.add_argument(
+        "--client-profile",
+        help="Absolute path to a verified canonical EvalScope client profile JSON",
+    )
     parser.add_argument(
         "--runtime-value",
         action="append",
@@ -331,6 +383,7 @@ def main() -> int:
             base_url_override=args.base_url,
             output_root=args.output_root,
             runtime_values=runtime_values,
+            client_profile=args.client_profile,
         )
     except ValueError as exc:
         parser.error(str(exc))

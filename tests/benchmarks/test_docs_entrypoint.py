@@ -37,5 +37,11 @@ def test_execution_guide_keeps_bundle_rebuild_and_phase3b_contract():
         "semantic accuracy",
         "8213",
         "18000",
+        "--client-profile",
+        "client_preflight_command",
+        "__CLIENT_PROFILE_REQUIRED__",
+        "cpu_isolated_no_torch",
+        "python_prefix",
+        "samefile",
     ):
         assert marker in text

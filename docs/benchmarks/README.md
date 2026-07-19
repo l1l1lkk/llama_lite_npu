@@ -13,6 +13,8 @@
 
 当前没有 `v0.0.15rc2` 的 strict current 性能数字。[`capability_smoke.yaml`](../../benchmarks/configs/campaigns/capability_smoke.yaml) 只生成 diagnostic 计划，即使固定输出和 token 门禁通过也不得形成性能结论。
 
+Phase 3B-3 Lite capability 生命周期属于 rejected diagnostic：服务启动、health 与模型接口正常，但 EvalScope 在提交首个请求前因 client 依赖链显式导入 `torch_npu`、且 CPU client 不可见 `libhccl.so` 而失败；server request count 为 0，没有性能数字。后续 capability 必须先使用 verified client profile 完成 CPU preflight，失败时禁止启动 server/NPU。推荐隔离组合仍标记为“尚待服务器 CPU 验证”。
+
 ## Comparison scope
 
 - `capability_only`：只验证 endpoint、stream、固定输出、token usage 和指标能力；始终 `performance_eligible=false`。

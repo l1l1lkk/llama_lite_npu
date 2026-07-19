@@ -97,6 +97,7 @@ class CampaignSpec:
     publishable: bool
     aggregation_allowed: bool
     result_namespace: str
+    client_profile_required: bool
     client_environment: Mapping[str, str]
     model: str
     frameworks: tuple[str, ...]
@@ -123,6 +124,7 @@ class CampaignSpec:
             "publishable",
             "aggregation_allowed",
             "result_namespace",
+            "client_profile_required",
             "client_environment",
             "model",
             "frameworks",
@@ -146,6 +148,8 @@ class CampaignSpec:
             raise ValueError(f"unsupported campaign kind: {kind}")
         if comparison_scope not in COMPARISON_SCOPES:
             raise ValueError(f"unsupported comparison_scope: {comparison_scope}")
+        if not isinstance(value["client_profile_required"], bool):
+            raise ValueError("client_profile_required must be boolean")
         if kind == "performance" and "semantic_accuracy" in value:
             raise ValueError("semantic accuracy must be reported in a separate campaign")
         if kind == "capability":
@@ -155,6 +159,8 @@ class CampaignSpec:
                 raise ValueError("capability campaigns cannot be publishable or aggregatable")
             if str(value["result_namespace"]) != "diagnostics":
                 raise ValueError("capability campaigns require result_namespace=diagnostics")
+            if not bool(value["client_profile_required"]):
+                raise ValueError("capability campaigns require client_profile_required=true")
         frameworks = tuple(str(item) for item in value["frameworks"])
         if not frameworks or len(set(frameworks)) != len(frameworks):
             raise ValueError("frameworks must be a non-empty unique list")
@@ -192,6 +198,7 @@ class CampaignSpec:
             publishable=bool(value["publishable"]),
             aggregation_allowed=bool(value["aggregation_allowed"]),
             result_namespace=str(value["result_namespace"]),
+            client_profile_required=bool(value["client_profile_required"]),
             client_environment={str(key): str(item) for key, item in value["client_environment"].items()},
             model=str(value["model"]),
             frameworks=frameworks,

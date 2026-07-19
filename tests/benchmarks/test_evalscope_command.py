@@ -48,9 +48,10 @@ def test_evalscope_command_is_generated_only_from_contract():
         run,
         base_url=plan["adapter"]["base_url"],
         output_dir="synthetic-output",
+        client_executable="/opt/evalscope-client/bin/evalscope",
     )
 
-    assert command[:2] == ["evalscope", "perf"]
+    assert command[:2] == ["/opt/evalscope-client/bin/evalscope", "perf"]
     assert command[command.index("--dataset-path") + 1].endswith("formal.jsonl")
     assert command[command.index("--min-tokens") + 1] == "64"
     assert command[command.index("--max-tokens") + 1] == "64"
@@ -67,6 +68,19 @@ def test_independent_warmup_uses_its_own_dataset_count_and_zero_offset():
     assert command[command.index("--dataset-path") + 1].endswith("warmup.jsonl")
     assert command[command.index("--number") + 1] == "2"
     assert command[command.index("--dataset-offset") + 1] == "0"
+
+
+@pytest.mark.parametrize("executable", ("evalscope", "relative/evalscope", "/opt/evalscope;touch-x", ""))
+def test_evalscope_command_rejects_non_absolute_or_unsafe_executable(executable):
+    plan = build_campaign_plan("lite_llama", CAMPAIGN)
+    with pytest.raises(ValueError, match="executable"):
+        build_evalscope_command(
+            plan["client_contract"],
+            plan["runs"][0],
+            base_url=plan["adapter"]["base_url"],
+            output_dir="synthetic-output",
+            client_executable=executable,
+        )
 
 
 @pytest.mark.parametrize(

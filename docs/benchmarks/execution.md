@@ -10,6 +10,7 @@ python -m benchmarks.serving.run_campaign \
   --campaign benchmarks/configs/campaigns/capability_smoke.yaml \
   --runtime-value QWEN3_32B_LITE_CHECKPOINT=/data/liuke/llama_lite_npu/my_weight/Qwen3-32B \
   --runtime-value QWEN3_32B_TOKENIZER=/data/model_weights/Qwen3-32B \
+  --client-profile /data/liuke/benchmark-envs/evalscope-client/profile.json \
   --output-root /data/liuke/benchmark-diagnostics/phase3b/<commit>/lite_llama \
   --dry-run
 
@@ -19,13 +20,16 @@ python -m benchmarks.serving.run_campaign \
   --base-url http://127.0.0.1:18000 \
   --runtime-value QWEN3_32B_HF_CHECKPOINT=/data/model_weights/Qwen3-32B \
   --runtime-value QWEN3_32B_TOKENIZER=/data/model_weights/Qwen3-32B \
+  --client-profile /data/liuke/benchmark-envs/evalscope-client/profile.json \
   --output-root /data/liuke/benchmark-diagnostics/phase3b/<commit>/vllm_ascend \
   --dry-run
 ```
 
 `--output-root` 是计划中的精确根目录；dry-run 不创建它。旧 `p0_smoke` ID 已废弃，避免 capability 与 performance 各自形成“当前入口”。
 
-`--runtime-value NAME=VALUE` 可重复使用，只能绑定模型配置实际声明的完整占位符。值必须是规范的 Linux 绝对路径，按单个 argv 字符串传递，不做 shell expansion、命令替换或部分字符串替换。未绑定时仍可 planning，但计划会保留占位符、列出 `unresolved_runtime_values` 并设置 `capability_execution_ready=false`。当前框架所需 checkpoint 与公共 tokenizer 都绑定后，该字段才为 `true`；它只表示命令路径完整，不代表 NPU preflight、strict correctness 或 performance eligibility 已通过。
+`--runtime-value NAME=VALUE` 可重复使用，只能绑定模型配置实际声明的完整占位符。值必须是规范的 Linux 绝对路径，按单个 argv 字符串传递，不做 shell expansion、命令替换或部分字符串替换。未绑定时仍可 planning，但计划会保留占位符并列出 `unresolved_runtime_values`。
+
+`--client-profile` 必须指向已经通过 CPU preflight 的绝对 JSON 路径。未提供 profile 时仍可 dry-run，但 `client_profile_status=unresolved`、`capability_execution_ready=false`，命令首元素为不可执行标识 `__CLIENT_PROFILE_REQUIRED__`，绝不回退到 PATH 中的裸 `evalscope`。只有模型 runtime bindings 和 verified client profile 同时完整时，`capability_execution_ready` 才能为 `true`；它仍不代表 strict correctness 或 performance eligibility 已通过。
 
 ## Runtime endpoint
 
@@ -47,7 +51,17 @@ canonical endpoint 永远是 `POST /v1/chat/completions`。base URL 只允许带
 {"TORCH_DEVICE_BACKEND_AUTOLOAD": "0"}
 ```
 
-它只阻止 client 环境自动加载 `torch_npu` 后因缺少 `libhccl` 失败，不代表 server 禁用 NPU。环境变量作为独立序列化字段传递，不能拼进 shell argv；paired validator 会逐字段比较。
+它只阻止后端自动加载，不代表 server 禁用 NPU，也不能阻止第三方包显式执行 `import torch_npu`。Phase 3B-3 的 rejected diagnostic 已证明：EvalScope 1.7.1 经 ModelScope 1.37.0、Transformers 5.8.0 和 Accelerate 1.6.0 显式导入 `torch_npu`，最终因 CPU client 不可见 `libhccl.so` 而在请求提交前失败。因此该环境变量只是 profile 的必要条件，不是充分条件。环境变量作为独立序列化字段传递，不能拼进 shell argv；paired validator 会逐字段比较。
+
+### Client profile 与 CPU preflight
+
+client profile schema v1 冻结绝对 Python/EvalScope executable、`python_prefix` 环境根、诊断用 `python_base_prefix`、精确包版本、requirements lock SHA、关键 dist-info 指纹、EvalScope flags、tokenizer 关键文件 SHA 与 CPU load 结果。`accelerate`、`torch`、`torch_npu` 必须显式记录；当前 `cpu_isolated_no_torch` policy 要求三者为 absent/null。profile 的 overall fingerprint 不包含生成时间，但覆盖全部执行身份字段。
+
+Python executable 身份使用规范化但不跟随符号链接的路径；禁止使用 `resolve()`/`realpath()` 或仅用 `samefile` 判断 venv。这样 `<venv>/bin/python` 即使链接到基础解释器也保留所选 venv 身份。同时必须满足 executable 位于 `<python_prefix>/bin/`、live `sys.prefix` 等于 profile prefix，且 `sys.prefix != sys.base_prefix`。因此共享同一基础解释器的 sibling venv 和基础解释器本身都不能冒充目标 client。`python_prefix`、`python_base_prefix` 与 executable 都进入 overall fingerprint 和 paired 字段级比较。
+
+推荐候选为 Python 3.10、EvalScope 1.8.0、ModelScope 1.36.3、Transformers 5.5.3 的隔离 client，且不安装 Accelerate、torch 或 torch_npu。该组合目前只是只读参考环境中 imports/help 已通过，尚待服务器 Python 3.10 独立环境和本地 Qwen3 tokenizer CPU load 验证，不能提前标成服务器可用。
+
+计划中的 `client_preflight_command` 同时包含 argv 与环境，必须在任何 adapter/server/NPU lifecycle 前执行。它重新检查 executable、package/import、CPU-only local tokenizer load、EvalScope flags、lock SHA 和 dist-info fingerprint；返回非零时 orchestration guard 保证 adapter launch 次数为 0。Lite 与 vLLM-Ascend 必须使用同一个 profile fingerprint、executable 与 tokenizer identity。
 
 ## Diagnostic contract
 
@@ -138,7 +152,7 @@ aggregate 必须从 request-level evidence 生成，并且先于 `manifest.json`
 
 1. 唯一代码 SHA、模型 logical identity、framework representation、runtime bindings 与环境指纹已记录；
 2. 两框架 common client/workload contract 与 frozen JSONL SHA 完全一致；
-3. capability 运行必须 `capability_execution_ready=true`，但未校准 token 的 diagnostic 仍不得进入性能汇总；
+3. capability 运行必须具有 verified client profile，且 CPU preflight 必须先于 server/NPU；模型 bindings 与 profile 均完整后才允许 `capability_execution_ready=true`，但未校准 token 的 diagnostic 仍不得进入性能汇总；
 4. NPU 6/7 空闲，目标端口关闭，无残留 server/worker/client；不得干扰 8000 与 8012；
 5. lifecycle、warmup/formal 边界、cache state、timeout、progress watchdog 和停止门已预注册。
 

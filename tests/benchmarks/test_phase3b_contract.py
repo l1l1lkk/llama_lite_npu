@@ -208,9 +208,11 @@ def test_unbound_plan_preserves_placeholders_and_lists_only_framework_requiremen
     ),
 )
 def test_bound_plan_resolves_checkpoint_and_tokenizer_without_changing_evidence_class(
-    framework, bindings, checkpoint
+    framework, bindings, checkpoint, client_profile_path
 ):
-    plan = build_campaign_plan(framework, CAMPAIGN, runtime_values=bindings)
+    plan = build_campaign_plan(
+        framework, CAMPAIGN, runtime_values=bindings, client_profile=client_profile_path
+    )
     launch = plan["adapter"]["launch_command"]
     client = plan["runs"][0]["formal_command"]
     assert plan["capability_execution_ready"] is True
@@ -224,16 +226,17 @@ def test_bound_plan_resolves_checkpoint_and_tokenizer_without_changing_evidence_
     assert plan["performance_eligible"] is False
 
 
-def test_paired_bound_plans_require_same_public_tokenizer_but_allow_checkpoint_difference():
-    lite = build_campaign_plan("lite_llama", CAMPAIGN, runtime_values=LITE_BINDINGS)
-    vllm = build_campaign_plan("vllm_ascend", CAMPAIGN, runtime_values=VLLM_BINDINGS)
+def test_paired_bound_plans_require_same_public_tokenizer_but_allow_checkpoint_difference(client_profile_path):
+    lite = build_campaign_plan(
+        "lite_llama", CAMPAIGN, runtime_values=LITE_BINDINGS, client_profile=client_profile_path
+    )
+    vllm = build_campaign_plan(
+        "vllm_ascend", CAMPAIGN, runtime_values=VLLM_BINDINGS, client_profile=client_profile_path
+    )
     assert validate_paired_plans(lite, vllm)["status"] == "pass"
 
-    drifted = build_campaign_plan(
-        "vllm_ascend",
-        CAMPAIGN,
-        runtime_values={**VLLM_BINDINGS, "QWEN3_32B_TOKENIZER": "/fixtures/other/Qwen3-32B"},
-    )
+    drifted = deepcopy(vllm)
+    drifted["client_contract"]["tokenizer"] = "/fixtures/other/Qwen3-32B"
     report = validate_paired_plans(lite, drifted)
     assert report["status"] == "fail"
     assert "client_contract.tokenizer" in report["errors"]
@@ -265,7 +268,7 @@ def test_runtime_binding_parser_rejects_malformed_unknown_duplicate_or_unsafe_va
         })
 
 
-def test_cli_runtime_values_are_repeatable_and_serialized(tmp_path):
+def test_cli_runtime_values_are_repeatable_and_serialized(tmp_path, client_profile_path):
     root = tmp_path / "diagnostics"
     command = [
         sys.executable,
@@ -281,6 +284,8 @@ def test_cli_runtime_values_are_repeatable_and_serialized(tmp_path):
         "QWEN3_32B_TOKENIZER=/fixtures/hf/Qwen3-32B",
         "--output-root",
         str(root),
+        "--client-profile",
+        str(client_profile_path),
         "--dry-run",
     ]
     completed = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)

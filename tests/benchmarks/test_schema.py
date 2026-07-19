@@ -46,6 +46,7 @@ comparison_scope: production_stack
 publishable: true
 aggregation_allowed: true
 result_namespace: results
+client_profile_required: true
 client_environment: {TORCH_DEVICE_BACKEND_AUTOLOAD: "0"}
 model: qwen3_32b_tp2_fp16
 frameworks: [lite_llama]

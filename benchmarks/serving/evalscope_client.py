@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
+from .client_profile import CLIENT_PROFILE_REQUIRED, validate_linux_absolute_path
+
 
 def build_evalscope_command(
     contract: Mapping[str, Any],
@@ -11,16 +13,19 @@ def build_evalscope_command(
     *,
     base_url: str,
     output_dir: str,
+    client_executable: str,
     phase: str = "formal",
 ) -> list[str]:
     if phase not in {"formal", "warmup"}:
         raise ValueError("phase must be formal or warmup")
+    if client_executable != CLIENT_PROFILE_REQUIRED:
+        validate_linux_absolute_path(client_executable, label="EvalScope client executable")
     is_warmup = phase == "warmup"
     dataset = contract["dataset"]["warmup" if is_warmup else "formal"]
     requests = run["warmup_requests" if is_warmup else "formal_requests"]
     offset = contract["warmup_offset" if is_warmup else "formal_offset"]
     command = [
-        "evalscope",
+        client_executable,
         "perf",
         "--url",
         base_url.rstrip("/") + contract["endpoint_path"],

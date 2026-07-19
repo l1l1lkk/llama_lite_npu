@@ -32,6 +32,42 @@ MODEL_IDENTITY_FIELDS = (
     "max_sequence_length",
 )
 
+CLIENT_PROFILE_FIELDS = (
+    "status",
+    "client_id",
+    "policy",
+    "python_executable",
+    "python_prefix",
+    "python_base_prefix",
+    "evalscope_executable",
+    "packages.python",
+    "packages.evalscope",
+    "packages.modelscope",
+    "packages.transformers",
+    "packages.accelerate",
+    "packages.torch",
+    "packages.torch_npu",
+    "requirements_lock.path",
+    "requirements_lock.sha256",
+    "installed_distribution_fingerprint.sha256",
+    "tokenizer.resolved_path",
+    "tokenizer.config_sha256",
+    "tokenizer.tokenizer_sha256",
+    "tokenizer.tokenizer_config_sha256",
+    "tokenizer.cpu_load_status",
+    "preflight.tool_code_sha256",
+    "overall_fingerprint_sha256",
+)
+
+
+def _nested_get(mapping: Mapping[str, Any] | None, dotted: str) -> Any:
+    value: Any = mapping
+    for part in dotted.split("."):
+        if not isinstance(value, Mapping):
+            return None
+        value = value.get(part)
+    return value
+
 
 def comparable_client_contract(plan: Mapping[str, Any]) -> dict[str, Any]:
     contract = plan["client_contract"]
@@ -50,6 +86,9 @@ def validate_paired_plans(left: Mapping[str, Any], right: Mapping[str, Any]) -> 
     for field in environment_keys:
         if left.get("client_environment", {}).get(field) != right.get("client_environment", {}).get(field):
             errors.append(f"client_environment.{field}")
+    for field in CLIENT_PROFILE_FIELDS:
+        if _nested_get(left.get("client_profile"), field) != _nested_get(right.get("client_profile"), field):
+            errors.append(f"client_profile.{field}")
     for field in MODEL_IDENTITY_FIELDS:
         if left["model"]["logical_identity"].get(field) != right["model"]["logical_identity"].get(field):
             errors.append(f"model.logical_identity.{field}")

@@ -6,6 +6,7 @@ comparison_scope: capability_only
 publishable: false
 aggregation_allowed: false
 result_namespace: diagnostics
+client_profile_required: true
 client_environment:
   TORCH_DEVICE_BACKEND_AUTOLOAD: "0"
 model: qwen3_32b_tp2_fp16
