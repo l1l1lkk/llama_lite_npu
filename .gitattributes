@@ -4,3 +4,10 @@ benchmarks/qwen3_32b_tp2_fp16/datasets/** -text whitespace=cr-at-eol
 
 # Compact evidence manifests hash raw bytes, so checkout bytes must stay LF.
 docs/validation_data/** text eol=lf
+
+# Frozen DeepSeek reference contracts hash complete source bytes.
+lite_llama/models/moe.py text eol=lf
+tests/reference/deepseek_moe_reference.py text eol=lf
+tests/models/test_deepseek_moe_reference.py text eol=lf
+tests/models/test_deepseek_moe_router.py text eol=lf
+tests/models/test_deepseek_moe_block.py text eol=lf

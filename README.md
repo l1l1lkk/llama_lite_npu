@@ -12,7 +12,7 @@ the core execution path instead of wrapping a high-level inference library.
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.7-orange)
 ![Ascend](https://img.shields.io/badge/Ascend-910B3-red)
-![Version](https://img.shields.io/badge/version-0.0.15rc1-blue)
+![Version](https://img.shields.io/badge/version-0.0.15rc2-blue)
 
 </div>
 
@@ -94,7 +94,9 @@ It is not positioned as a production replacement for vLLM-Ascend or MindIE.
 
 ## MoE Runtime Correctness
 
-v0.0.15rc1 extends the tuple-compatible generic MoE boundary with
+v0.0.15rc2 retains the DeepSeek MoE component capability introduced in
+v0.0.15rc1 and formalizes one release branch and one annotated tag per version.
+The component extends the tuple-compatible generic MoE boundary with
 DeepSeek V2/V3 component compatibility. It adds softmax/sigmoid grouped top-k,
 selection-only V3 correction bias, routed and shared experts, official-field
 configuration, HF-to-canonical-to-runtime weight layouts, and bounded
@@ -113,7 +115,7 @@ decoder/CausalLM, W8A8, all-to-all/EPLB, or non-contiguous expert maps. EP is
 limited to replicated-token contiguous expert slices; real TP2/EP2 NPU
 collectives are not yet validated. DeepSeek decode Graph remains explicitly
 fail-closed, and DeepSeek-V4 routing is unsupported. See the
-[v0.0.15rc1 release report](docs/releases/v0.0.15rc1.md) and
+[v0.0.15rc2 release report](docs/releases/v0.0.15rc2.md) and
 [DeepSeekMoE runtime design](docs/deepseek_moe_runtime_design.md).
 
 ## Benchmarks
@@ -164,6 +166,7 @@ tokens:
 
 ## Current Release Notes
 
+- [v0.0.15rc2 Release Report](docs/releases/v0.0.15rc2.md) - per-version release branch/tag policy and portable frozen-source checks.
 - [v0.0.15rc1 Release Report](docs/releases/v0.0.15rc1.md) - DeepSeek V2/V3 MoE component compatibility and single-card NPU correctness.
 - [v0.0.14rc1 Release Report](docs/releases/v0.0.14rc1.md) - generic Qwen3 MoE runtime boundaries and layered reference correctness.
 - [v0.0.13rc3 Release Report](docs/releases/v0.0.13rc3.md) - fixed-output control and strict Graph ablation.

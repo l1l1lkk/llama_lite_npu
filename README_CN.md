@@ -4,7 +4,7 @@
 
 [English](README.md) | [中文](README_CN.md)
 
-![Version](https://img.shields.io/badge/version-0.0.15rc1-blue)
+![Version](https://img.shields.io/badge/version-0.0.15rc2-blue)
 
 ## 项目定位
 
@@ -40,7 +40,9 @@ OpenAI 兼容 API -> Continuous Batch Scheduler -> ModelExecutor -> Paged KV / A
 
 ## MoE Runtime 正确性
 
-v0.0.15rc1 在保持 tuple 解包兼容的通用 MoE 边界上增加 DeepSeek V2/V3 组件级
+v0.0.15rc2 保留 v0.0.15rc1 引入的 DeepSeek V2/V3 MoE 组件能力，并正式规定每个
+版本对应一个 release 分支和一个 annotated tag。该组件在保持 tuple 解包兼容的通用
+MoE 边界上增加
 兼容：softmax/sigmoid grouped top-k、V3 correction bias 仅参与选择、routed/shared
 experts、官方字段配置、HF→canonical→runtime 权重布局和有界单层 safetensors 读取。
 Qwen3 参数名、checkpoint layout、state-dict key 和默认执行行为保持不变。
@@ -52,7 +54,7 @@ Qwen3 参数名、checkpoint layout、state-dict key 和默认执行行为保持
 DeepSeek 边界不包含 MLA、attention、KV/RoPE、完整 decoder/CausalLM、W8A8、
 all-to-all/EPLB 或非连续 expert map。EP 仅为 replicated-token 连续 expert slice，
 真实 TP2/EP2 NPU collective 尚未验证；DeepSeek decode Graph 保持 fail-closed，V4 routing
-不支持。详见 [v0.0.15rc1 发布记录](docs/releases/v0.0.15rc1.md)和
+不支持。详见 [v0.0.15rc2 发布记录](docs/releases/v0.0.15rc2.md)和
 [DeepSeekMoE Runtime 设计](docs/deepseek_moe_runtime_design.md)。
 
 ## 性能数据
@@ -81,6 +83,7 @@ v0.0.13rc3 在 Continuous Batching 路径新增逐请求 `min_tokens`，并在�
 
 ## 当前版本说明
 
+- [v0.0.15rc2 发布记录](docs/releases/v0.0.15rc2.md)：每版本独立 release 分支/tag 规范与冻结源码跨平台校验。
 - [v0.0.15rc1 发布记录](docs/releases/v0.0.15rc1.md)：DeepSeek V2/V3 MoE 组件兼容与单卡 NPU correctness。
 - [v0.0.14rc1 发布记录](docs/releases/v0.0.14rc1.md)：通用 Qwen3 MoE runtime 边界与分层 reference correctness。
 - [v0.0.13rc3 发布记录](docs/releases/v0.0.13rc3.md)：固定输出控制与严格 Graph 消融。

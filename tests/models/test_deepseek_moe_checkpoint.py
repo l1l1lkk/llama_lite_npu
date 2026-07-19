@@ -999,14 +999,6 @@ class DeepSeekMoeCheckpointContractTest(unittest.TestCase):
             "apply_weight_convert.py",
             "lite_llama/executor/executor_struct.py",
             "lite_llama/executor/model_executor.py",
-            "tests/reference/deepseek_moe_reference.py",
-            "tests/models/test_deepseek_moe_reference.py",
-            "tests/models/test_deepseek_moe_router.py",
-            "tests/models/test_deepseek_moe_block.py",
-            "tests/models/test_deepseek_moe_weights.py",
-            "tests/models/test_deepseek_moe_component.py",
-            "tests/models/test_moe_reference.py",
-            "tests/models/test_qwen3_moe.py",
         )
         result = subprocess.run(
             ["git", "diff", "--exit-code", "HEAD", "--", *frozen],

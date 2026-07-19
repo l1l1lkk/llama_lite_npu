@@ -50,9 +50,10 @@ class RepositoryDocumentationTests(unittest.TestCase):
         english = (ROOT / "README.md").read_text(encoding="utf-8")
         chinese = (ROOT / "README_CN.md").read_text(encoding="utf-8")
 
-        self.assertEqual(version, "0.0.15rc1")
-        self.assertIn("0.0.15rc1", english)
-        self.assertIn("0.0.15rc1", chinese)
+        self.assertEqual(version, "0.0.15rc2")
+        self.assertIn("0.0.15rc2", english)
+        self.assertIn("0.0.15rc2", chinese)
+        self.assertTrue((ROOT / "docs/releases/v0.0.15rc2.md").exists())
         self.assertTrue((ROOT / "docs/releases/v0.0.15rc1.md").exists())
         self.assertTrue((ROOT / "docs/releases/v0.0.14rc1.md").exists())
         self.assertTrue((ROOT / "docs/releases/v0.0.13rc3.md").exists())
@@ -66,6 +67,15 @@ class RepositoryDocumentationTests(unittest.TestCase):
         self.assertIn("小功能或 Bug 修复", versioning)
         self.assertIn("0.0.13rc2 -> 0.0.13rc3", versioning)
         self.assertIn("benchmark 数据与测试脚本", versioning)
+        self.assertIn("release/<VERSION>", versioning)
+        self.assertIn("v<VERSION>", versioning)
+        self.assertIn("annotated tag", versioning)
+
+        release = (ROOT / "docs/releases/v0.0.15rc2.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("release/0.0.15rc2", release)
+        self.assertIn("v0.0.15rc2", release)
 
     def test_core_modules_have_module_docstrings(self):
         modules = (

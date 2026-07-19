@@ -24,6 +24,38 @@ v0.0.1rc1
 
 仓库根目录的 [`VERSION`](../VERSION) 是当前版本的唯一文本标识。
 
+## 发布分支与标签
+
+每个发布版本必须创建独立的正式发布分支：
+
+```text
+release/<VERSION>
+```
+
+例如，`VERSION` 为 `0.0.15rc2` 时，正式发布分支与 annotated tag 分别为：
+
+```text
+release/0.0.15rc2
+v0.0.15rc2
+```
+
+`feature/*` 只用于功能开发，不是发布版本的身份。新版本不得通过继续推进旧版本的
+release 分支来替代新分支；例如 `0.0.15rc2` 不得发布到 `release/0.0.15rc1` 或
+`release/0.0.12rc1`。
+
+正式发布完成时，下列事实必须指向同一个完整 commit SHA：
+
+- `release/<VERSION>` 的分支 head；
+- `v<VERSION>` annotated tag 的 peeled commit；
+- 本地 release checkout 与 GitLab live release ref；
+- 通过发布门的服务器 checkout；
+- 根目录 `VERSION` 与 `docs/releases/v<VERSION>.md` 记录的版本。
+
+annotated tag 是不可变的历史事实，不得删除后重建、移动或 force 更新。tag 发布后，
+对应 release 分支也不得继续推进；后续变更必须增加 RC 编号或基础版本号，并创建新的
+release 分支和 tag。已经发布的历史 tag 不因规范补充而重写；历史分支若存在命名或
+指向不一致，必须单独审计并获得明确授权后处理。
+
 ## 升级规则
 
 ### 功能大更新
@@ -81,7 +113,10 @@ v0.0.1rc1
 4. 版本报告记录相对上一版本的功能、修复、性能、测试环境、验证方法和已知限制；
 5. README只展示最新版本、最新性能以及相对vLLM-Ascend基座的对比；
 6. README链接到最新版本报告、完整CHANGELOG和本规范；
-7. 创建并推送对应Git Tag，例如`v0.0.2rc1`。
+7. 创建并推送独立发布分支 `release/<版本号>`；
+8. 创建并推送对应的 annotated Git Tag，例如 `v0.0.2rc1`；
+9. 现场核验 release 分支、tag peeled commit、本地、GitLab 与已验证服务器 checkout
+   的完整 SHA 一致。
 
 ## 自动执行约定
 

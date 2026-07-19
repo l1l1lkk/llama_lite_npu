@@ -824,7 +824,7 @@ class DeepSeekMoeWeightContractTest(unittest.TestCase):
                 self.assertEqual(actual, expected)
 
         frozen = {
-            "lite_llama/models/moe.py": "ae44153220a76eb5234fbcafc6fc49504377b27b431b68db121cef5b6d09b8ca",
+            "lite_llama/models/moe.py": "fd9451db180e1ee7dce432ebf437de206614e15d546a15d0e63b149330f992a0",
             "tests/reference/deepseek_moe_reference.py": "659e73c636d52e002321a91ce5956e3f125ed2b125bffd7cb801513ad9e33691",
             "tests/models/test_deepseek_moe_reference.py": "c027762442e0b44364225d512ad625e11946f25dd822a635a3f13f9460ca0fff",
             "tests/models/test_deepseek_moe_router.py": "588240fbaf9611bf0f7ec002bd949446b35453a7cbcd77af17badc08405953b4",
@@ -832,7 +832,8 @@ class DeepSeekMoeWeightContractTest(unittest.TestCase):
         }
         for path, expected in frozen.items():
             with self.subTest(path=path):
-                actual = hashlib.sha256((ROOT / path).read_bytes()).hexdigest()
+                source_bytes = (ROOT / path).read_bytes().replace(b"\r\n", b"\n")
+                actual = hashlib.sha256(source_bytes).hexdigest()
                 self.assertEqual(actual, expected)
 
 

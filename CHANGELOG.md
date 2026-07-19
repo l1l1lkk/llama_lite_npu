@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.0.15rc2] - 2026-07-19
+
+Release-governance and cross-platform test-contract correction for the DeepSeek
+MoE component line.
+
+### Changed
+
+- Established one immutable release branch per published version using
+  `release/<VERSION>` and one annotated tag using `v<VERSION>`.
+- Required the release branch head, peeled annotated tag, `VERSION`, release
+  report, local checkout, GitLab ref, and validated server checkout to identify
+  the same release commit.
+- Classified `feature/*` branches as temporary development refs rather than
+  published version identities, and prohibited advancing an older release
+  branch to publish a newer version.
+
+### Fixed
+
+- Made frozen DeepSeek source-hash checks insensitive to Git for Windows CRLF
+  checkout materialization while continuing to hash the complete source bytes.
+- Added narrow LF checkout rules for the frozen DeepSeek reference and contract
+  files so fresh Windows and Linux worktrees materialize the same bytes.
+
+### Tests
+
+- Kept the v0.0.15rc1 DeepSeek/Qwen production and hardware conclusions
+  unchanged; this RC does not change router, expert, checkpoint, Graph, or NPU
+  execution code.
+- Added repository documentation contracts for the current release branch and
+  annotated tag names.
+
+### Docs
+
+- [v0.0.15rc2 release report](docs/releases/v0.0.15rc2.md)
+- [Version management and release policy](docs/versioning.md)
+
 ## [0.0.15rc1] - 2026-07-18
 
 DeepSeek V2/V3 MoE component compatibility and single-card NPU correctness release.

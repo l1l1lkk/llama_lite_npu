@@ -24,6 +24,7 @@
 
 ## 发布文档
 
+- [v0.0.15rc2 发布记录](releases/v0.0.15rc2.md)：每版本独立 release 分支/tag 规范与冻结源码跨平台校验。
 - [v0.0.15rc1 发布记录](releases/v0.0.15rc1.md)：DeepSeek V2/V3 MoE 组件兼容与单卡 NPU correctness。
 - [v0.0.14rc1 发布记录](releases/v0.0.14rc1.md)：通用 Qwen3 MoE runtime 边界与分层 reference correctness。
 - [v0.0.13rc3 发布记录](releases/v0.0.13rc3.md)：`min_tokens` 固定输出控制与严格 NPU Graph 消融。

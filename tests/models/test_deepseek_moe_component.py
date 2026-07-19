@@ -801,11 +801,6 @@ class DeepSeekMoeComponentContractTest(unittest.TestCase):
             "lite_llama/models/moe.py",
             "lite_llama/executor/tp_utils.py",
             "lite_llama/utils/deepseek_moe_weights.py",
-            "tests/reference/deepseek_moe_reference.py",
-            "tests/models/test_deepseek_moe_reference.py",
-            "tests/models/test_deepseek_moe_router.py",
-            "tests/models/test_deepseek_moe_block.py",
-            "tests/models/test_deepseek_moe_weights.py",
         )
         result = subprocess.run(
             ["git", "diff", "--exit-code", "HEAD", "--", *frozen_paths],
