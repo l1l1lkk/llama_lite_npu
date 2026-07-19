@@ -11,7 +11,7 @@ from benchmarks.serving.schema import load_framework
 
 
 ROOT = Path(__file__).resolve().parents[2]
-CAMPAIGN = ROOT / "benchmarks/configs/campaigns/p0_smoke.yaml"
+CAMPAIGN = ROOT / "benchmarks/configs/campaigns/capability_smoke.yaml"
 
 
 def test_adapters_declare_capabilities_without_fabricating_graph_zeroes():

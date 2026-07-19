@@ -23,3 +23,19 @@ def test_docs_index_has_one_current_entry_and_legacy_pages_are_demoted():
     assert len(re.findall(r"^- \[Benchmark 总入口\]\(benchmarks/README\.md\)", index, re.MULTILINE)) == 1
     assert "Historical/unverified" in (ROOT / "docs/vllm_ascend_benchmark.md").read_text(encoding="utf-8")
     assert "historical v1" in (ROOT / "docs/benchmark_results/README.md").read_text(encoding="utf-8")
+
+
+def test_execution_guide_keeps_bundle_rebuild_and_phase3b_contract():
+    text = (DOC_ROOT / "execution.md").read_text(encoding="utf-8")
+    for marker in (
+        "validate.bundle",
+        "--rebuild",
+        "manifest.json",
+        "omitted.json",
+        "runs/<framework>",
+        "performance correctness",
+        "semantic accuracy",
+        "8213",
+        "18000",
+    ):
+        assert marker in text

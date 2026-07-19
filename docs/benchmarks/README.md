@@ -1,38 +1,31 @@
 # Benchmark 总入口
 
-本目录是项目当前唯一的 benchmark 文档入口。新测试使用 canonical v2 harness；旧脚本、旧报告和旧数据包继续保留用于历史复核，但不能因为目录仍存在就视为当前版本的严格基线。
+本目录是当前 benchmark 的唯一文档入口。新测试使用 canonical v2 harness；旧脚本、旧报告和旧数据包仅用于历史复核，不能自动升级为当前版本的严格可比数据。
 
 ## 证据等级
 
-| 等级 | 含义 | 可否用于当前跨框架比较 |
+| 等级 | 用途 | 性能发布资格 |
 | --- | --- | --- |
-| strict current | 当前代码、冻结 workload、环境指纹、逐请求门禁和 bundle v2 均通过 | 可以，但只能比较完整匹配的 cell |
-| historical strict old-code | 旧提交上通过当时严格门禁，原始证据可复算 | 不可以替代当前版本；只作历史趋势和方法复用 |
-| historical unverified | 缺原始请求、指纹、固定输出或完整环境证据 | 不可以；只能引用为历史记录 |
-| diagnostic | screening、warmup、失败生命周期、profiler 或局部现场 | 不进入 aggregate、baseline 或速度比 |
+| diagnostic | capability smoke、warmup、失败生命周期和现场诊断 | 禁止进入 aggregate、baseline 和 current history |
+| strict current | 当前代码、冻结 workload、环境指纹、逐请求门禁和 bundle v2 全部通过 | 仅在 comparison scope 门禁通过时可发布 |
+| historical strict old-code | 旧提交上可复算且通过当时严格门禁 | 只能用于历史趋势 |
+| historical unverified | 缺少原始证据、固定输出或环境指纹 | 不可用于严格比较 |
 
-当前尚无 `v0.0.15rc2` 的 strict current 性能数据。`p0_smoke.yaml` 只是 Phase 2 的计划与合成门禁配置，workload 明确标记为未做服务端 token 校准，不能形成性能结论。
+当前没有 `v0.0.15rc2` 的 strict current 性能数字。[`capability_smoke.yaml`](../../benchmarks/configs/campaigns/capability_smoke.yaml) 只生成 diagnostic 计划，即使固定输出和 token 门禁通过也不得形成性能结论。
 
-## 当前入口
+## Comparison scope
 
-- [统一执行指南](execution.md)：runner、配置、证据结构、校验门和 NPU 前置条件。
-- [Campaign 索引](campaigns/README.md)：canonical v2 campaign 报告入口；当前没有 rc2 正式报告。
-- [跨版本/跨框架历史](history.md)：历史证据等级与旧入口映射。
-- [`benchmarks/serving/`](../../benchmarks/serving/)：统一 runner、adapter、strict validator 和 bundle v2 实现。
-- [`benchmarks/configs/`](../../benchmarks/configs/)：模型、框架和 campaign 声明。
-- [`benchmarks/workloads/`](../../benchmarks/workloads/)：冻结 workload 与 SHA256。
-- [`benchmarks/results/`](../../benchmarks/results/)：Git-tracked compact evidence；现有内容均为历史 campaign。
+- `capability_only`：只验证 endpoint、stream、固定输出、token usage 和指标能力；始终 `performance_eligible=false`。
+- `production_stack`：允许框架使用各自发布支持的原生依赖，但必须完整记录环境指纹并验证 checkpoint 等价。结论只能称“同硬件、同 workload 的生产栈比较”，不能称仅框架变量不同。
+- `controlled_stack`：除 workload/checkpoint 等价外，还要求 CANN、PyTorch、torch_npu 等共享栈字段一致，才允许因果归因。
 
-## 发布结论门
+Phase 3A 只读现场显示：Lite 环境为 CANN 8.5 / torch 2.7.1，vLLM-Ascend 发布环境为 CANN 9.0 / torch 2.10.0；Lite 使用自定义 PTH，vLLM-Ascend 使用 HF safetensors。关键 config/tokenizer/index SHA 一致，但完整权重等价性和转换 provenance 尚未验证。因此当前只能进行 `capability_only` smoke。
 
-只有同时满足以下条件才能发布性能数字：
+## 文档
 
-1. 模型/checkpoint/config/tokenizer、代码、软件栈和硬件指纹完整；
-2. 两框架使用同一冻结 JSONL、seed、formal/warmup 独立 offset、请求顺序、OpenAI chat stream client contract；
-3. 每请求 success、实际 input/output token、request count/order 均严格通过；
-4. 固定输出 capability probe 和实际 token 校准已完成；
-5. Graph 状态只能是 `pass`、`fail` 或 `unsupported`，不得把 unsupported 写成零；
-6. Git bundle 可脱离服务器校验 SHA 并从逐请求 evidence 重建 aggregate；
-7. semantic accuracy 与 performance correctness 分开报告。
+- [统一执行指南](execution.md)
+- [Campaign 索引](campaigns/README.md)
+- [跨版本、跨框架历史索引](history.md)
+- [`benchmarks/serving/`](../../benchmarks/serving/)：runner、adapter、validator 与 bundle v2
 
-历史 Graph 消融属于项目内部路径比较，不是 vLLM-Ascend 对比。
+历史 Graph 消融是项目内部路径比较，不是 vLLM-Ascend 对比。准确率与性能正确性必须分开报告。

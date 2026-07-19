@@ -1,13 +1,31 @@
 schema_version: 2
-model_id: qwen3_32b_tp2_fp16
 served_name: Qwen3-32B
-# Phase 3 must resolve both placeholders to the same files and record their SHA256.
-checkpoint: ${QWEN3_32B_CHECKPOINT}
-tokenizer: ${QWEN3_32B_TOKENIZER}
-config_sha256: capability-probe-required
-dtype: fp16
-tensor_parallel_size: 2
-max_sequence_length: 4096
+logical_identity:
+  model_id: qwen3_32b_tp2_fp16
+  config_sha256: 97e295b63283935788fac5e4f8860862a56d4089538cafc93f0431f2ebe483bb
+  tokenizer_sha256: aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4
+  tokenizer_config_sha256: 973ace74a4b7e317f60719a54abc776f7fb7e9b8ea2831efda4e4db40ba42f49
+  model_index_sha256: bed42c6c55274bc08a1f616bceb3bcb84b3f02cb6584c573bd18c6519291ecd0
+  tokenizer_path: ${QWEN3_32B_TOKENIZER}
+  dtype: fp16
+  tensor_parallel_size: 2
+  max_sequence_length: 4096
+representations:
+  lite_llama:
+    path: ${QWEN3_32B_LITE_CHECKPOINT}
+    format: custom_pth
+    fingerprint: {status: unverified, sha256: null}
+    provenance: {status: unverified, source_representation: hf_safetensors, record: null}
+  vllm_ascend:
+    path: ${QWEN3_32B_HF_CHECKPOINT}
+    format: hf_safetensors
+    index_sha256: bed42c6c55274bc08a1f616bceb3bcb84b3f02cb6584c573bd18c6519291ecd0
+    fingerprint: {status: unverified, sha256: null}
+    provenance: {status: native_hf, source_representation: hf_safetensors, record: null}
+equivalence:
+  status: unverified
+  valid_for_causal: false
+  reason: custom pth conversion provenance and full weight fingerprints are not frozen
 hardware:
   accelerator: Atlas 910B3
   device_count: 2

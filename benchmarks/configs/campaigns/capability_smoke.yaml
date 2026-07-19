@@ -1,10 +1,15 @@
 schema_version: 2
-campaign_id: p0_smoke
-kind: performance
+campaign_id: capability_smoke
+kind: capability
+purpose: bounded fixed-output and endpoint capability probe
+comparison_scope: capability_only
+publishable: false
+aggregation_allowed: false
+result_namespace: diagnostics
+client_environment:
+  TORCH_DEVICE_BACKEND_AUTOLOAD: "0"
 model: qwen3_32b_tp2_fp16
-frameworks:
-  - lite_llama
-  - vllm_ascend
+frameworks: [lite_llama, vllm_ascend]
 workload:
   id: qwen3_32b_p128_smoke_uncalibrated_v1
   formal_dataset: benchmarks/workloads/qwen3_32b_p128_smoke_uncalibrated_v1/formal.jsonl
@@ -14,7 +19,6 @@ workload:
   formal_offset: 0
   warmup_offset: 0
   request_order: frozen_jsonl
-  actual_token_calibrated: false
 cases:
   - id: p128_o64_c1
     prompt_tokens: 128
@@ -25,9 +29,7 @@ cases:
 repeats: 1
 lifecycle: independent_per_run
 stream: true
-sampling:
-  temperature: 0.0
-  top_p: 1.0
+sampling: {temperature: 0.0, top_p: 1.0}
 fixed_output:
   strategy: min_equals_max
   capability_probe_required: true
@@ -45,5 +47,5 @@ failure_gates:
   workload_fingerprint: true
   environment_fingerprint: true
   graph_fallback: framework_capability_aware
-result_root: benchmarks/results
+result_root: benchmarks/diagnostics
 total_timeout_s: 21600

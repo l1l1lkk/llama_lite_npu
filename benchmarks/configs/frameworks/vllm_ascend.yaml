@@ -10,6 +10,10 @@ launch:
     - vllm
     - serve
     - "{checkpoint}"
+    - --host
+    - 0.0.0.0
+    - --port
+    - "{port}"
     - --served-model-name
     - "{served_name}"
     - --dtype
@@ -31,3 +35,9 @@ metrics:
   graph_counters: unsupported
   fallback_counters: unsupported
   npu_usage: supported
+runtime_environment:
+  fingerprint_status: unverified
+  cann: "9.0.0"
+  torch: "2.10.0"
+  torch_npu: "2.10.0"
+  vllm_ascend: "0.20.2rc1"

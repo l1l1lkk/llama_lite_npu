@@ -13,10 +13,12 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_loads_canonical_campaign_contract():
-    spec = load_campaign(ROOT / "benchmarks/configs/campaigns/p0_smoke.yaml")
+    spec = load_campaign(ROOT / "benchmarks/configs/campaigns/capability_smoke.yaml")
 
     assert isinstance(spec, CampaignSpec)
-    assert spec.campaign_id == "p0_smoke"
+    assert spec.campaign_id == "capability_smoke"
+    assert spec.kind == "capability"
+    assert spec.comparison_scope == "capability_only"
     assert spec.frameworks == ("lite_llama", "vllm_ascend")
     assert spec.stream is True
     assert spec.sampling == {"temperature": 0.0, "top_p": 1.0}
@@ -27,7 +29,7 @@ def test_loads_canonical_campaign_contract():
     assert spec.repeats == 1
     assert spec.cases[0].formal_requests == 4
     assert spec.cases[0].warmup_requests == 2
-    plan = build_campaign_plan("lite_llama", ROOT / "benchmarks/configs/campaigns/p0_smoke.yaml")
+    plan = build_campaign_plan("lite_llama", ROOT / "benchmarks/configs/campaigns/capability_smoke.yaml")
     assert plan["client_contract"]["dataset"]["actual_token_calibrated"] is False
     assert plan["client_contract"]["dataset"]["strict_publishable"] is False
 
@@ -39,6 +41,12 @@ def test_schema_rejects_accuracy_mixed_into_performance(tmp_path):
 schema_version: 2
 campaign_id: bad
 kind: performance
+purpose: reject mixed accuracy
+comparison_scope: production_stack
+publishable: true
+aggregation_allowed: true
+result_namespace: results
+client_environment: {TORCH_DEVICE_BACKEND_AUTOLOAD: "0"}
 model: qwen3_32b_tp2_fp16
 frameworks: [lite_llama]
 semantic_accuracy: {score: 1.0}
@@ -49,7 +57,7 @@ lifecycle: independent_per_run
 stream: true
 sampling: {temperature: 0.0, top_p: 1.0}
 fixed_output: {strategy: min_equals_max, capability_probe_required: true}
-graph: {mode: production, causal_claim: false}
+graph: {mode: production, causal_claim: false, required: false}
 failure_gates: {strict_tokens: true}
 result_root: benchmarks/results
 """,
@@ -86,7 +94,7 @@ def test_plan_rejects_case_requests_beyond_frozen_dataset(tmp_path):
         encoding="utf-8",
     )
     campaign = tmp_path / "campaign.yaml"
-    value = yaml.safe_load((ROOT / "benchmarks/configs/campaigns/p0_smoke.yaml").read_text(encoding="utf-8"))
+    value = yaml.safe_load((ROOT / "benchmarks/configs/campaigns/capability_smoke.yaml").read_text(encoding="utf-8"))
     value["workload"].update(
         {
             "id": "too-small",

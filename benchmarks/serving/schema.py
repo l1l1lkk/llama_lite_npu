@@ -5,12 +5,39 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
+from urllib.parse import urlsplit
 
 import yaml
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CANONICAL_ENDPOINT_PATH = "/v1/chat/completions"
+CAMPAIGN_KINDS = {"capability", "performance", "accuracy"}
+COMPARISON_SCOPES = {"capability_only", "production_stack", "controlled_stack"}
+
+
+def validate_base_url(value: str) -> dict[str, Any]:
+    """Validate and normalize a runtime server origin without an API path."""
+    try:
+        parsed = urlsplit(str(value))
+        port = parsed.port
+    except ValueError as exc:
+        raise ValueError(f"invalid base URL: {value}") from exc
+    if parsed.scheme not in {"http", "https"}:
+        raise ValueError("base URL scheme must be http or https")
+    if not parsed.hostname or port is None or not (1 <= port <= 65535):
+        raise ValueError("base URL must contain a host and explicit valid port")
+    if parsed.username is not None or parsed.password is not None:
+        raise ValueError("base URL must not contain credentials")
+    if parsed.path or parsed.query or parsed.fragment:
+        raise ValueError("base URL must not contain path, query, or fragment")
+    host = f"[{parsed.hostname}]" if ":" in parsed.hostname else parsed.hostname
+    return {
+        "base_url": f"{parsed.scheme}://{host}:{port}",
+        "scheme": parsed.scheme,
+        "host": parsed.hostname,
+        "port": port,
+    }
 
 
 def _read_yaml(path: Path) -> dict[str, Any]:
@@ -65,6 +92,12 @@ class CampaignSpec:
     schema_version: int
     campaign_id: str
     kind: str
+    purpose: str
+    comparison_scope: str
+    publishable: bool
+    aggregation_allowed: bool
+    result_namespace: str
+    client_environment: Mapping[str, str]
     model: str
     frameworks: tuple[str, ...]
     workload: Mapping[str, Any]
@@ -85,6 +118,12 @@ class CampaignSpec:
             "schema_version",
             "campaign_id",
             "kind",
+            "purpose",
+            "comparison_scope",
+            "publishable",
+            "aggregation_allowed",
+            "result_namespace",
+            "client_environment",
             "model",
             "frameworks",
             "workload",
@@ -101,8 +140,21 @@ class CampaignSpec:
         _require(value, required, "campaign")
         if int(value["schema_version"]) != 2:
             raise ValueError("only campaign schema_version=2 is supported")
-        if value["kind"] == "performance" and "semantic_accuracy" in value:
+        kind = str(value["kind"])
+        comparison_scope = str(value["comparison_scope"])
+        if kind not in CAMPAIGN_KINDS:
+            raise ValueError(f"unsupported campaign kind: {kind}")
+        if comparison_scope not in COMPARISON_SCOPES:
+            raise ValueError(f"unsupported comparison_scope: {comparison_scope}")
+        if kind == "performance" and "semantic_accuracy" in value:
             raise ValueError("semantic accuracy must be reported in a separate campaign")
+        if kind == "capability":
+            if comparison_scope != "capability_only":
+                raise ValueError("capability campaigns require comparison_scope=capability_only")
+            if bool(value["publishable"]) or bool(value["aggregation_allowed"]):
+                raise ValueError("capability campaigns cannot be publishable or aggregatable")
+            if str(value["result_namespace"]) != "diagnostics":
+                raise ValueError("capability campaigns require result_namespace=diagnostics")
         frameworks = tuple(str(item) for item in value["frameworks"])
         if not frameworks or len(set(frameworks)) != len(frameworks):
             raise ValueError("frameworks must be a non-empty unique list")
@@ -134,7 +186,13 @@ class CampaignSpec:
         return cls(
             schema_version=2,
             campaign_id=str(value["campaign_id"]),
-            kind=str(value["kind"]),
+            kind=kind,
+            purpose=str(value["purpose"]),
+            comparison_scope=comparison_scope,
+            publishable=bool(value["publishable"]),
+            aggregation_allowed=bool(value["aggregation_allowed"]),
+            result_namespace=str(value["result_namespace"]),
+            client_environment={str(key): str(item) for key, item in value["client_environment"].items()},
             model=str(value["model"]),
             frameworks=frameworks,
             workload=workload,
@@ -168,9 +226,35 @@ def load_campaign(value: str | Path) -> CampaignSpec:
 
 def load_model(value: str | Path) -> dict[str, Any]:
     model = _read_yaml(_resolve_config(value, "models"))
-    _require(model, {"schema_version", "model_id", "served_name", "checkpoint", "tokenizer", "dtype", "tensor_parallel_size"}, "model")
+    _require(
+        model,
+        {"schema_version", "served_name", "logical_identity", "representations", "equivalence"},
+        "model",
+    )
     if int(model["schema_version"]) != 2:
         raise ValueError("only model schema_version=2 is supported")
+    _require(
+        model["logical_identity"],
+        {
+            "model_id",
+            "config_sha256",
+            "tokenizer_sha256",
+            "tokenizer_path",
+            "dtype",
+            "tensor_parallel_size",
+            "max_sequence_length",
+        },
+        "model.logical_identity",
+    )
+    for framework in ("lite_llama", "vllm_ascend"):
+        if framework not in model["representations"]:
+            raise ValueError(f"model representation is missing {framework}")
+        _require(
+            model["representations"][framework],
+            {"path", "format", "fingerprint", "provenance"},
+            f"model.representations.{framework}",
+        )
+    _require(model["equivalence"], {"status", "valid_for_causal"}, "model.equivalence")
     return model
 
 
@@ -183,4 +267,6 @@ def load_framework(value: str | Path) -> dict[str, Any]:
         raise ValueError(
             f"framework endpoint_path must match canonical endpoint {CANONICAL_ENDPOINT_PATH}"
         )
+    validate_base_url(str(framework["base_url"]))
+    _require(framework, {"runtime_environment"}, "framework")
     return framework

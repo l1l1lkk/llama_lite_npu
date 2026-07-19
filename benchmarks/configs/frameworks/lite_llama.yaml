@@ -17,7 +17,7 @@ launch:
     - --host
     - 0.0.0.0
     - --port
-    - "8213"
+    - "{port}"
     - --max_seq_len
     - "4096"
     - --page_size
@@ -34,3 +34,8 @@ metrics:
   graph_counters: supported
   fallback_counters: supported
   npu_usage: supported
+runtime_environment:
+  fingerprint_status: unverified
+  cann: "8.5.0"
+  torch: "2.7.1"
+  torch_npu: "2.7.1"

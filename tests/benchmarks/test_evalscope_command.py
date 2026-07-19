@@ -9,7 +9,7 @@ from benchmarks.serving.validate.campaign import validate_paired_plans
 
 
 ROOT = Path(__file__).resolve().parents[2]
-CAMPAIGN = ROOT / "benchmarks/configs/campaigns/p0_smoke.yaml"
+CAMPAIGN = ROOT / "benchmarks/configs/campaigns/capability_smoke.yaml"
 
 
 def _normalized_contract(plan):
@@ -89,9 +89,8 @@ def test_paired_plan_reports_client_field_drift(field, value):
     ("field", "value"),
     (
         ("model_id", "different"),
-        ("checkpoint", "different"),
         ("config_sha256", "different"),
-        ("tokenizer", "different"),
+        ("tokenizer_sha256", "different"),
         ("dtype", "bf16"),
         ("tensor_parallel_size", 1),
     ),
@@ -99,9 +98,9 @@ def test_paired_plan_reports_client_field_drift(field, value):
 def test_paired_plan_reports_model_identity_drift(field, value):
     left = build_campaign_plan("lite_llama", CAMPAIGN)
     right = deepcopy(build_campaign_plan("vllm_ascend", CAMPAIGN))
-    right["model"][field] = value
+    right["model"]["logical_identity"][field] = value
 
     report = validate_paired_plans(left, right)
 
     assert report["status"] == "fail"
-    assert f"model.{field}" in report["errors"]
+    assert f"model.logical_identity.{field}" in report["errors"]
