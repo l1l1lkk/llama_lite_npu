@@ -193,3 +193,31 @@ wheel-only closure 的 fresh versioned venv，并同时通过以下 CPU-only 门
 historical verified-under-schema v1 证据，不满足 schema v2 execution contract；下一环境
 必须使用 fresh versioned r11，不能原地安装修复 r10。任何上述门失败时，preflight 必须
 返回非零，且 adapter/server launch invocation count 必须为 0。
+
+## Streaming usage evidence provenance
+
+Phase 3D-5A 的 `usage_chunk_missing` 结论已降级为 `unproven`
+diagnostic；它不能证明 Lite 的线上 SSE 缺少 usage chunk。EvalScope 的
+streaming persistence 只把带 `choices` 的事件写入 `response_messages`。
+`choices=[]` 的 usage-only 事件会更新 token 字段，但不会进入该列表；如果
+wire 上没有 usage，finalize 又可能用 tokenizer fallback 产生相同的 token
+值。因此，`response_messages` 中没有 usage 或 DB 中存在 prompt/completion
+token 都不能单独证明 wire usage 为 missing 或 observed。
+
+正式门禁必须保留证据来源：只有完整保存的 raw SSE 序列才能把
+`wire_usage_status` 判为 `observed` 或 `missing`。`observed` 要求恰好一个
+usage-only 事件，位于 finish 之后、`[DONE]` 之前，且 stream identity 与
+token 算术全部有效；仅 EvalScope persistence 证据必须保持 `unknown`，不得
+进入该 usage gate。
+
+validator 的 raw SSE 输入是按接收顺序保存、已经 UTF-8 解码的 transport
+chunks；HTTP/aiohttp chunk 边界可以落在 SSE 行、CRLF、JSON 或事件的任意
+位置。parser 必须跨 chunk 保留 buffer，只在完整 SSE 空行分隔符到达后解析
+事件。对单请求有界 probe，验证器先逐项确认 chunk 为字符串，再按序 join
+完整 decoded wire 后解析，避免把 chunk 尾部未决 `\r` 提前当作独立换行。
+包括 `[DONE]` 在内的尾事件如果没有完整终止分隔符，或 `[DONE]` 后
+仍有非空事件/字节，证据都必须判为 invalid，不能用于 wire gate。
+
+后续线上确认只能使用单独授权的 capability-only raw SSE probe：在 formal
+之前执行一个有界请求，原样保存 SSE，并与 performance/formal 请求隔离。
+该 probe 是 diagnostic，不得进入 aggregate、baseline 或性能结论。
