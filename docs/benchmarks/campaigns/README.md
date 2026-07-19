@@ -2,6 +2,10 @@
 
 当前没有 `v0.0.15rc2` 正式性能报告。Phase 3B-3 曾执行一次 Lite capability smoke，但 EvalScope client 在请求提交前失败，server request count 为 0；该生命周期只作为 rejected diagnostic，不是性能结果，也不进入 aggregate、baseline 或 history current。
 
+Phase 3D-1 的 r10 client 也在请求提交前失败（`request_count=0`）：CLI help 门未覆盖
+`evalscope.perf.main` 的真实 import，且基础 EvalScope closure 未包含完整 `EvalScope[perf]`
+依赖。后续 campaign 必须绑定 schema v2 profile；schema v1 historical profile 不得执行。
+
 唯一当前预备配置是 [`capability_smoke.yaml`](../../../benchmarks/configs/campaigns/capability_smoke.yaml)。它包含两个框架各一个有界 diagnostic cell，固定 `stream=true`、greedy、`min_tokens=max_tokens=64`，并明确禁止发布和聚合。
 
 该配置要求 `client_profile_required=true`。未来计划必须绑定同一个 verified client profile；profile CPU preflight 必须早于任一 server/NPU 生命周期。当前推荐的 Python 3.10 / EvalScope 1.8.0 / ModelScope 1.36.3 / Transformers 5.5.3 隔离组合尚待服务器 CPU 验证，不能据此声称 smoke 已恢复。

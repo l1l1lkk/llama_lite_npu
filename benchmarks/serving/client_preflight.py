@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib
 import importlib.metadata
 import json
 import os
@@ -14,8 +15,14 @@ import subprocess
 import sys
 from typing import Any, Mapping, Protocol
 
+from packaging.markers import default_environment
+from packaging.requirements import Requirement
+from packaging.utils import canonicalize_name
+from packaging.version import Version
+
 from .client_profile import (
     CLIENT_PACKAGE_FIELDS,
+    CLIENT_PROFILE_SCHEMA_VERSION,
     compute_profile_fingerprint,
     load_client_profile,
     validate_client_profile,
@@ -49,12 +56,19 @@ REQUIRED_EVALSCOPE_FLAGS = frozenset(
     }
 )
 REQUIRED_CLIENT_ENVIRONMENT = {"TORCH_DEVICE_BACKEND_AUTOLOAD": "0"}
+PERF_EXTRA = "perf"
+PERF_ENTRYPOINT_MODULES = (
+    "evalscope.perf.main",
+    "evalscope.perf.plugin.api.openai_api",
+)
+MINIMUM_PERF_RUNTIME_DISTRIBUTIONS = frozenset({"fastapi", "sse-starlette", "uvicorn"})
 
 
 class ClientProbe(Protocol):
     def is_file(self, path: str | Path) -> bool: ...
     def package_versions(self) -> Mapping[str, str | None]: ...
     def validate_imports(self) -> None: ...
+    def evalscope_perf_contract(self) -> Mapping[str, Any]: ...
     def load_tokenizer(self, path: str | Path) -> Mapping[str, Any]: ...
     def evalscope_help_flags(self, executable: str, environment: Mapping[str, str]) -> set[str]: ...
     def distribution_fingerprint(self) -> str: ...
@@ -91,6 +105,67 @@ class RealClientProbe:
     def validate_imports(self) -> None:
         from modelscope import AutoTokenizer as ModelScopeAutoTokenizer  # noqa: F401
         from transformers import AutoTokenizer as TransformersAutoTokenizer  # noqa: F401
+
+    @staticmethod
+    def _normalized_requirement(requirement: Requirement) -> str:
+        name = canonicalize_name(requirement.name)
+        extras = ""
+        if requirement.extras:
+            extras = "[" + ",".join(sorted(canonicalize_name(extra) for extra in requirement.extras)) + "]"
+        target = f" @ {requirement.url}" if requirement.url else str(requirement.specifier)
+        marker = f"; {requirement.marker}" if requirement.marker else ""
+        return f"{name}{extras}{target}{marker}"
+
+    def evalscope_perf_contract(self) -> Mapping[str, Any]:
+        """Validate the installed metadata closure and import the real perf entrypoints."""
+        distribution = importlib.metadata.distribution("evalscope")
+        provided_extras = {
+            canonicalize_name(item)
+            for item in (distribution.metadata.get_all("Provides-Extra") or [])
+        }
+        if PERF_EXTRA not in provided_extras:
+            raise RuntimeError("EvalScope metadata does not provide extra: perf")
+
+        marker_environment = default_environment()
+        marker_environment["extra"] = PERF_EXTRA
+        applicable: list[str] = []
+        applicable_names: set[str] = set()
+        for raw_requirement in distribution.requires or []:
+            requirement = Requirement(raw_requirement)
+            if requirement.marker is not None and not requirement.marker.evaluate(marker_environment):
+                continue
+            normalized_name = canonicalize_name(requirement.name)
+            try:
+                installed_version = importlib.metadata.version(requirement.name)
+            except importlib.metadata.PackageNotFoundError as exc:
+                raise RuntimeError(
+                    f"missing EvalScope perf requirement: {normalized_name} ({requirement})"
+                ) from exc
+            if requirement.specifier and Version(installed_version) not in requirement.specifier:
+                raise RuntimeError(
+                    "EvalScope perf requirement version mismatch: "
+                    f"{normalized_name} {installed_version} does not satisfy {requirement.specifier}"
+                )
+            applicable.append(self._normalized_requirement(requirement))
+            applicable_names.add(normalized_name)
+
+        missing_runtime = sorted(MINIMUM_PERF_RUNTIME_DISTRIBUTIONS - applicable_names)
+        if missing_runtime:
+            raise RuntimeError(
+                "EvalScope perf marker evaluation omitted required runtime dependencies: "
+                + ", ".join(missing_runtime)
+            )
+        try:
+            for module in PERF_ENTRYPOINT_MODULES:
+                importlib.import_module(module)
+        except Exception as exc:
+            raise RuntimeError(f"EvalScope perf entrypoint import failed: {exc}") from exc
+        return {
+            "extra": PERF_EXTRA,
+            "entrypoint_import_status": "pass",
+            "entrypoint_modules": list(PERF_ENTRYPOINT_MODULES),
+            "applicable_requirements": sorted(set(applicable)),
+        }
 
     def load_tokenizer(self, path: str | Path) -> Mapping[str, Any]:
         from transformers import AutoTokenizer
@@ -208,6 +283,7 @@ def generate_verified_profile(
             raise RuntimeError(f"required package is absent: {name}")
 
     probe.validate_imports()
+    perf_contract = dict(probe.evalscope_perf_contract())
     tokenizer_result = dict(probe.load_tokenizer(tokenizer))
     flags = set(probe.evalscope_help_flags(evalscope_executable, REQUIRED_CLIENT_ENVIRONMENT))
     missing_flags = sorted(REQUIRED_EVALSCOPE_FLAGS - flags)
@@ -222,7 +298,7 @@ def generate_verified_profile(
         __import__("datetime").timezone.utc
     ).isoformat().replace("+00:00", "Z")
     profile: dict[str, Any] = {
-        "schema_version": 1,
+        "schema_version": CLIENT_PROFILE_SCHEMA_VERSION,
         "status": "verified",
         "client_id": client_id,
         "policy": "cpu_isolated_no_torch",
@@ -237,7 +313,11 @@ def generate_verified_profile(
             "algorithm": "sha256-dist-info-metadata-record-v1",
             "sha256": distribution_sha,
         },
-        "evalscope_perf": {"help_status": "pass", "flags": sorted(flags)},
+        "evalscope_perf": {
+            **perf_contract,
+            "help_status": "pass",
+            "flags": sorted(flags),
+        },
         "tokenizer": {
             "resolved_path": str(tokenizer.resolve()),
             **{name: _sha256_file(path) for name, path in key_files.items()},

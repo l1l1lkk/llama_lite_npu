@@ -172,3 +172,24 @@ aggregate 必须从 request-level evidence 生成，并且先于 `manifest.json`
 正式 capability smoke 前必须复核 NPU 6/7、端口、残留进程和模型挂载。OOM、HTTP/stream失败、strict token mismatch、Lite Graph fallback、真实停滞或无法安全判断残留状态时，只保留 rejected diagnostic 并停止；不得写入 aggregate。
 
 每个生命周期结束只能停止本阶段创建的客户端、server、worker或专用容器。必须复验对应端口关闭、无残留进程、NPU 6/7恢复空闲；不得删除旧 checkout、历史 bundle、profiler 或其他用户资产。清理证据本身写入 diagnostic metadata。
+
+## EvalScope perf execution profile contract
+
+Phase 3D-1 是 `request_count=0` 的 rejected diagnostic：Lite 服务已通过 health，
+但 r10 client 在提交 warmup 前导入 `evalscope.perf.main` 时因缺少 `uvicorn`
+失败，因此没有性能数字。`evalscope perf --help` 只验证 CLI 参数解析，不会验证
+execute path 的完整运行依赖。
+
+新的 verified profile 使用 schema v2。环境必须来自包含 `EvalScope[perf]` 完整
+wheel-only closure 的 fresh versioned venv，并同时通过以下 CPU-only 门禁：
+
+- 从 EvalScope METADATA 确认 `Provides-Extra: perf`；
+- 按当前 Python、平台和 `extra=perf` 计算全部 applicable requirements，逐项验证
+  installed version 满足 specifier；
+- 真实导入 `evalscope.perf.main` 与 OpenAI perf plugin；
+- 保留 AutoTokenizer imports、local-only tokenizer load 与 perf help flags 门。
+
+禁止通过 sitecustomize、修改 site-packages 或 `sys.modules` 注入制造通过。r10 仅是
+historical verified-under-schema v1 证据，不满足 schema v2 execution contract；下一环境
+必须使用 fresh versioned r11，不能原地安装修复 r10。任何上述门失败时，preflight 必须
+返回非零，且 adapter/server launch invocation count 必须为 0。

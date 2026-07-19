@@ -27,7 +27,7 @@ VLLM_BINDINGS = {
 
 def verified_profile() -> dict:
     profile = {
-        "schema_version": 1,
+        "schema_version": 2,
         "status": "verified",
         "client_id": "evalscope-client-py310-e1.8.0-ms1.36.3-tf5.5.3",
         "policy": "cpu_isolated_no_torch",
@@ -54,7 +54,18 @@ def verified_profile() -> dict:
             "sha256": "2" * 64,
         },
         "evalscope_perf": {
+            "extra": "perf",
             "help_status": "pass",
+            "entrypoint_import_status": "pass",
+            "entrypoint_modules": [
+                "evalscope.perf.main",
+                "evalscope.perf.plugin.api.openai_api",
+            ],
+            "applicable_requirements": [
+                "fastapi>=0.100",
+                "sse-starlette>=1.6",
+                "uvicorn>=0.20",
+            ],
             "flags": [
                 "--api", "--dataset", "--dataset-offset", "--dataset-path",
                 "--max-tokens", "--min-tokens", "--model", "--name",
@@ -123,6 +134,36 @@ def test_malformed_unverified_or_tampered_profile_is_rejected(tmp_path, mutation
         load_client_profile(path)
 
 
+def test_schema_v1_profile_cannot_impersonate_new_verified_profile(tmp_path):
+    profile = verified_profile()
+    profile["schema_version"] = 1
+    profile["overall_fingerprint_sha256"] = compute_profile_fingerprint(profile)
+
+    with pytest.raises(ValueError, match="schema_version=2"):
+        load_client_profile(write_profile(tmp_path, profile))
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    (
+        ("extra", None, "missing required fields"),
+        ("entrypoint_import_status", "fail", "entrypoint import status"),
+        ("entrypoint_modules", [], "entrypoint modules"),
+        ("applicable_requirements", [], "applicable requirements"),
+    ),
+)
+def test_profile_requires_complete_perf_execution_contract(tmp_path, field, value, message):
+    profile = verified_profile()
+    if value is None:
+        profile["evalscope_perf"].pop(field)
+    else:
+        profile["evalscope_perf"][field] = value
+    profile["overall_fingerprint_sha256"] = compute_profile_fingerprint(profile)
+
+    with pytest.raises(ValueError, match=message):
+        load_client_profile(write_profile(tmp_path, profile))
+
+
 def test_verified_profile_binds_absolute_client_and_readiness_depends_on_model(tmp_path):
     path = write_profile(tmp_path)
     unbound = build_campaign_plan("lite_llama", CAMPAIGN, client_profile=path)
@@ -154,6 +195,10 @@ def test_verified_profile_binds_absolute_client_and_readiness_depends_on_model(t
         (("requirements_lock", "sha256"), "7" * 64, "client_profile.requirements_lock.sha256"),
         (("tokenizer", "tokenizer_sha256"), "8" * 64, "client_profile.tokenizer.tokenizer_sha256"),
         (("overall_fingerprint_sha256",), "9" * 64, "client_profile.overall_fingerprint_sha256"),
+        (("evalscope_perf", "extra"), "wrong", "client_profile.evalscope_perf.extra"),
+        (("evalscope_perf", "entrypoint_import_status"), "fail", "client_profile.evalscope_perf.entrypoint_import_status"),
+        (("evalscope_perf", "entrypoint_modules"), ["evalscope.perf.main"], "client_profile.evalscope_perf.entrypoint_modules"),
+        (("evalscope_perf", "applicable_requirements"), ["uvicorn>=999"], "client_profile.evalscope_perf.applicable_requirements"),
     ),
 )
 def test_paired_profile_drift_is_field_level(tmp_path, path, value, error):

@@ -8,7 +8,7 @@ from benchmarks.serving.client_profile import compute_profile_fingerprint
 @pytest.fixture
 def client_profile_path(tmp_path):
     profile = {
-        "schema_version": 1,
+        "schema_version": 2,
         "status": "verified",
         "client_id": "evalscope-client-py310-e1.8.0-ms1.36.3-tf5.5.3",
         "policy": "cpu_isolated_no_torch",
@@ -35,7 +35,18 @@ def client_profile_path(tmp_path):
             "sha256": "2" * 64,
         },
         "evalscope_perf": {
+            "extra": "perf",
             "help_status": "pass",
+            "entrypoint_import_status": "pass",
+            "entrypoint_modules": [
+                "evalscope.perf.main",
+                "evalscope.perf.plugin.api.openai_api",
+            ],
+            "applicable_requirements": [
+                "fastapi>=0.100",
+                "sse-starlette>=1.6",
+                "uvicorn>=0.20",
+            ],
             "flags": [
                 "--api", "--dataset", "--dataset-offset", "--dataset-path",
                 "--max-tokens", "--min-tokens", "--model", "--name",

@@ -8,8 +8,11 @@ from pathlib import Path, PurePosixPath
 import re
 from typing import Any, Mapping
 
+from packaging.requirements import InvalidRequirement, Requirement
+from packaging.utils import canonicalize_name
 
-CLIENT_PROFILE_SCHEMA_VERSION = 1
+
+CLIENT_PROFILE_SCHEMA_VERSION = 2
 CLIENT_PROFILE_REQUIRED = "__CLIENT_PROFILE_REQUIRED__"
 CLIENT_PACKAGE_FIELDS = (
     "python",
@@ -124,7 +127,7 @@ def validate_client_profile(value: Mapping[str, Any]) -> dict[str, Any]:
     if unexpected:
         raise ValueError(f"client profile has unexpected fields: {', '.join(unexpected)}")
     if not isinstance(value["schema_version"], int) or isinstance(value["schema_version"], bool) or value["schema_version"] != CLIENT_PROFILE_SCHEMA_VERSION:
-        raise ValueError("only client profile schema_version=1 is supported")
+        raise ValueError("only client profile schema_version=2 is supported")
     if value["status"] != "verified":
         raise ValueError("client profile status must be verified")
     if not isinstance(value["client_id"], str) or not value["client_id"]:
@@ -186,15 +189,63 @@ def validate_client_profile(value: Mapping[str, Any]) -> dict[str, Any]:
     _validate_hex64(distribution["sha256"], label="client profile installed_distribution_fingerprint.sha256")
 
     perf = value["evalscope_perf"]
-    if not isinstance(perf, Mapping) or perf.get("help_status") != "pass":
-        raise ValueError("client profile EvalScope perf help status must be pass")
-    flags = perf.get("flags")
-    if set(perf) != {"help_status", "flags"}:
+    if not isinstance(perf, Mapping):
+        raise ValueError("client profile evalscope_perf must be a mapping")
+    perf_fields = {
+        "extra",
+        "help_status",
+        "flags",
+        "entrypoint_import_status",
+        "entrypoint_modules",
+        "applicable_requirements",
+    }
+    _require(perf, perf_fields, "client profile evalscope_perf")
+    if set(perf) != perf_fields:
         raise ValueError("client profile evalscope_perf has unexpected fields")
-    if not isinstance(flags, list) or not flags or len(flags) != len(set(flags)):
+    if perf.get("extra") != "perf":
+        raise ValueError("client profile EvalScope extra must be perf")
+    if perf.get("help_status") != "pass":
+        raise ValueError("client profile EvalScope perf help status must be pass")
+    if perf.get("entrypoint_import_status") != "pass":
+        raise ValueError("client profile EvalScope perf entrypoint import status must be pass")
+    flags = perf.get("flags")
+    if not isinstance(flags, list) or not flags or flags != sorted(set(flags)):
         raise ValueError("client profile EvalScope flags must be a non-empty unique list")
     if not all(isinstance(flag, str) and flag.startswith("--") for flag in flags):
         raise ValueError("client profile EvalScope flags contain an invalid item")
+    modules = perf.get("entrypoint_modules")
+    if (
+        not isinstance(modules, list)
+        or not modules
+        or modules != sorted(set(modules))
+        or not all(isinstance(module, str) and module for module in modules)
+    ):
+        raise ValueError("client profile EvalScope perf entrypoint modules must be a non-empty sorted unique list")
+    if "evalscope.perf.main" not in modules:
+        raise ValueError("client profile EvalScope perf entrypoint modules must include evalscope.perf.main")
+    requirements = perf.get("applicable_requirements")
+    if (
+        not isinstance(requirements, list)
+        or not requirements
+        or requirements != sorted(set(requirements))
+        or not all(isinstance(requirement, str) and requirement for requirement in requirements)
+    ):
+        raise ValueError("client profile EvalScope perf applicable requirements must be a non-empty sorted unique list")
+    parsed_requirements = []
+    for requirement in requirements:
+        try:
+            parsed_requirements.append(Requirement(requirement))
+        except InvalidRequirement as exc:
+            raise ValueError(
+                f"client profile EvalScope perf applicable requirement is invalid: {requirement}"
+            ) from exc
+    requirement_names = {canonicalize_name(requirement.name) for requirement in parsed_requirements}
+    missing_runtime = sorted({"fastapi", "sse-starlette", "uvicorn"} - requirement_names)
+    if missing_runtime:
+        raise ValueError(
+            "client profile EvalScope perf applicable requirements omit runtime dependencies: "
+            + ", ".join(missing_runtime)
+        )
 
     tokenizer = value["tokenizer"]
     if not isinstance(tokenizer, Mapping):

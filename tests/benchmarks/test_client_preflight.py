@@ -1,4 +1,5 @@
 import json
+import importlib.metadata
 from pathlib import Path
 import subprocess
 import sys
@@ -6,6 +7,7 @@ import sys
 import pytest
 
 from benchmarks.serving.client_preflight import (
+    RealClientProbe,
     REQUIRED_EVALSCOPE_FLAGS,
     generate_verified_profile,
     run_preflight_before_launch,
@@ -14,12 +16,22 @@ from benchmarks.serving.client_preflight import (
 from benchmarks.serving.client_profile import load_client_profile
 
 
+PERF_REQUIREMENTS = ["fastapi>=0.100", "sse-starlette>=1.6", "uvicorn>=0.20"]
+PERF_MODULES = ["evalscope.perf.main", "evalscope.perf.plugin.api.openai_api"]
+
+
 class SyntheticProbe:
-    def __init__(self, *, imports=True, tokenizer=True, help_flags=None, packages=None, identity=None):
+    def __init__(
+        self, *, imports=True, tokenizer=True, help_flags=None, packages=None,
+        identity=None, perf_error=None, perf_requirements=None, perf_modules=None,
+    ):
         self.imports = imports
         self.tokenizer = tokenizer
         self.help_flags = set(help_flags or REQUIRED_EVALSCOPE_FLAGS)
         self.packages = packages
+        self.perf_error = perf_error
+        self.perf_requirements = list(perf_requirements or PERF_REQUIREMENTS)
+        self.perf_modules = list(perf_modules or PERF_MODULES)
         self.identity = identity or {
             "executable": "/opt/client/bin/python",
             "prefix": "/opt/client",
@@ -54,6 +66,16 @@ class SyntheticProbe:
 
     def evalscope_help_flags(self, executable, environment):
         return self.help_flags
+
+    def evalscope_perf_contract(self):
+        if self.perf_error:
+            raise RuntimeError(self.perf_error)
+        return {
+            "extra": "perf",
+            "entrypoint_import_status": "pass",
+            "entrypoint_modules": self.perf_modules,
+            "applicable_requirements": self.perf_requirements,
+        }
 
     def distribution_fingerprint(self):
         return "2" * 64
@@ -121,6 +143,166 @@ def test_failed_preflight_does_not_write_verified_profile(tmp_path, probe, messa
             output_path=output,
         )
     assert not output.exists()
+
+
+@pytest.mark.parametrize(
+    ("error", "message"),
+    (
+        ("EvalScope metadata does not provide extra: perf", "does not provide extra"),
+        ("missing EvalScope perf requirement: uvicorn", "missing.*uvicorn"),
+        ("EvalScope perf requirement version mismatch: uvicorn 0.19", "version mismatch"),
+        ("EvalScope perf entrypoint import failed: No module named uvicorn", "entrypoint import failed"),
+    ),
+)
+def test_perf_contract_failures_block_profile_and_launch(tmp_path, error, message):
+    lock, tokenizer = fixture_files(tmp_path)
+    output = tmp_path / "profile.json"
+    probe = SyntheticProbe(perf_error=error)
+
+    with pytest.raises(RuntimeError, match=message):
+        generate_verified_profile(
+            client_id="synthetic-client",
+            python_executable="/opt/client/bin/python",
+            python_prefix="/opt/client",
+            evalscope_executable="/opt/client/bin/evalscope",
+            requirements_lock=lock,
+            tokenizer_path=tokenizer,
+            probe=probe,
+            output_path=output,
+        )
+    result = run_preflight_before_launch(lambda: 1, lambda: pytest.fail("launch invoked"))
+    assert result["launch_invocations"] == 0
+    assert not output.exists()
+
+
+def test_positive_profile_freezes_help_imports_and_metadata_requirements(tmp_path):
+    lock, tokenizer = fixture_files(tmp_path)
+    profile = generate_verified_profile(
+        client_id="synthetic-client",
+        python_executable="/opt/client/bin/python",
+        python_prefix="/opt/client",
+        evalscope_executable="/opt/client/bin/evalscope",
+        requirements_lock=lock,
+        tokenizer_path=tokenizer,
+        probe=SyntheticProbe(),
+    )
+
+    assert profile["schema_version"] == 2
+    assert profile["evalscope_perf"]["extra"] == "perf"
+    assert profile["evalscope_perf"]["entrypoint_import_status"] == "pass"
+    assert profile["evalscope_perf"]["entrypoint_modules"] == PERF_MODULES
+    assert profile["evalscope_perf"]["applicable_requirements"] == PERF_REQUIREMENTS
+
+
+class FakeEvalScopeDistribution:
+    def __init__(self, extras, requirements):
+        self.metadata = self
+        self.requires = requirements
+        self._extras = extras
+
+    def get_all(self, key):
+        return self._extras if key == "Provides-Extra" else None
+
+
+def install_real_perf_probe_fakes(monkeypatch, *, extras=("perf",), versions=None, import_error=None):
+    requirements = [
+        "fastapi>=0.100; extra == 'perf'",
+        "sse-starlette>=1.6; extra == 'perf'",
+        "uvicorn>=0.20; extra == 'perf'",
+        "ignored-extra>=1; extra == 'other'",
+    ]
+    versions = versions or {
+        "fastapi": "0.115.0",
+        "sse-starlette": "2.1.0",
+        "uvicorn": "0.30.0",
+    }
+    monkeypatch.setattr(
+        importlib.metadata,
+        "distribution",
+        lambda name: FakeEvalScopeDistribution(extras, requirements),
+    )
+
+    def version(name):
+        if name not in versions:
+            raise importlib.metadata.PackageNotFoundError(name)
+        return versions[name]
+
+    monkeypatch.setattr(importlib.metadata, "version", version)
+
+    def import_module(name):
+        if import_error:
+            raise ModuleNotFoundError(import_error)
+        return object()
+
+    monkeypatch.setattr("benchmarks.serving.client_preflight.importlib.import_module", import_module)
+
+
+def test_real_perf_contract_is_metadata_derived_and_imports_entrypoints(monkeypatch):
+    install_real_perf_probe_fakes(monkeypatch)
+
+    contract = RealClientProbe().evalscope_perf_contract()
+
+    assert contract["extra"] == "perf"
+    assert contract["entrypoint_import_status"] == "pass"
+    assert contract["entrypoint_modules"] == PERF_MODULES
+    assert contract["applicable_requirements"] == [
+        'fastapi>=0.100; extra == "perf"',
+        'sse-starlette>=1.6; extra == "perf"',
+        'uvicorn>=0.20; extra == "perf"',
+    ]
+
+
+def test_real_perf_contract_rejects_missing_declared_extra(monkeypatch):
+    install_real_perf_probe_fakes(monkeypatch, extras=())
+
+    with pytest.raises(RuntimeError, match="does not provide extra"):
+        RealClientProbe().evalscope_perf_contract()
+
+
+def test_real_perf_contract_rejects_missing_dependency(monkeypatch):
+    install_real_perf_probe_fakes(
+        monkeypatch,
+        versions={"fastapi": "0.115.0", "sse-starlette": "2.1.0"},
+    )
+    with pytest.raises(RuntimeError, match="missing.*uvicorn"):
+        RealClientProbe().evalscope_perf_contract()
+
+
+def test_real_perf_contract_rejects_wrong_dependency_version(monkeypatch):
+    install_real_perf_probe_fakes(
+        monkeypatch,
+        versions={"fastapi": "0.115.0", "sse-starlette": "2.1.0", "uvicorn": "0.19.0"},
+    )
+    with pytest.raises(RuntimeError, match="version mismatch.*uvicorn"):
+        RealClientProbe().evalscope_perf_contract()
+
+
+def test_real_perf_contract_rejects_actual_entrypoint_import_failure(monkeypatch):
+    install_real_perf_probe_fakes(monkeypatch, import_error="No module named 'uvicorn'")
+
+    with pytest.raises(RuntimeError, match="entrypoint import failed.*uvicorn"):
+        RealClientProbe().evalscope_perf_contract()
+
+
+def test_live_verify_rejects_perf_contract_drift(tmp_path):
+    lock, tokenizer = fixture_files(tmp_path)
+    output = tmp_path / "profile.json"
+    generate_verified_profile(
+        client_id="synthetic-client",
+        python_executable="/opt/client/bin/python",
+        python_prefix="/opt/client",
+        evalscope_executable="/opt/client/bin/evalscope",
+        requirements_lock=lock,
+        tokenizer_path=tokenizer,
+        probe=SyntheticProbe(),
+        output_path=output,
+    )
+
+    with pytest.raises(RuntimeError, match="fingerprint differs"):
+        verify_existing_profile(
+            output,
+            probe=SyntheticProbe(perf_requirements=[*PERF_REQUIREMENTS, "uvloop>=0.19"]),
+        )
 
 
 def test_cpu_isolated_policy_rejects_torch_accelerate_or_torch_npu(tmp_path):

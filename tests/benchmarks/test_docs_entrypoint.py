@@ -43,5 +43,9 @@ def test_execution_guide_keeps_bundle_rebuild_and_phase3b_contract():
         "cpu_isolated_no_torch",
         "python_prefix",
         "samefile",
+        "evalscope.perf.main",
+        "EvalScope[perf]",
+        "schema v1",
+        "request_count=0",
     ):
         assert marker in text
