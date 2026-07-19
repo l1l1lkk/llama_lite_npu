@@ -1,5 +1,7 @@
 # vLLM-Ascend Performance Benchmark
 
+> Historical/unverified：本文是旧手工测试记录，不具备 canonical v2 的冻结 workload、统一 strict validator 和 Git-tracked raw bundle。当前跨框架规则见 [`docs/benchmarks/README.md`](benchmarks/README.md)，不得把本文数字升级为 `v0.0.15rc2` 严格对比。
+
 This document records vLLM-Ascend benchmark results used as the external comparison baseline for `llama_lite_npu`.
 
 The historical `vllm-ascend 0.8.4rc2` screenshot is treated only as historical reference. New comparison data should be collected from the current vLLM-Ascend environment with complete launch parameters and EvalScope outputs.

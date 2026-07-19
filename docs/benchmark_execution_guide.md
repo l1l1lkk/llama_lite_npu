@@ -1,5 +1,7 @@
 # Benchmark 执行手册
 
+> 本文保留任务1至任务5的历史执行契约。当前统一执行指南已迁移到 [`docs/benchmarks/execution.md`](benchmarks/execution.md)；新 campaign 以 canonical v2 为准。
+
 本文汇总 Qwen3-32B、2×Atlas 910B3 基线建设任务1至任务5的统一执行方法。所有性能结论必须来自 Git-tracked reproducibility bundle，不能只保留人工表格，也不能依赖服务器上可能被清理的 SQLite、HTML 或完整日志。
 
 ## 固定契约

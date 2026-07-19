@@ -1,0 +1,49 @@
+schema_version: 2
+campaign_id: p0_smoke
+kind: performance
+model: qwen3_32b_tp2_fp16
+frameworks:
+  - lite_llama
+  - vllm_ascend
+workload:
+  id: qwen3_32b_p128_smoke_uncalibrated_v1
+  formal_dataset: benchmarks/workloads/qwen3_32b_p128_smoke_uncalibrated_v1/formal.jsonl
+  warmup_dataset: benchmarks/workloads/qwen3_32b_p128_smoke_uncalibrated_v1/warmup.jsonl
+  manifest: benchmarks/workloads/qwen3_32b_p128_smoke_uncalibrated_v1/workload.json
+  seed: 42
+  formal_offset: 0
+  warmup_offset: 0
+  request_order: frozen_jsonl
+  actual_token_calibrated: false
+cases:
+  - id: p128_o64_c1
+    prompt_tokens: 128
+    output_tokens: 64
+    concurrency: 1
+    formal_requests: 4
+    warmup_requests: 2
+repeats: 1
+lifecycle: independent_per_run
+stream: true
+sampling:
+  temperature: 0.0
+  top_p: 1.0
+fixed_output:
+  strategy: min_equals_max
+  capability_probe_required: true
+  capability_probed: false
+graph:
+  mode: production
+  required: false
+  causal_claim: false
+  unsupported_policy: record_and_continue
+failure_gates:
+  strict_input_tokens: true
+  strict_output_tokens: true
+  zero_failed_requests: true
+  request_order: true
+  workload_fingerprint: true
+  environment_fingerprint: true
+  graph_fallback: framework_capability_aware
+result_root: benchmarks/results
+total_timeout_s: 21600

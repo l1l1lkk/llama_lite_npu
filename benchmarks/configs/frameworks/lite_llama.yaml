@@ -1,0 +1,36 @@
+schema_version: 2
+framework: lite_llama
+base_url: http://127.0.0.1:8213
+endpoint_path: /v1/chat/completions
+health_path: /health
+launch:
+  environment:
+    ASCEND_RT_VISIBLE_DEVICES: "6,7"
+  command:
+    - python
+    - -m
+    - torch.distributed.run
+    - --nproc_per_node={tensor_parallel_size}
+    - server.py
+    - --checkpoints_dir
+    - "{checkpoint}"
+    - --host
+    - 0.0.0.0
+    - --port
+    - "8213"
+    - --max_seq_len
+    - "4096"
+    - --page_size
+    - "16"
+    - --compiled_model
+    - --continuous_batching
+    - --max_batch_size
+    - "32"
+    - --no_decode_priority
+metrics:
+  request_timing: supported
+  scheduler: supported
+  kv_pages: supported
+  graph_counters: supported
+  fallback_counters: supported
+  npu_usage: supported

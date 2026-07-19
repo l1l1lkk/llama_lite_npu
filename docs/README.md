@@ -10,7 +10,8 @@
 - [中文项目首页](../README_CN.md)：与英文首页同步的中文版本。
 - [版本管理规范](versioning.md)：版本号、变更日志、发布文档与 Tag 规则。
 - [变更日志](../CHANGELOG.md)：按时间倒序记录版本变化。
-- [推理性能历史](inference_performance_history.md)：记录各版本核心测试结果。
+- [Benchmark 总入口](benchmarks/README.md)：当前统一 runner、执行指南、campaign 与历史证据等级。
+- [旧推理性能记录](inference_performance_history.md)：迁移前历史表；当前索引统一见 Benchmark 总入口。
 - [性能优化记录](performance_optimization.md)：记录主要优化方向和阶段结论。
 - [错误复盘记录](bug_records.md)：记录框架开发中的错误、排查和修复经验。
 - [可观测性与 Prometheus 指标](observability.md)：指标、PromQL 和抓取配置。
@@ -45,8 +46,7 @@
 
 ## 外部对比基线
 
-- [vLLM-Ascend 性能基线](vllm_ascend_benchmark.md)：外部
-  vLLM-Ascend 对比数据和 EvalScope 测试说明。
+- [vLLM-Ascend 历史手工记录](vllm_ascend_benchmark.md)：缺 canonical v2 原始证据，不能作为当前严格对比；当前规则见 [Benchmark 总入口](benchmarks/README.md)。
 
 ## 历史教程文档
 

@@ -1,0 +1,16 @@
+{
+  "schema_version": 2,
+  "workload_id": "qwen3_32b_p128_smoke_uncalibrated_v1",
+  "seed": 42,
+  "formal_offset": 0,
+  "warmup_offset": 0,
+  "request_order": "frozen_jsonl",
+  "formal_requests": 4,
+  "warmup_requests": 2,
+  "formal_sha256": "3b8203b69d16536662ec1addd44919754b0f393f956be231d1944c1ddd7761aa",
+  "warmup_sha256": "f0a575f837caa1aae342c4793fced577a43aed57496fd4cae4e78c8f26d0a477",
+  "target_server_input_tokens": 128,
+  "actual_token_calibrated": false,
+  "strict_publishable": false,
+  "note": "Phase 2 synthetic planning fixture. Phase 3 must calibrate actual server-side token length and freeze accepted prompts before any formal run."
+}

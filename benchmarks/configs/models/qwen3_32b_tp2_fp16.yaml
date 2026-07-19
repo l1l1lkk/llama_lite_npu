@@ -1,0 +1,14 @@
+schema_version: 2
+model_id: qwen3_32b_tp2_fp16
+served_name: Qwen3-32B
+# Phase 3 must resolve both placeholders to the same files and record their SHA256.
+checkpoint: ${QWEN3_32B_CHECKPOINT}
+tokenizer: ${QWEN3_32B_TOKENIZER}
+config_sha256: capability-probe-required
+dtype: fp16
+tensor_parallel_size: 2
+max_sequence_length: 4096
+hardware:
+  accelerator: Atlas 910B3
+  device_count: 2
+  visible_devices: "6,7"

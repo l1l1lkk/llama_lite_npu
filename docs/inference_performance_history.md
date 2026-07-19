@@ -1,5 +1,7 @@
 # 推理性能历史记录
 
+> 本文是迁移前历史明细，包含多种 client 与 workload。当前唯一历史索引为 [`docs/benchmarks/history.md`](benchmarks/history.md)；只有完整匹配 canonical contract 的结果才能进入当前比较。
+
 本文按时间倒序记录项目的核心推理性能，用于观察版本演进和性能回归。
 
 ## 记录规则

@@ -1,0 +1,33 @@
+schema_version: 2
+framework: vllm_ascend
+base_url: http://127.0.0.1:8000
+endpoint_path: /v1/chat/completions
+health_path: /health
+launch:
+  environment:
+    ASCEND_RT_VISIBLE_DEVICES: "6,7"
+  command:
+    - vllm
+    - serve
+    - "{checkpoint}"
+    - --served-model-name
+    - "{served_name}"
+    - --dtype
+    - "{dtype}"
+    - --tensor-parallel-size
+    - "{tensor_parallel_size}"
+    - --max-model-len
+    - "4096"
+    - --max-num-seqs
+    - "32"
+    - --block-size
+    - "128"
+    - --compilation-config
+    - '{"cudagraph_mode":"FULL_DECODE_ONLY","cudagraph_capture_sizes":[1,4,8,16,32]}'
+metrics:
+  request_timing: unsupported
+  scheduler: supported
+  kv_pages: unsupported
+  graph_counters: unsupported
+  fallback_counters: unsupported
+  npu_usage: supported

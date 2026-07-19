@@ -1,5 +1,7 @@
 # Qwen3-32B TP=2 FP16 benchmark contract
 
+> 本目录保留 20260711--20260714 historical v1 campaign 的重建工具和契约。新 benchmark 使用 [`benchmarks/serving/`](../serving/) canonical v2 harness，当前文档入口为 [`docs/benchmarks/README.md`](../../docs/benchmarks/README.md)。旧 bundle 不迁移、不重写，也不能替代当前版本数据。
+
 This directory defines the reproducible primary server baseline for
 Qwen3-32B on 2 x Atlas 910B3. It replaces ad-hoc table-only measurements;
 historical figures remain historical and are not silently mixed into this
