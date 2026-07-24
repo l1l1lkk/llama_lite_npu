@@ -30,10 +30,35 @@ class _FakeInferenceMetrics:
 
 
 observability_module.InferenceMetrics = _FakeInferenceMetrics
+tracing_module = types.ModuleType("lite_llama.tracing")
+
+
+class _FakeTraceManager:
+    enabled = False
+
+    def allows(self, _level):
+        return False
+
+    def close(self):
+        return None
+
+    def snapshot(self, **_kwargs):
+        return {"enabled": False, "events": []}
+
+
+tracing_module.TraceManager = _FakeTraceManager
+tracing_module.TraceLifecycleObserver = lambda manager: manager
+tracing_module.ObserverHub = lambda *observers: observers[0]
+tracing_module.TracingBackend = lambda backend, manager, rank=0: backend
+tracing_module.install_generator_layer_hooks = lambda generator, manager: None
+tracing_module.rank_output_path = (
+    lambda output_path, rank, tensor_parallel: output_path
+)
 sys.modules.setdefault("lite_llama", lite_llama_module)
 sys.modules.setdefault("lite_llama.utils", utils_module)
 sys.modules.setdefault("lite_llama.utils.device", device_module)
 sys.modules.setdefault("lite_llama.observability", observability_module)
+sys.modules.setdefault("lite_llama.tracing", tracing_module)
 
 import server
 

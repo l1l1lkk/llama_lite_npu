@@ -277,6 +277,18 @@ throughput, KV page usage, preemption, and NPU Graph activity.
 See the [observability guide](docs/observability.md) for metric names, PromQL
 examples, and a Prometheus scrape configuration.
 
+For request, scheduler, and model-layer progress, start the live trace viewer:
+
+```bash
+python -m lite_llama.trace_cli run --trace-level layer --no-open -- \
+  --checkpoints_dir my_weight/Qwen3-32B --port 8213
+```
+
+Open `http://127.0.0.1:8213/debug/trace`. The layer mode automatically disables
+NPU Graph unless the server arguments explicitly select a Graph mode. See the
+[inference trace guide](docs/inference_trace.md) for SSE endpoints, JSONL
+recording, TP rank files, timing semantics, and privacy boundaries.
+
 ## Repository Guide
 
 ```text
@@ -302,6 +314,7 @@ docs/bug_records.md          engineering mistakes and root-cause reviews
 - [Performance history](docs/inference_performance_history.md)
 - [Engineering bug records](docs/bug_records.md)
 - [Observability guide](docs/observability.md)
+- [Inference trace viewer](docs/inference_trace.md)
 - [v0.0.10rc3 release notes](docs/releases/v0.0.10rc3.md)
 
 ## Current Limitations

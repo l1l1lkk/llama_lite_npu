@@ -30,11 +30,35 @@ def load_server_module():
     observability.InferenceMetrics = type(
         "InferenceMetrics", (), {"__init__": lambda self: None}
     )
+    tracing = ModuleType("lite_llama.tracing")
+    tracing.TraceManager = type(
+        "TraceManager",
+        (),
+        {
+            "__init__": lambda self: setattr(self, "enabled", False),
+            "allows": lambda self, level: False,
+            "close": lambda self: None,
+            "snapshot": lambda self, **kwargs: {
+                "enabled": False,
+                "events": [],
+            },
+        },
+    )
+    tracing.TraceLifecycleObserver = lambda manager: manager
+    tracing.ObserverHub = lambda *observers: observers[0]
+    tracing.TracingBackend = lambda backend, manager, rank=0: backend
+    tracing.install_generator_layer_hooks = (
+        lambda generator, manager: None
+    )
+    tracing.rank_output_path = (
+        lambda output_path, rank, tensor_parallel: output_path
+    )
     stubs = {
         "lite_llama": package,
         "lite_llama.utils": utils,
         "lite_llama.utils.device": device,
         "lite_llama.observability": observability,
+        "lite_llama.tracing": tracing,
     }
     saved = {name: sys.modules.get(name) for name in stubs}
     sys.modules.update(stubs)

@@ -41,10 +41,27 @@ class ServerContinuousBatchingContractTest(unittest.TestCase):
         self.assertIn("_metrics.snapshot()", self.source)
 
     def test_server_injects_metrics_and_request_endpoint(self):
-        self.assertIn("metrics=_metrics", self.source)
+        self.assertIn("metrics=_observer", self.source)
         self.assertIn('endpoint="chat"', self.source)
         self.assertIn('endpoint="completion"', self.source)
         self.assertIn("_sync_runtime_metrics", self.source)
+
+    def test_server_exposes_live_inference_trace(self):
+        for option in (
+            "--trace",
+            "--trace_level",
+            "--trace_output",
+            "--trace_buffer_events",
+        ):
+            self.assertIn(option, self.source)
+        for endpoint in (
+            'app.get("/debug/trace"',
+            'app.get("/debug/trace/snapshot")',
+            'app.get("/debug/trace/events")',
+        ):
+            self.assertIn(endpoint, self.source)
+        self.assertIn("TracingBackend", self.source)
+        self.assertIn("install_generator_layer_hooks", self.source)
 
     def test_server_exposes_expert_parallel_mode(self):
         self.assertIn("--moe_parallel_mode", self.source)

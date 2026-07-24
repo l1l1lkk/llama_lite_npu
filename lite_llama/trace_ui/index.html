@@ -1,0 +1,512 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LiteLlama Trace</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #071017;
+      --panel: rgba(14, 27, 38, .88);
+      --panel-2: #102331;
+      --line: rgba(152, 184, 204, .16);
+      --text: #e8f1f5;
+      --muted: #8da5b3;
+      --cyan: #4bd5e7;
+      --blue: #5b8cff;
+      --violet: #a879ff;
+      --green: #5fe1a4;
+      --amber: #f7bf62;
+      --red: #ff7188;
+      --radius: 14px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 12% -10%, rgba(62, 144, 255, .22), transparent 35%),
+        radial-gradient(circle at 88% 0%, rgba(131, 83, 255, .16), transparent 28%),
+        var(--bg);
+      font: 13px/1.45 Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 18px 24px 14px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(7, 16, 23, .82);
+      backdrop-filter: blur(18px);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-mark {
+      width: 34px; height: 34px; border-radius: 10px;
+      display: grid; place-items: center;
+      background: linear-gradient(135deg, var(--cyan), var(--blue) 52%, var(--violet));
+      box-shadow: 0 0 28px rgba(75, 213, 231, .24);
+      color: #05141d; font-weight: 900;
+    }
+    h1 { font-size: 17px; margin: 0; letter-spacing: .02em; }
+    .subtitle { color: var(--muted); font-size: 11px; margin-top: 2px; }
+    .toolbar { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+    button, select {
+      color: var(--text); background: #10212d; border: 1px solid var(--line);
+      border-radius: 9px; padding: 7px 10px; font: inherit; cursor: pointer;
+    }
+    button:hover { border-color: rgba(75, 213, 231, .5); }
+    .status-pill {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 7px 10px; border: 1px solid var(--line); border-radius: 999px;
+      color: var(--muted); background: rgba(10, 23, 32, .8);
+    }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--amber); }
+    .online .dot { background: var(--green); box-shadow: 0 0 10px var(--green); }
+    .error .dot { background: var(--red); }
+    main { padding: 18px 24px 30px; max-width: 1800px; margin: 0 auto; }
+    .metrics {
+      display: grid; grid-template-columns: repeat(6, minmax(135px, 1fr));
+      gap: 10px; margin-bottom: 12px;
+    }
+    .metric, .panel {
+      background: linear-gradient(150deg, rgba(18, 39, 53, .86), rgba(10, 23, 33, .9));
+      border: 1px solid var(--line); border-radius: var(--radius);
+      box-shadow: 0 12px 38px rgba(0, 0, 0, .16);
+    }
+    .metric { padding: 13px 14px; min-height: 78px; }
+    .metric-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+    .metric-value { font-size: 22px; font-weight: 720; margin-top: 5px; font-variant-numeric: tabular-nums; }
+    .metric-sub { color: var(--muted); font-size: 10px; margin-top: 2px; }
+    .pipeline {
+      display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;
+      margin-bottom: 12px;
+    }
+    .stage {
+      position: relative; padding: 11px 13px; border: 1px solid var(--line);
+      border-radius: 11px; background: rgba(13, 29, 40, .8); overflow: hidden;
+    }
+    .stage::after {
+      content: ""; position: absolute; left: 0; bottom: 0; height: 2px;
+      width: var(--load, 0%); background: var(--stage-color, var(--cyan));
+      transition: width .25s ease;
+    }
+    .stage b { display: block; font-size: 12px; }
+    .stage span { color: var(--muted); font-variant-numeric: tabular-nums; }
+    .workspace {
+      display: grid; grid-template-columns: minmax(270px, .8fr) minmax(440px, 1.7fr) minmax(260px, .8fr);
+      gap: 12px; align-items: stretch;
+    }
+    .panel { min-width: 0; overflow: hidden; }
+    .panel-head {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 10px; padding: 11px 13px; border-bottom: 1px solid var(--line);
+    }
+    .panel-head h2 { font-size: 12px; margin: 0; text-transform: uppercase; letter-spacing: .09em; }
+    .panel-meta { color: var(--muted); font-size: 10px; }
+    .scroll { overflow: auto; height: 410px; padding: 8px; }
+    .request {
+      padding: 9px 10px; border: 1px solid transparent; border-radius: 9px;
+      background: rgba(17, 36, 49, .72); margin-bottom: 6px;
+    }
+    .request:hover { border-color: var(--line); }
+    .request-top { display: flex; justify-content: space-between; gap: 10px; }
+    .request-id { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #c9e7f0; }
+    .request-state { color: var(--amber); font-size: 10px; text-transform: uppercase; }
+    .request.done .request-state { color: var(--green); }
+    .request.failed .request-state { color: var(--red); }
+    .request-stats { display: flex; gap: 10px; color: var(--muted); font-size: 10px; margin-top: 5px; }
+    .layers {
+      height: 410px; overflow: auto; padding: 12px;
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+      align-content: start; gap: 7px;
+    }
+    .layer {
+      min-height: 48px; border: 1px solid var(--line); border-radius: 9px;
+      background: #0c1c27; padding: 7px 8px; transition: .12s ease;
+    }
+    .layer.active {
+      border-color: var(--cyan); background: rgba(39, 126, 151, .24);
+      box-shadow: 0 0 18px rgba(75, 213, 231, .18); transform: translateY(-1px);
+    }
+    .layer.recent { border-color: rgba(95, 225, 164, .46); }
+    .layer-name { color: #cbe5ee; font-size: 10px; }
+    .layer-time { color: var(--muted); font-size: 9px; margin-top: 5px; font-variant-numeric: tabular-nums; }
+    .batch {
+      padding: 9px 10px; margin-bottom: 6px; border-left: 2px solid var(--blue);
+      background: rgba(17, 36, 49, .72); border-radius: 6px;
+    }
+    .batch.prefill, .batch.prefill_chunk { border-left-color: var(--violet); }
+    .batch.decode { border-left-color: var(--cyan); }
+    .batch-title { display: flex; justify-content: space-between; }
+    .batch-meta { color: var(--muted); font-size: 10px; margin-top: 4px; }
+    .timeline { margin-top: 12px; }
+    #timeline { width: 100%; height: 230px; display: block; }
+    .empty { color: var(--muted); padding: 24px 12px; text-align: center; }
+    .warning {
+      display: none; margin-bottom: 12px; padding: 10px 12px; border-radius: 10px;
+      color: #ffe0a7; background: rgba(133, 85, 18, .24); border: 1px solid rgba(247, 191, 98, .32);
+    }
+    .warning.show { display: block; }
+    @media (max-width: 1100px) {
+      .metrics { grid-template-columns: repeat(3, 1fr); }
+      .workspace { grid-template-columns: 1fr 1.5fr; }
+      .workspace .panel:last-child { grid-column: 1 / -1; }
+    }
+    @media (max-width: 720px) {
+      header { align-items: flex-start; padding: 14px; }
+      main { padding: 12px; }
+      .metrics { grid-template-columns: repeat(2, 1fr); }
+      .pipeline { grid-template-columns: 1fr 1fr; }
+      .workspace { grid-template-columns: 1fr; }
+      .workspace .panel:last-child { grid-column: auto; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="brand-mark">L</div>
+      <div>
+        <h1>LiteLlama Trace</h1>
+        <div class="subtitle" id="session">等待 Trace 会话</div>
+      </div>
+    </div>
+    <div class="toolbar">
+      <span class="status-pill" id="connection"><span class="dot"></span><span>连接中</span></span>
+      <select id="phaseFilter" aria-label="阶段筛选">
+        <option value="all">全部阶段</option>
+        <option value="prefill">Prefill</option>
+        <option value="decode">Decode</option>
+      </select>
+      <button id="pause">暂停</button>
+      <button id="clear">清空视图</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="warning" id="warning"></div>
+    <section class="metrics">
+      <article class="metric"><div class="metric-label">TTFT</div><div class="metric-value" id="ttft">—</div><div class="metric-sub">最近完成请求</div></article>
+      <article class="metric"><div class="metric-label">TPOT</div><div class="metric-value" id="tpot">—</div><div class="metric-sub">相邻 Token 平均</div></article>
+      <article class="metric"><div class="metric-label">Queue</div><div class="metric-value" id="queue">0</div><div class="metric-sub">等待 / Prefill</div></article>
+      <article class="metric"><div class="metric-label">Running</div><div class="metric-value" id="running">0</div><div class="metric-sub">Decode 请求</div></article>
+      <article class="metric"><div class="metric-label">Batches</div><div class="metric-value" id="batchCount">0</div><div class="metric-sub">当前会话</div></article>
+      <article class="metric"><div class="metric-label">Events</div><div class="metric-value" id="eventCount">0</div><div class="metric-sub" id="dropCount">Dropped 0</div></article>
+    </section>
+
+    <section class="pipeline">
+      <div class="stage" id="stageReceive" style="--stage-color:var(--blue)"><b>Request</b><span>0 received</span></div>
+      <div class="stage" id="stageQueue" style="--stage-color:var(--amber)"><b>Scheduler Queue</b><span>0 waiting</span></div>
+      <div class="stage" id="stagePrefill" style="--stage-color:var(--violet)"><b>Prefill</b><span>0 active</span></div>
+      <div class="stage" id="stageDecode" style="--stage-color:var(--cyan)"><b>Decode</b><span>0 running</span></div>
+      <div class="stage" id="stageDone" style="--stage-color:var(--green)"><b>Complete</b><span>0 finished</span></div>
+    </section>
+
+    <section class="workspace">
+      <article class="panel">
+        <div class="panel-head"><h2>Requests</h2><span class="panel-meta" id="requestMeta">0 active</span></div>
+        <div class="scroll" id="requests"><div class="empty">尚无请求事件</div></div>
+      </article>
+      <article class="panel">
+        <div class="panel-head"><h2>Model Layers</h2><span class="panel-meta" id="layerMeta">等待 Layer Hook</span></div>
+        <div class="layers" id="layers"><div class="empty">使用 --trace_level layer 查看逐层进度</div></div>
+      </article>
+      <article class="panel">
+        <div class="panel-head"><h2>Execution Batches</h2><span class="panel-meta" id="batchMeta">0 active</span></div>
+        <div class="scroll" id="batches"><div class="empty">尚无 Prefill / Decode Batch</div></div>
+      </article>
+    </section>
+
+    <article class="panel timeline">
+      <div class="panel-head"><h2>Request Timeline</h2><span class="panel-meta">实时窗口 · Host dispatch time</span></div>
+      <canvas id="timeline"></canvas>
+    </article>
+  </main>
+
+  <script>
+    (() => {
+      const MAX_EVENTS = 12000;
+      const MAX_REQUESTS = 80;
+      const state = {
+        paused: false, events: [], requests: new Map(), batches: new Map(),
+        layers: new Map(), scheduler: {waiting: 0, prefilling: 0, running: 0},
+        lastSeq: 0, dropped: 0, level: "request", source: null, dirty: true
+      };
+      const $ = id => document.getElementById(id);
+      const fmtMs = ns => ns == null ? "—" : `${(ns / 1e6).toFixed(ns < 1e9 ? 1 : 0)} ms`;
+      const shortId = id => id.length > 22 ? `${id.slice(0, 9)}…${id.slice(-8)}` : id;
+      const operationOf = event => event.operation || event.event.replace(/_(start|end|error)$/, "");
+
+      function setConnection(kind, label) {
+        const el = $("connection");
+        el.className = `status-pill ${kind}`;
+        el.lastElementChild.textContent = label;
+      }
+
+      function requestRecord(event) {
+        const id = event.request_id;
+        if (!id) return null;
+        if (!state.requests.has(id)) {
+          state.requests.set(id, {
+            id, endpoint: event.endpoint || "unknown", state: "queued",
+            promptTokens: event.prompt_tokens || 0, generatedTokens: 0,
+            submitted: event.timestamp_ns, admitted: null, firstToken: null,
+            lastToken: null, finished: null, finishReason: null, events: []
+          });
+        }
+        return state.requests.get(id);
+      }
+
+      function ingest(event) {
+        if (!event || event.seq == null || event.seq <= state.lastSeq) return;
+        state.lastSeq = event.seq;
+        state.events.push(event);
+        if (state.events.length > MAX_EVENTS) state.events.splice(0, state.events.length - MAX_EVENTS);
+
+        const request = requestRecord(event);
+        if (request) {
+          request.events.push(event);
+          if (event.event === "request_submitted") {
+            request.state = "queued"; request.submitted = event.timestamp_ns;
+          } else if (event.event === "request_admitted") {
+            request.state = "prefill"; request.admitted = event.timestamp_ns;
+          } else if (event.event === "token_sampled") {
+            request.state = "decode";
+            request.generatedTokens = event.generated_tokens || request.generatedTokens + 1;
+            if (!request.firstToken) request.firstToken = event.timestamp_ns;
+            request.lastToken = event.timestamp_ns;
+          } else if (event.event === "request_finished") {
+            request.state = "done"; request.finished = event.timestamp_ns;
+            request.finishReason = event.finish_reason;
+          } else if (event.event === "request_failed") {
+            request.state = "failed"; request.finished = event.timestamp_ns;
+          }
+        }
+
+        if (event.event === "scheduler_state") {
+          state.scheduler = {
+            waiting: event.waiting || 0,
+            prefilling: event.prefilling || 0,
+            running: event.running || 0
+          };
+        }
+
+        if (/_start$/.test(event.event) && event.batch_id != null) {
+          state.batches.set(event.batch_id, {
+            id: event.batch_id, operation: operationOf(event), active: true,
+            start: event.timestamp_ns, end: null, duration: null,
+            requestIds: event.request_ids || [], batchSize: event.batch_size || 0,
+            executionMode: event.execution_mode || "eager", rank: event.rank
+          });
+        } else if (/_(end|error)$/.test(event.event) && event.batch_id != null) {
+          const batch = state.batches.get(event.batch_id);
+          if (batch) {
+            batch.active = false; batch.end = event.timestamp_ns;
+            batch.duration = event.host_duration_us;
+            batch.error = /_error$/.test(event.event);
+          }
+        }
+
+        if ((event.event === "layer_start" || event.event === "layer_end") && event.module) {
+          const layer = state.layers.get(event.module) || {
+            name: event.module, index: event.layer_index, active: false,
+            recent: false, duration: null, operation: null, batchId: null
+          };
+          layer.active = event.event === "layer_start";
+          layer.recent = event.event === "layer_end";
+          layer.duration = event.host_duration_us ?? layer.duration;
+          layer.operation = event.operation;
+          layer.batchId = event.batch_id;
+          state.layers.set(event.module, layer);
+          if (event.event === "layer_end") {
+            setTimeout(() => { layer.recent = false; state.dirty = true; }, 700);
+          }
+        }
+        state.dirty = true;
+      }
+
+      function metricSamples() {
+        const completed = [...state.requests.values()].filter(r => r.finished);
+        const latest = completed[completed.length - 1];
+        let ttft = null, tpot = null;
+        if (latest && latest.firstToken) ttft = latest.firstToken - latest.submitted;
+        if (latest && latest.generatedTokens > 1 && latest.lastToken && latest.firstToken) {
+          tpot = (latest.lastToken - latest.firstToken) / (latest.generatedTokens - 1);
+        }
+        return {ttft, tpot, completed};
+      }
+
+      function renderMetrics() {
+        const {ttft, tpot, completed} = metricSamples();
+        $("ttft").textContent = fmtMs(ttft);
+        $("tpot").textContent = fmtMs(tpot);
+        $("queue").textContent = `${state.scheduler.waiting} / ${state.scheduler.prefilling}`;
+        $("running").textContent = state.scheduler.running;
+        $("batchCount").textContent = state.batches.size;
+        $("eventCount").textContent = state.events.length.toLocaleString();
+        $("dropCount").textContent = `Dropped ${state.dropped.toLocaleString()}`;
+        const active = [...state.requests.values()].filter(r => !["done", "failed"].includes(r.state)).length;
+        $("requestMeta").textContent = `${active} active`;
+        $("batchMeta").textContent = `${[...state.batches.values()].filter(b => b.active).length} active`;
+
+        const total = Math.max(1, state.requests.size);
+        const stageData = [
+          ["stageReceive", state.requests.size, `${state.requests.size} received`],
+          ["stageQueue", state.scheduler.waiting, `${state.scheduler.waiting} waiting`],
+          ["stagePrefill", state.scheduler.prefilling, `${state.scheduler.prefilling} active`],
+          ["stageDecode", state.scheduler.running, `${state.scheduler.running} running`],
+          ["stageDone", completed.length, `${completed.length} finished`]
+        ];
+        stageData.forEach(([id, value, label]) => {
+          const el = $(id); el.style.setProperty("--load", `${Math.min(100, value / total * 100)}%`);
+          el.querySelector("span").textContent = label;
+        });
+      }
+
+      function renderRequests() {
+        const container = $("requests");
+        const rows = [...state.requests.values()].slice(-MAX_REQUESTS).reverse();
+        if (!rows.length) { container.innerHTML = '<div class="empty">尚无请求事件</div>'; return; }
+        container.innerHTML = rows.map(request => {
+          const elapsed = (request.finished || request.lastToken || request.submitted) - request.submitted;
+          return `<div class="request ${request.state}">
+            <div class="request-top"><span class="request-id" title="${request.id}">${shortId(request.id)}</span><span class="request-state">${request.state}</span></div>
+            <div class="request-stats"><span>prompt ${request.promptTokens}</span><span>output ${request.generatedTokens}</span><span>${fmtMs(elapsed)}</span></div>
+          </div>`;
+        }).join("");
+      }
+
+      function renderLayers() {
+        const container = $("layers");
+        const filter = $("phaseFilter").value;
+        const layers = [...state.layers.values()]
+          .filter(layer => filter === "all" || layer.operation === filter)
+          .sort((a, b) => {
+            if (typeof a.index === "number" && typeof b.index === "number") return a.index - b.index;
+            return a.name.localeCompare(b.name);
+          });
+        if (!layers.length) {
+          container.innerHTML = '<div class="empty">使用 --trace_level layer 查看逐层进度</div>';
+          $("layerMeta").textContent = "等待 Layer Hook";
+          return;
+        }
+        $("layerMeta").textContent = `${layers.length} layers · host dispatch`;
+        container.innerHTML = layers.map(layer => `<div class="layer ${layer.active ? "active" : ""} ${layer.recent ? "recent" : ""}">
+          <div class="layer-name">Layer ${layer.index}</div>
+          <div class="layer-time">${layer.operation || "—"} · ${layer.duration == null ? "—" : `${layer.duration.toFixed(1)} µs`}</div>
+        </div>`).join("");
+      }
+
+      function renderBatches() {
+        const container = $("batches");
+        const filter = $("phaseFilter").value;
+        const rows = [...state.batches.values()]
+          .filter(batch => filter === "all" || batch.operation.startsWith(filter))
+          .slice(-70).reverse();
+        if (!rows.length) { container.innerHTML = '<div class="empty">尚无 Prefill / Decode Batch</div>'; return; }
+        container.innerHTML = rows.map(batch => `<div class="batch ${batch.operation}">
+          <div class="batch-title"><b>#${batch.id} ${batch.operation}</b><span>${batch.active ? "running" : batch.error ? "error" : "done"}</span></div>
+          <div class="batch-meta">rank ${batch.rank} · ${batch.executionMode} · batch ${batch.batchSize} · ${batch.duration == null ? "—" : `${batch.duration.toFixed(1)} µs`}</div>
+        </div>`).join("");
+      }
+
+      function renderTimeline() {
+        const canvas = $("timeline"), rect = canvas.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+        const width = Math.max(300, Math.floor(rect.width)), height = Math.max(180, Math.floor(rect.height));
+        if (canvas.width !== width * dpr || canvas.height !== height * dpr) {
+          canvas.width = width * dpr; canvas.height = height * dpr;
+        }
+        const ctx = canvas.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, width, height);
+        const requests = [...state.requests.values()].slice(-12);
+        if (!requests.length) {
+          ctx.fillStyle = "#8da5b3"; ctx.font = "12px system-ui"; ctx.fillText("等待请求事件…", 18, 32); return;
+        }
+        const times = state.events.map(event => event.timestamp_ns);
+        const min = Math.min(...times), max = Math.max(...times, min + 1e6), span = max - min;
+        const labelWidth = 115, rowH = Math.min(16, (height - 28) / requests.length);
+        ctx.font = "10px ui-monospace, monospace";
+        requests.forEach((request, index) => {
+          const y = 20 + index * rowH;
+          ctx.fillStyle = "#8da5b3"; ctx.fillText(shortId(request.id), 8, y + 9);
+          ctx.fillStyle = "rgba(152,184,204,.09)"; ctx.fillRect(labelWidth, y, width - labelWidth - 10, rowH - 3);
+          const events = request.events;
+          for (let i = 0; i < events.length - 1; i++) {
+            const event = events[i], next = events[i + 1];
+            const x = labelWidth + (event.timestamp_ns - min) / span * (width - labelWidth - 12);
+            const x2 = labelWidth + (next.timestamp_ns - min) / span * (width - labelWidth - 12);
+            const color = event.event === "request_submitted" ? "#f7bf62" :
+              event.event === "request_admitted" ? "#a879ff" :
+              event.event === "token_sampled" ? "#4bd5e7" : "#5fe1a4";
+            ctx.fillStyle = color; ctx.fillRect(x, y + 2, Math.max(2, x2 - x), rowH - 7);
+          }
+        });
+      }
+
+      function render() {
+        if (!state.dirty || state.paused) return;
+        state.dirty = false;
+        renderMetrics(); renderRequests(); renderLayers(); renderBatches(); renderTimeline();
+      }
+      function animationLoop() { render(); requestAnimationFrame(animationLoop); }
+
+      async function boot() {
+        try {
+          const response = await fetch("./trace/snapshot?limit=10000", {cache: "no-store"});
+          const snapshot = await response.json();
+          state.level = snapshot.level || "request";
+          state.dropped = snapshot.dropped_events || 0;
+          $("session").textContent = `${snapshot.session_id} · rank ${snapshot.rank} · ${state.level}`;
+          (snapshot.events || []).forEach(ingest);
+          if (!snapshot.enabled) {
+            $("warning").textContent = "Trace 当前未启用。请使用 server.py --trace 或 python -m lite_llama.trace_cli run 启动。";
+            $("warning").classList.add("show");
+            setConnection("error", "Trace 未启用");
+            return;
+          }
+          if (state.level === "layer") {
+            $("warning").textContent = "Layer 时间为 Host dispatch time；NPU Graph Replay 不会逐层进入 Python Hook。";
+            $("warning").classList.add("show");
+          }
+          connect();
+        } catch (error) {
+          setConnection("error", "加载失败");
+          $("warning").textContent = `无法加载 Trace 快照：${error.message}`;
+          $("warning").classList.add("show");
+        }
+      }
+
+      function connect() {
+        if (state.source) state.source.close();
+        state.source = new EventSource(`./trace/events?after_seq=${state.lastSeq}`);
+        state.source.addEventListener("trace", message => {
+          try { ingest(JSON.parse(message.data)); } catch (_) {}
+        });
+        state.source.onopen = () => setConnection("online", "Live");
+        state.source.onerror = () => setConnection("error", "重连中");
+      }
+
+      $("pause").addEventListener("click", event => {
+        state.paused = !state.paused;
+        event.currentTarget.textContent = state.paused ? "继续" : "暂停";
+        if (!state.paused) state.dirty = true;
+      });
+      $("clear").addEventListener("click", () => {
+        state.events = []; state.requests.clear(); state.batches.clear(); state.layers.clear();
+        state.dirty = true;
+      });
+      $("phaseFilter").addEventListener("change", () => { state.dirty = true; });
+      window.addEventListener("resize", () => { state.dirty = true; });
+      window.addEventListener("beforeunload", () => state.source?.close());
+      requestAnimationFrame(animationLoop);
+      boot();
+    })();
+  </script>
+</body>
+</html>

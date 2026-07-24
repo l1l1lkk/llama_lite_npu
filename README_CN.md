@@ -119,6 +119,18 @@ curl http://127.0.0.1:8213/debug/stats
 
 重点指标包括请求延迟、队列深度、TTFT、ITL、KV 页使用量、NPU Graph replay/fallback、采样 candidate/fallback 统计等。
 
+需要观察真实请求经过 Scheduler、Prefill、Decode 和模型层的进展时，可以启动
+Trace CLI：
+
+```bash
+python -m lite_llama.trace_cli run --trace-level layer --no-open -- \
+  --checkpoints_dir my_weight/Qwen3-32B --port 8213
+```
+
+浏览器访问 `http://127.0.0.1:8213/debug/trace`。详细的事件语义、SSE 接口、
+JSONL 记录、TP Rank 文件和 NPU Graph 限制见
+[推理请求与模型层可视化](docs/inference_trace.md)。
+
 ## 致谢
 
 本项目基于 [lite_llama](https://github.com/harleyszhang/lite_llama) 的思想继续扩展，主要用于学习昇腾推理框架实现。

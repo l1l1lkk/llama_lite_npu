@@ -29,18 +29,32 @@ import threading
 import time
 import uuid
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Optional, List, Union, AsyncGenerator
 
 import torch
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, JSONResponse, Response
+from fastapi.responses import (
+    HTMLResponse,
+    JSONResponse,
+    Response,
+    StreamingResponse,
+)
 from pydantic import BaseModel, Field, model_validator
 from PIL import Image
 
 from lite_llama.utils.device import get_device
 from lite_llama.observability import InferenceMetrics
+from lite_llama.tracing import (
+    ObserverHub,
+    TraceLifecycleObserver,
+    TraceManager,
+    TracingBackend,
+    install_generator_layer_hooks,
+    rank_output_path,
+)
 
 # ---------------------------------------------------------------------------
 # Pydantic models (OpenAI-compatible schemas)
@@ -121,6 +135,10 @@ if _request_trace_prefix:
     _metrics.configure_request_timing_trace(
         f"{_request_trace_prefix}.rank{os.environ.get('LOCAL_RANK', '0')}.jsonl"
     )
+_trace = TraceManager()
+_trace_observer = TraceLifecycleObserver(_trace)
+_observer = ObserverHub(_metrics, _trace_observer)
+_layer_tracer = None
 _sampling_candidate_k = 2048
 
 
@@ -351,6 +369,8 @@ def _tp_continuous_worker_loop():
         enable_partial_prefix_cache=_partial_prefix_cache,
         sampling_candidate_k=_sampling_candidate_k,
     )
+    if _trace.allows("scheduler"):
+        backend = TracingBackend(backend, _trace, rank=_rank)
     channel = StoreCommandChannel()
     requests_by_id = {}
     validate_decode_state = os.environ.get(
@@ -464,8 +484,10 @@ def _start_continuous_scheduler(
         _generator,
         enable_partial_prefix_cache=partial_prefix_cache,
         sampling_candidate_k=sampling_candidate_k,
-        metrics=_metrics,
+        metrics=_observer,
     )
+    if _trace.allows("scheduler"):
+        local_backend = TracingBackend(local_backend, _trace, rank=_rank)
     _continuous_backend = (
         _TpCoordinatedContinuousBackend(local_backend)
         if _is_tp
@@ -485,7 +507,7 @@ def _start_continuous_scheduler(
         chunked_prefill_policy=chunked_prefill_policy,
         chunked_prefill_min_tokens=chunked_prefill_min_tokens,
         max_preemptions=max_preemptions,
-        metrics=_metrics,
+        metrics=_observer,
     )
     _scheduler_poll_seconds = max(0.0001, scheduler_poll_ms / 1000.0)
     _scheduler_stop = threading.Event()
@@ -509,7 +531,7 @@ async def lifespan(app: FastAPI):
     # Startup: generator is loaded by main() before uvicorn
     yield
     # Shutdown
-    global _generator, _continuous_scheduler
+    global _generator, _continuous_scheduler, _layer_tracer
     if _scheduler_stop is not None:
         _scheduler_stop.set()
     if _scheduler_thread is not None:
@@ -518,6 +540,10 @@ async def lifespan(app: FastAPI):
         _continuous_scheduler.shutdown()
     if _is_tp and _continuous_batching:
         _continuous_backend.shutdown_workers()
+    if _layer_tracer is not None:
+        _layer_tracer.close()
+        _layer_tracer = None
+    _trace.close()
     _continuous_scheduler = None
     _generator = None
 
@@ -731,6 +757,75 @@ async def debug_stats():
         }
     )
     return snapshot
+
+
+@app.get("/debug/trace", response_class=HTMLResponse)
+async def trace_viewer():
+    viewer_path = (
+        Path(__file__).resolve().parent
+        / "lite_llama"
+        / "trace_ui"
+        / "index.html"
+    )
+    if not viewer_path.is_file():
+        raise HTTPException(404, "trace viewer asset is unavailable")
+    return HTMLResponse(viewer_path.read_text(encoding="utf-8"))
+
+
+@app.get("/debug/trace/snapshot")
+async def trace_snapshot(after_seq: int = 0, limit: int = 2_000):
+    return _trace.snapshot(
+        after_seq=max(0, int(after_seq)),
+        limit=max(1, min(int(limit), 10_000)),
+    )
+
+
+@app.get("/debug/trace/events")
+async def trace_events(raw: Request, after_seq: int = 0):
+    if not _trace.enabled:
+        raise HTTPException(409, "inference tracing is disabled")
+    last_event_id = raw.headers.get("last-event-id")
+    cursor = max(0, int(after_seq))
+    if last_event_id:
+        try:
+            cursor = max(cursor, int(last_event_id))
+        except ValueError:
+            pass
+
+    async def stream():
+        nonlocal cursor
+        yield "retry: 1000\n\n"
+        while not await raw.is_disconnected():
+            events = await asyncio.to_thread(
+                _trace.wait_for_events,
+                cursor,
+                1.0,
+                256,
+            )
+            if not events:
+                yield ": keepalive\n\n"
+                continue
+            for event in events:
+                cursor = int(event["seq"])
+                payload = json.dumps(
+                    event,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                )
+                yield (
+                    f"id: {cursor}\n"
+                    "event: trace\n"
+                    f"data: {payload}\n\n"
+                )
+
+    return StreamingResponse(
+        stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @app.get("/v1/models")
@@ -1300,6 +1395,44 @@ def main():
             "MoE expert execution mode. Ignored by dense and VL models."
         ),
     )
+    parser.add_argument(
+        "--trace",
+        action="store_true",
+        help=(
+            "Enable the redacted inference trace stream and viewer at "
+            "/debug/trace."
+        ),
+    )
+    parser.add_argument(
+        "--trace_level",
+        "--trace-level",
+        dest="trace_level",
+        choices=("request", "scheduler", "layer"),
+        default="scheduler",
+        help=(
+            "Trace detail level. Layer progress is exact only when NPU Graph "
+            "is disabled."
+        ),
+    )
+    parser.add_argument(
+        "--trace_output",
+        "--trace-output",
+        dest="trace_output",
+        type=str,
+        default=None,
+        help=(
+            "Optional JSONL output path. Tensor-parallel runs add a rank "
+            "suffix automatically."
+        ),
+    )
+    parser.add_argument(
+        "--trace_buffer_events",
+        "--trace-buffer-events",
+        dest="trace_buffer_events",
+        type=int,
+        default=50_000,
+        help="Maximum number of live trace events retained in memory.",
+    )
     parser.set_defaults(compiled_model=True)
     parser.set_defaults(continuous_batching=True, decode_priority=True)
     args = parser.parse_args()
@@ -1307,13 +1440,25 @@ def main():
     # Detect TP
     from lite_llama.executor.tp_utils import detect_tp_env
     global _rank, _is_tp, _continuous_batching, _partial_prefix_cache
-    global _sampling_candidate_k
+    global _sampling_candidate_k, _layer_tracer
     tp = detect_tp_env()
     _rank = tp.rank if tp else 0
     _is_tp = tp is not None and tp.enabled
     _continuous_batching = args.continuous_batching
     _partial_prefix_cache = bool(args.partial_prefix_cache)
     _sampling_candidate_k = max(1, int(args.sampling_candidate_k))
+    trace_output = rank_output_path(
+        args.trace_output,
+        rank=_rank,
+        tensor_parallel=_is_tp,
+    )
+    _trace.configure(
+        enabled=args.trace,
+        level=args.trace_level,
+        max_events=args.trace_buffer_events,
+        rank=_rank,
+        output_path=trace_output,
+    )
 
     device = f"npu:{_rank}" if _is_tp else get_device(args.device)
     if _rank == 0:
@@ -1325,6 +1470,15 @@ def main():
         print(f"MoE parallel mode: {args.moe_parallel_mode.upper()}")
         print(f"Partial Prefix Cache: {'on' if args.partial_prefix_cache else 'off'}")
         print(f"Sampling candidate_k: {_sampling_candidate_k}")
+        print(
+            "Inference trace: "
+            f"{args.trace_level if args.trace else 'off'}"
+        )
+        if args.trace and args.trace_level == "layer" and args.compiled_model:
+            print(
+                "Warning: NPU Graph replay bypasses Python layer hooks; use "
+                "--no_compiled_model for exact per-layer progress."
+            )
 
     load_generator(
         args.checkpoints_dir,
@@ -1334,6 +1488,8 @@ def main():
         compiled_model=args.compiled_model,
         moe_parallel_mode=args.moe_parallel_mode,
     )
+    if _trace.allows("layer"):
+        _layer_tracer = install_generator_layer_hooks(_generator, _trace)
 
     if _is_vl and _continuous_batching:
         if _rank == 0:
@@ -1373,6 +1529,9 @@ def main():
         print(f"  GET  /health")
         print(f"  GET  /metrics")
         print(f"  GET  /debug/stats")
+        if args.trace:
+            print(f"  GET  /debug/trace")
+            print(f"  GET  /debug/trace/events")
         if _continuous_batching:
             effective_max_prefill_tokens = getattr(
                 _continuous_scheduler, "max_prefill_tokens", args.max_prefill_tokens
@@ -1391,10 +1550,16 @@ def main():
         uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
     else:
         # Non-rank-0: TP worker loop — mirrors rank 0 generation
-        if _continuous_batching:
-            _tp_continuous_worker_loop()
-        else:
-            _tp_worker_loop()
+        try:
+            if _continuous_batching:
+                _tp_continuous_worker_loop()
+            else:
+                _tp_worker_loop()
+        finally:
+            if _layer_tracer is not None:
+                _layer_tracer.close()
+                _layer_tracer = None
+            _trace.close()
 
 
 if __name__ == "__main__":
