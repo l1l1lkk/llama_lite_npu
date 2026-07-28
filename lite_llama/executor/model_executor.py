@@ -1002,7 +1002,7 @@ def _get_num_layers_from_config(model_config) -> int:
 
 
 def _pack_dense_swiglu_state_dict(state_dict: dict) -> dict:
-    """Interleave dense Qwen3 gate/up rows for the packed Triton kernel."""
+    """Pack dense Qwen3 gate/up weights in the CANN SwiGLU split order."""
 
     gate_suffix = ".mlp.gate_proj.weight"
     for gate_key in [key for key in state_dict if key.endswith(gate_suffix)]:
@@ -1018,10 +1018,7 @@ def _pack_dense_swiglu_state_dict(state_dict: dict) -> dict:
                 f"SwiGLU gate/up weight shapes differ for {prefix}: "
                 f"{gate_weight.shape} != {up_weight.shape}"
             )
-        state_dict[packed_key] = torch.stack(
-            (gate_weight, up_weight),
-            dim=1,
-        ).flatten(0, 1)
+        state_dict[packed_key] = torch.cat((gate_weight, up_weight), dim=0)
     return state_dict
 
 

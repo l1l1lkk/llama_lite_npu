@@ -130,11 +130,7 @@ def run(args: argparse.Namespace) -> dict:
     for case in DEFAULT_CASES:
         a = torch.randn(case.shape, device=device, dtype=dtype)
         b = torch.randn(case.shape, device=device, dtype=dtype)
-        packed = (
-            torch.stack((a, b), dim=-1).flatten(-2)
-            if swiglu_packed_forward
-            else None
-        )
+        packed = torch.cat((a, b), dim=-1) if swiglu_packed_forward else None
         operation = (
             (lambda: swiglu_packed_forward(packed))
             if swiglu_packed_forward
@@ -204,11 +200,7 @@ def run(args: argparse.Namespace) -> dict:
             "git_branch": git_value("branch", "--show-current"),
             "git_commit": git_value("rev-parse", "HEAD"),
             "backend_module": swiglu_forward.__module__,
-            "input_layout": (
-                "interleaved_gate_up"
-                if swiglu_packed_forward
-                else "separate_gate_up"
-            ),
+            "input_layout": "packed_gate_up" if swiglu_packed_forward else "separate_gate_up",
             "device": args.device,
             "physical_device": args.physical_device,
             "dtype": args.dtype,
