@@ -71,7 +71,7 @@ def main() -> None:
     gate = gate[start:end].to(device=device, dtype=torch.float16)
     up = up[start:end].to(device=device, dtype=torch.float16)
     down = down[:, start:end].to(device=device, dtype=torch.float16)
-    packed_weight = torch.cat((gate, up), dim=0)
+    packed_weight = torch.stack((gate, up), dim=1).flatten(0, 1)
 
     rows = []
     for shape in DEFAULT_SHAPES:
