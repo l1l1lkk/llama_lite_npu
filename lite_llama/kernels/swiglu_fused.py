@@ -36,11 +36,10 @@ def _swiglu_packed_kernel(
     tl.store(output_row + offsets, output, mask=mask)
 
 
-def _block_size(feature_width: int, row_count: int) -> int:
-    """Choose a UB-safe tile for latency-oriented and throughput-oriented rows."""
+def _block_size(feature_width: int) -> int:
+    """Choose a UB-safe tile without padding a complete wide row."""
 
-    max_block_size = 4096 if row_count <= 32 else _MAX_BLOCK_SIZE
-    return min(max_block_size, triton.next_power_of_2(feature_width))
+    return min(_MAX_BLOCK_SIZE, triton.next_power_of_2(feature_width))
 
 
 def _validate_pair(a: torch.Tensor, b: torch.Tensor) -> None:
@@ -71,7 +70,7 @@ def swiglu_packed_forward(gate_up: torch.Tensor) -> torch.Tensor:
             dtype=gate_up.dtype,
             device=gate_up.device,
         )
-        block_size = _block_size(feature_width, gate_up_rows.shape[0])
+        block_size = _block_size(feature_width)
         grid = (
             gate_up_rows.shape[0],
             triton.cdiv(feature_width, block_size),
