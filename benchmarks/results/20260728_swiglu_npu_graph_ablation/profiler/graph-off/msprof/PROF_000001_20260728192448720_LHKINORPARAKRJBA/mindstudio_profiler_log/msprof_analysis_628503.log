@@ -1,0 +1,183 @@
+2026-07-28 19:26:13 [INFO] [628503] [628503] [time_logger.h:28] DeviceContextEntry  start
+2026-07-28 19:26:13 [INFO] [628503] [628505] [parser.cpp:120] notify: no files pattern, don't need to parse
+2026-07-28 19:26:13 [INFO] [628503] [628506] [parser.cpp:51] loop: /data/liuke/swiglu_graph_validation_20260728/profiler/graph-off/msprof/PROF_000001_20260728192448720_LHKINORPARAKRJBA/device_6/data/lpmFreqConv.data.6.slice_0, file size: 4440
+2026-07-28 19:26:13 [INFO] [628503] [628505] [ts_track_parser.cpp:65] TsTrack structCount: 0
+2026-07-28 19:26:13 [INFO] [628503] [628506] [parser.cpp:54] total size: 4440
+2026-07-28 19:26:13 [INFO] [628503] [628505] [parser.cpp:177] Parser is completed!
+2026-07-28 19:26:13 [INFO] [628503] [628506] [parser.cpp:159] Parse filePrefix is: lpmFreqConv., the number of files is: 1, and the total size of all files is: 4440
+2026-07-28 19:26:13 [INFO] [628503] [628506] [parser.cpp:87] Data has been read to the memory successfully!
+2026-07-28 19:26:13 [INFO] [628503] [628506] [freq_parser.cpp:67] FreqProfileData structCount is : 5
+2026-07-28 19:26:13 [INFO] [628503] [628506] [freq_parser.cpp:95] Freq.data parser is completed, begin to save data into dataInventory!
+2026-07-28 19:26:13 [INFO] [628503] [628506] [parser.cpp:177] Parser is completed!
+2026-07-28 19:26:13 [INFO] [628503] [628507] [db_runner.h:75] Start query data
+2026-07-28 19:26:13 [INFO] [628503] [628507] [db_runner.h:86] Query data success: SELECT expand_status from StreamExpandSpec LIMIT 1
+2026-07-28 19:26:13 [INFO] [628503] [628504] [process_control.cpp:189] Level[0]Release Data Types: 
+2026-07-28 19:26:13 [INFO] [628503] [628510] [freq_persistence.cpp:46] Start to process /data/liuke/swiglu_graph_validation_20260728/profiler/graph-off/msprof/PROF_000001_20260728192448720_LHKINORPARAKRJBA/device_6/sqlite/freq.db.
+2026-07-28 19:26:13 [INFO] [628503] [628511] [step_trace_process.cpp:197] Start to process step trace data
+2026-07-28 19:26:13 [INFO] [628503] [628510] [persistence_utils.h:39] Processor Save FreqParse Data.
+2026-07-28 19:26:13 [WARN] [628503] [628511] [step_trace_process.cpp:200] stepData is empty
+2026-07-28 19:26:13 [INFO] [628503] [628510] [db_runner.cpp:49] Start create FreqParse
+2026-07-28 19:26:13 [INFO] [628503] [628512] [parser.cpp:51] loop: /data/liuke/swiglu_graph_validation_20260728/profiler/graph-off/msprof/PROF_000001_20260728192448720_LHKINORPARAKRJBA/device_6/data/stars_soc.data.6.slice_0, file size: 3372032
+2026-07-28 19:26:13 [INFO] [628503] [628509] [parser.cpp:51] loop: /data/liuke/swiglu_graph_validation_20260728/profiler/graph-off/msprof/PROF_000001_20260728192448720_LHKINORPARAKRJBA/device_6/data/ffts_profile.data.6.slice_0, file size: 2008576
+2026-07-28 19:26:13 [INFO] [628503] [628512] [parser.cpp:51] loop: /data/liuke/swiglu_graph_validation_20260728/profiler/graph-off/msprof/PROF_000001_20260728192448720_LHKINORPARAKRJBA/device_6/data/stars_soc.data.6.slice_1, file size: 1875328
+2026-07-28 19:26:13 [INFO] [628503] [628509] [parser.cpp:54] total size: 2008576
+2026-07-28 19:26:13 [INFO] [628503] [628512] [parser.cpp:54] total size: 5247360
+2026-07-28 19:26:13 [INFO] [628503] [628509] [parser.cpp:159] Parse filePrefix is: ffts_profile, the number of files is: 1, and the total size of all files is: 2008576
+2026-07-28 19:26:13 [INFO] [628503] [628512] [parser.cpp:159] Parse filePrefix is: stars_soc., the number of files is: 2, and the total size of all files is: 5247360
+2026-07-28 19:26:13 [INFO] [628503] [628510] [db_runner.cpp:62] create FreqParse success
+2026-07-28 19:26:13 [INFO] [628503] [628510] [db_runner.h:57] Start insert data to FreqParse
+2026-07-28 19:26:13 [INFO] [628503] [628510] [db_runner.h:68] insert data to FreqParse success
+2026-07-28 19:26:13 [INFO] [628503] [628510] [freq_persistence.cpp:55] Process FreqParse done!
+2026-07-28 19:26:13 [INFO] [628503] [628509] [parser.cpp:87] Data has been read to the memory successfully!
+2026-07-28 19:26:13 [INFO] [628503] [628509] [ffts_profile_parser.cpp:79] FftsProfileData structCount is : 15692
+2026-07-28 19:26:13 [INFO] [628503] [628512] [parser.cpp:87] Data has been read to the memory successfully!
+2026-07-28 19:26:13 [INFO] [628503] [628512] [stars_soc_parser.cpp:77] StarsSoc structCount: 81990
+2026-07-28 19:26:13 [INFO] [628503] [628509] [ffts_profile_parser.cpp:93] Ffts_profile.data parser is completed, begin to save data into dataInventory!
+2026-07-28 19:26:13 [INFO] [628503] [628509] [parser.cpp:177] Parser is completed!
+2026-07-28 19:26:13 [INFO] [628503] [628512] [parser.cpp:177] Parser is completed!
+2026-07-28 19:26:13 [INFO] [628503] [628504] [process_control.cpp:189] Level[1]Release Data Types: N8Analysis6Domain16StreamExpandSpecE 
+2026-07-28 19:26:13 [INFO] [628503] [628514] [time_logger.h:28] LogModeling::SplitLogGroups  start
+2026-07-28 19:26:13 [INFO] [628503] [628515] [acc_pmu_persistence.cpp:57] Start to process /data/liuke/swiglu_graph_validation_20260728/profiler/graph-off/msprof/PROF_000001_20260728192448720_LHKINORPARAKRJBA/device_6/sqlite/acc_pmu.db.
+2026-07-28 19:26:13 [INFO] [628503] [628513] [pmu_modeling.cpp:48] PMU modeling has done!
+2026-07-28 19:26:13 [INFO] [628503] [628515] [acc_pmu_persistence.cpp:61] There is no acc pmu data don't need to persistence!
+2026-07-28 19:26:13 [INFO] [628503] [628514] [time_logger.h:35] LogModeling::SplitLogGroups  end, cost time = 6 ms
+2026-07-28 19:26:13 [INFO] [628503] [628514] [log_modeling.cpp:152] HalLogData size:81990
+2026-07-28 19:26:13 [INFO] [628503] [628514] [log_modeling.cpp:153] acsqS stream:4, total:25892
+2026-07-28 19:26:13 [INFO] [628503] [628514] [log_modeling.cpp:154] acsqE stream:4, total:25892
+2026-07-28 19:26:13 [INFO] [628503] [628514] [log_modeling.cpp:155] fftsS stream:3, total:15103
+2026-07-28 19:26:13 [INFO] [628503] [628514] [log_modeling.cpp:156] fftsE stream:3, total:15103
+2026-07-28 19:26:13 [INFO] [628503] [628514] [time_logger.h:28] LogModeling::AddToDeviceTask  start
+2026-07-28 19:26:13 [INFO] [628503] [628514] [log_modeling.cpp:224] ACSQ matched count:25892
+2026-07-28 19:26:13 [INFO] [628503] [628514] [log_modeling.cpp:234] FFTS matched count:15103
+2026-07-28 19:26:13 [INFO] [628503] [628514] [time_logger.h:35] LogModeling::AddToDeviceTask  end, cost time = 54 ms
+2026-07-28 19:26:13 [INFO] [628503] [628504] [process_control.cpp:189] Level[2]Release Data Types: St6vectorIN8Analysis6Domain10HalLogDataESaIS2_EE St6vectorIN8Analysis6Domain12HalTrackDataESaIS2_EE 
+2026-07-28 19:26:13 [INFO] [628503] [628516] [db_runner.h:75] Start query data
+2026-07-28 19:26:13 [INFO] [628503] [628516] [db_runner.h:86] Query data success: SELECT stream_id, request_id, batch_id, task_id, context_ids, model_id, task_type, connection_id FROM HostTask where device_id = 6
+2026-07-28 19:26:13 [INFO] [628503] [628516] [db_runner.h:75] Start query data
+2026-07-28 19:26:13 [INFO] [628503] [628516] [db_runner.h:86] Query data success: SELECT stream_id, batch_id, task_id, context_id, block_dim, mix_block_dim FROM TaskInfo where device_id = 6
+2026-07-28 19:26:13 [INFO] [628503] [628516] [load_host_data.cpp:101] Read host geinfo 0 not in table.
+2026-07-28 19:26:13 [INFO] [628503] [628516] [db_runner.h:75] Start query data
+2026-07-28 19:26:13 [INFO] [628503] [628516] [db_runner.h:86] Query data success: SELECT model_id, index_id, name, group_name, plane_id, timestamp , duration, stream_id, task_id, context_id, batch_id, device_id, is_master, local_rank, remote_rank, thread_id, transport_type, size, data_type, link_type, notify_id, rdma_type from HCCLTask where device_id = 6
+2026-07-28 19:26:13 [INFO] [628503] [628516] [db_runner.h:75] Start query data
+2026-07-28 19:26:13 [INFO] [628503] [628516] [db_runner.h:86] Query data success: SELECT device_id, model_id, index_id, thread_id, op_name, task_type, op_type, begin, end - begin, is_dynamic, connection_id, relay, retry, data_type, alg_type, count, group_name from HCCLOP where device_id = 6
+2026-07-28 19:26:13 [INFO] [628503] [628504] [process_control.cpp:189] Level[3]Release Data Types: 
+2026-07-28 19:26:13 [INFO] [628503] [628518] [pmu_association.cpp:38] context pmu count is : 14796
+2026-07-28 19:26:13 [INFO] [628503] [628518] [pmu_association.cpp:39] block pmu count is : 896
+2026-07-28 19:26:13 [INFO] [628503] [628518] [pmu_association.cpp:246] The acceleratorType of PMU is MIX
+2026-07-28 19:26:14 [INFO] [628503] [628518] [pmu_association.cpp:186] Context PMU has been calculated!
+2026-07-28 19:26:14 [INFO] [628503] [628517] [ascend_task_association.cpp:184] Found 40994 host device matched task, generate 41178 topDownTask
+2026-07-28 19:26:14 [INFO] [628503] [628504] [process_control.cpp:189] Level[4]Release Data Types: St3mapIN8Analysis6Domain6TaskIdESt6vectorINS1_8HostTaskESaIS4_EESt4lessIS2_ESaISt4pairIKS2_S6_EEE St6vectorIN8Analysis6Domain10HalPmuDataESaIS2_EE St6vectorIN8Analysis6Domain14HalFreqLpmDataESaIS2_EE 
+2026-07-28 19:26:14 [INFO] [628503] [628519] [hccl_calculator.cpp:51] Start Hccl calculator ProcessEntry.
+2026-07-28 19:26:14 [INFO] [628503] [628520] [metric_summary_persistence.cpp:273] Start to process /data/liuke/swiglu_graph_validation_20260728/profiler/graph-off/msprof/PROF_000001_20260728192448720_LHKINORPARAKRJBA/device_6/sqlite/metric_summary.db.
+2026-07-28 19:26:14 [INFO] [628503] [628520] [db_runner.cpp:49] Start create MetricSummary
+2026-07-28 19:26:14 [INFO] [628503] [628519] [hccl_calculator.cpp:77] Start Hccl calculator GetHcclData.
+2026-07-28 19:26:14 [INFO] [628503] [628519] [hccl_calculator.cpp:106] Start merge hccl task and ascend task.
+2026-07-28 19:26:14 [INFO] [628503] [628520] [db_runner.cpp:62] create MetricSummary success
+2026-07-28 19:26:14 [INFO] [628503] [628519] [hccl_calculator.cpp:205] Start merge hccl op data.
+2026-07-28 19:26:14 [INFO] [628503] [628519] [hccl_calculator.cpp:274] Start UpdateHcclOpNameByGroupName.
+2026-07-28 19:26:14 [INFO] [628503] [628520] [metric_summary_persistence.cpp:281] Process MetricSummary done!
+2026-07-28 19:26:14 [INFO] [628503] [628519] [hccl_calculator.cpp:300] Start UpdateHcclBandwidth.
+2026-07-28 19:26:14 [INFO] [628503] [628519] [hccl_calculator.cpp:376] Start GetHcclStatisticsData.
+2026-07-28 19:26:14 [INFO] [628503] [628519] [hccl_calculator.cpp:433] Start inject hccl data.
+2026-07-28 19:26:14 [INFO] [628503] [628504] [process_control.cpp:189] Level[5]Release Data Types: St3mapIN8Analysis6Domain6TaskIdESt6vectorINS1_10DeviceTaskESaIS4_EESt4lessIS2_ESaISt4pairIKS2_S6_EEE St6vectorIN8Analysis6Domain8HcclTaskESaIS2_EE 
+2026-07-28 19:26:14 [INFO] [628503] [628522] [ascend_task_persistence.cpp:72] Start to process /data/liuke/swiglu_graph_validation_20260728/profiler/graph-off/msprof/PROF_000001_20260728192448720_LHKINORPARAKRJBA/device_6/sqlite/ascend_task.db.
+2026-07-28 19:26:14 [INFO] [628503] [628521] [device_hccl_persistence.cpp:129] Start to dump device hccl data.
+2026-07-28 19:26:14 [INFO] [628503] [628521] [device_hccl_persistence.cpp:54] Start to process /data/liuke/swiglu_graph_validation_20260728/profiler/graph-off/msprof/PROF_000001_20260728192448720_LHKINORPARAKRJBA/device_6/sqlite/hccl_single_device.db.
+2026-07-28 19:26:14 [INFO] [628503] [628521] [persistence_utils.h:39] Processor Save HCCLOpSingleDevice Data.
+2026-07-28 19:26:14 [INFO] [628503] [628521] [db_runner.cpp:49] Start create HCCLOpSingleDevice
+2026-07-28 19:26:14 [INFO] [628503] [628521] [db_runner.cpp:62] create HCCLOpSingleDevice success
+2026-07-28 19:26:14 [INFO] [628503] [628521] [db_runner.h:57] Start insert data to HCCLOpSingleDevice
+2026-07-28 19:26:14 [INFO] [628503] [628522] [persistence_utils.h:39] Processor Save AscendTask Data.
+2026-07-28 19:26:14 [INFO] [628503] [628522] [db_runner.cpp:49] Start create AscendTask
+2026-07-28 19:26:14 [INFO] [628503] [628522] [db_runner.cpp:62] create AscendTask success
+2026-07-28 19:26:14 [INFO] [628503] [628522] [db_runner.h:57] Start insert data to AscendTask
+2026-07-28 19:26:14 [INFO] [628503] [628521] [db_runner.h:68] insert data to HCCLOpSingleDevice success
+2026-07-28 19:26:14 [INFO] [628503] [628521] [device_hccl_persistence.cpp:82] Start to process /data/liuke/swiglu_graph_validation_20260728/profiler/graph-off/msprof/PROF_000001_20260728192448720_LHKINORPARAKRJBA/device_6/sqlite/hccl_single_device.db.
+2026-07-28 19:26:14 [INFO] [628503] [628521] [persistence_utils.h:39] Processor Save HCCLTaskSingleDevice Data.
+2026-07-28 19:26:14 [INFO] [628503] [628521] [db_runner.cpp:49] Start create HCCLTaskSingleDevice
+2026-07-28 19:26:14 [INFO] [628503] [628521] [db_runner.cpp:62] create HCCLTaskSingleDevice success
+2026-07-28 19:26:14 [INFO] [628503] [628521] [db_runner.h:57] Start insert data to HCCLTaskSingleDevice
+2026-07-28 19:26:14 [INFO] [628503] [628521] [db_runner.h:68] insert data to HCCLTaskSingleDevice success
+2026-07-28 19:26:14 [INFO] [628503] [628521] [device_hccl_persistence.cpp:114] Start to process /data/liuke/swiglu_graph_validation_20260728/profiler/graph-off/msprof/PROF_000001_20260728192448720_LHKINORPARAKRJBA/device_6/sqlite/hccl_single_device.db.
+2026-07-28 19:26:14 [INFO] [628503] [628521] [persistence_utils.h:39] Processor Save HcclOpReport Data.
+2026-07-28 19:26:14 [INFO] [628503] [628521] [db_runner.cpp:49] Start create HcclOpReport
+2026-07-28 19:26:14 [INFO] [628503] [628521] [db_runner.cpp:62] create HcclOpReport success
+2026-07-28 19:26:14 [INFO] [628503] [628521] [db_runner.h:57] Start insert data to HcclOpReport
+2026-07-28 19:26:14 [INFO] [628503] [628521] [db_runner.h:68] insert data to HcclOpReport success
+2026-07-28 19:26:14 [INFO] [628503] [628522] [db_runner.h:68] insert data to AscendTask success
+2026-07-28 19:26:14 [INFO] [628503] [628522] [ascend_task_persistence.cpp:81] Process AscendTask done!
+2026-07-28 19:26:14 [INFO] [628503] [628504] [process_control.cpp:189] Level[6]Release Data Types: St6vectorI11TopDownTaskSaIS0_EE St6vectorIN8Analysis6Domain14DeviceHcclTaskESaIS2_EE St6vectorIN8Analysis6Domain14HcclStatisticsESaIS2_EE St6vectorIN8Analysis6Domain6HcclOpESaIS2_EE 
+2026-07-28 19:26:14 [INFO] [628503] [628503] [device_context.cpp:135] stat info: ===============================================================================
+deivce file in /data/liuke/swiglu_graph_validation_20260728/profiler/graph-off/msprof/PROF_000001_20260728192448720_LHKINORPARAKRJBA/device_6
+chip id: 5, process levels:7
+-------------------------------------------------------------------------------
+level[0] generalResult:true, process num:4
+	process0[DeviceTaskProcess]:return: 0x0, mandatory:true
+		dependProcessNames: 
+		startTime:15669518355316 us, duration: 44 us
+	process1[FreqParser]:return: 0x0, mandatory:true
+		dependProcessNames: 
+		startTime:15669518355345 us, duration: 231 us
+	process2[LoadStreamExpandSpec]:return: 0x0, mandatory:true
+		dependProcessNames: 
+		startTime:15669518355381 us, duration: 1093 us
+	process3[TsTrackParser]:return: 0x0, mandatory:true
+		dependProcessNames: 
+		startTime:15669518355389 us, duration: 97 us
+-------------------------------------------------------------------------------
+level[1] generalResult:true, process num:4
+	process0[FreqPersistence]:return: 0x0, mandatory:true
+		dependProcessNames: FreqParser, 
+		startTime:15669518356730 us, duration: 1142 us
+	process1[StarsSocParser]:return: 0x0, mandatory:true
+		dependProcessNames: LoadStreamExpandSpec, 
+		startTime:15669518356730 us, duration: 139575 us
+	process2[StepTraceProcess]:return: 0x0, mandatory:false
+		dependProcessNames: TsTrackParser, 
+		startTime:15669518356749 us, duration: 65 us
+	process3[FftsProfileParser]:return: 0x0, mandatory:true
+		dependProcessNames: LoadStreamExpandSpec, 
+		startTime:15669518356757 us, duration: 26384 us
+-------------------------------------------------------------------------------
+level[2] generalResult:true, process num:3
+	process0[PmuModeling]:return: 0x0, mandatory:true
+		dependProcessNames: FftsProfileParser, TsTrackParser, 
+		startTime:15669518497140 us, duration: 2118 us
+	process1[Domain::LogModeling]:return: 0x0, mandatory:true
+		dependProcessNames: StarsSocParser, TsTrackParser, 
+		startTime:15669518497148 us, duration: 60941 us
+	process2[AccPmuPersistence]:return: 0x0, mandatory:true
+		dependProcessNames: StarsSocParser, 
+		startTime:15669518497157 us, duration: 2698 us
+-------------------------------------------------------------------------------
+level[3] generalResult:true, process num:1
+	process0[LoadHostData]:return: 0x0, mandatory:false
+		dependProcessNames: Domain::LogModeling, 
+		startTime:15669518559260 us, duration: 150256 us
+-------------------------------------------------------------------------------
+level[4] generalResult:true, process num:2
+	process0[PmuAssociation]:return: 0x0, mandatory:true
+		dependProcessNames: LoadHostData, PmuModeling, 
+		startTime:15669518709940 us, duration: 62227 us
+	process1[AscendTaskAssociation]:return: 0x0, mandatory:true
+		dependProcessNames: LoadHostData, 
+		startTime:15669518709957 us, duration: 453879 us
+-------------------------------------------------------------------------------
+level[5] generalResult:true, process num:2
+	process0[HcclCalculator]:return: 0x0, mandatory:true
+		dependProcessNames: AscendTaskAssociation, LoadHostData, 
+		startTime:15669519171455 us, duration: 136913 us
+	process1[MetricSummaryPersistence]:return: 0x0, mandatory:true
+		dependProcessNames: PmuAssociation, 
+		startTime:15669519171473 us, duration: 88172 us
+-------------------------------------------------------------------------------
+level[6] generalResult:true, process num:2
+	process0[AscendTaskPersistence]:return: 0x0, mandatory:true
+		dependProcessNames: HcclCalculator, 
+		startTime:15669519317361 us, duration: 119805 us
+	process1[DeviceHcclPersistence]:return: 0x0, mandatory:true
+		dependProcessNames: HcclCalculator, 
+		startTime:15669519317426 us, duration: 114596 us
+
+
+2026-07-28 19:26:14 [INFO] [628503] [628503] [time_logger.h:35] DeviceContextEntry  end, cost time = 1100 ms

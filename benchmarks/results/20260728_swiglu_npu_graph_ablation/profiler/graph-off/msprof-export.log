@@ -1,0 +1,22 @@
+[WARNING] msprof is running as root. For security reasons, use a regular user account instead.
+[INFO] Start profiling...
+[INFO] Start export data in PROF_000001_20260728192448720_LHKINORPARAKRJBA.
+Tue 28 Jul 2026 19:26:12 [INFO] [MSVP] [628377] msprof_common.py: Start analyzing data in "/data/liuke/swiglu_graph_validation_20260728/profiler/graph-off/msprof/PROF_000001_20260728192448720_LHKINORPARAKRJBA/host" ...
+Tue 28 Jul 2026 19:26:12 [INFO] [MSVP] [628377] msprof_common.py: It may take few minutes, please be patient ...
+Tue 28 Jul 2026 19:26:13 [INFO] [MSVP] [628377] msprof_common.py: Analysis data in "/data/liuke/swiglu_graph_validation_20260728/profiler/graph-off/msprof/PROF_000001_20260728192448720_LHKINORPARAKRJBA/host" finished.
+Tue 28 Jul 2026 19:26:13 [INFO] [MSVP] [628377] msprof_common.py: Start analyzing data in "/data/liuke/swiglu_graph_validation_20260728/profiler/graph-off/msprof/PROF_000001_20260728192448720_LHKINORPARAKRJBA/device_6" ...
+Tue 28 Jul 2026 19:26:13 [INFO] [MSVP] [628377] msprof_common.py: It may take few minutes, please be patient ...
+Tue 28 Jul 2026 19:26:13 [INFO] [MSVP] [628377] msprof_common.py: Analysis data in "/data/liuke/swiglu_graph_validation_20260728/profiler/graph-off/msprof/PROF_000001_20260728192448720_LHKINORPARAKRJBA/device_6" finished.
+Tue 28 Jul 2026 19:26:14 [INFO] [MSVP] [628377] msprof_export.py: All collected data will be exported, path is: /data/liuke/swiglu_graph_validation_20260728/profiler/graph-off/msprof/PROF_000001_20260728192448720_LHKINORPARAKRJBA/device_6.
+Tue 28 Jul 2026 19:26:15 [INFO] [MSVP] [628377] msprof_export.py: There is no timeline data to export for "/data/liuke/swiglu_graph_validation_20260728/profiler/graph-off/msprof/PROF_000001_20260728192448720_LHKINORPARAKRJBA/host"
+Tue 28 Jul 2026 19:26:20 [INFO] [MSVP] [628571] msprof_export.py: The data in "/data/liuke/swiglu_graph_validation_20260728/profiler/graph-off/msprof/PROF_000001_20260728192448720_LHKINORPARAKRJBA/host" has been analyzed. Parsing phase will be skipped.
+Tue 28 Jul 2026 19:26:20 [INFO] [MSVP] [628571] msprof_export.py: The data in "/data/liuke/swiglu_graph_validation_20260728/profiler/graph-off/msprof/PROF_000001_20260728192448720_LHKINORPARAKRJBA/device_6" has been analyzed. Parsing phase will be skipped.
+Tue 28 Jul 2026 19:26:20 [INFO] [MSVP] [628571] msprof_export.py: All collected data will be exported, path is: /data/liuke/swiglu_graph_validation_20260728/profiler/graph-off/msprof/PROF_000001_20260728192448720_LHKINORPARAKRJBA/device_6.
+Tue 28 Jul 2026 19:26:20 [INFO] [MSVP] [628571] msprof_export.py: There is no summary data to export for "/data/liuke/swiglu_graph_validation_20260728/profiler/graph-off/msprof/PROF_000001_20260728192448720_LHKINORPARAKRJBA/host"
+Tue 28 Jul 2026 19:26:23 [INFO] [MSVP] [628571] msprof_export.py: All collected data will be exported, path is: /data/liuke/swiglu_graph_validation_20260728/profiler/graph-off/msprof/PROF_000001_20260728192448720_LHKINORPARAKRJBA/device_6.
+Tue 28 Jul 2026 19:26:23 [INFO] [MSVP] [628571] msprof_export.py: There is no summary data to export for "/data/liuke/swiglu_graph_validation_20260728/profiler/graph-off/msprof/PROF_000001_20260728192448720_LHKINORPARAKRJBA/device_6"
+Tue 28 Jul 2026 19:26:23 [INFO] [MSVP] [628571] msprof_common.py: Start exporting summary output_file.
+Tue 28 Jul 2026 19:26:23 [INFO] [MSVP] [628571] msprof_common.py: End exporting summary output_file.The file is stored in the /data/liuke/swiglu_graph_validation_20260728/profiler/graph-off/msprof/PROF_000001_20260728192448720_LHKINORPARAKRJBA/mindstudio_profiler_output path.
+[INFO] Export all data in PROF_000001_20260728192448720_LHKINORPARAKRJBA done.
+[INFO] Profiling finished.
+[INFO] Process profiling data complete. Data is saved in /data/liuke/swiglu_graph_validation_20260728/profiler/graph-off/msprof/PROF_000001_20260728192448720_LHKINORPARAKRJBA

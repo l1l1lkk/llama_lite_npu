@@ -1,0 +1,510 @@
+{
+  "cells": {
+    "baseline": {
+      "off": {
+        "p128-c1-o32": {
+          "e2e_ms_mean": 2447.953531673799,
+          "e2e_ms_repeat_cv_percent": 2.7065405398770443,
+          "e2e_ms_repeat_means": [
+            2404.5559759251773,
+            2524.2159869521856,
+            2415.088632144034
+          ],
+          "repeats": 3,
+          "requests": 12,
+          "throughput_tokens_per_s_mean": 13.076364560973312,
+          "tpot_ms_mean": 76.29938289943722,
+          "tpot_ms_repeat_cv_percent": 2.743658405306728,
+          "tpot_ms_repeat_means": [
+            74.89781557852703,
+            78.7057477019487,
+            75.29458541783595
+          ],
+          "ttft_ms_mean": 82.67266179124515,
+          "ttft_ms_repeat_cv_percent": 2.0457059082286815,
+          "ttft_ms_repeat_means": [
+            82.72369299083948,
+            84.33780819177628,
+            80.95648419111967
+          ]
+        },
+        "p512-c1-o32": {
+          "e2e_ms_mean": 2792.0371030146875,
+          "e2e_ms_repeat_cv_percent": 0.8875300656935228,
+          "e2e_ms_repeat_means": [
+            2776.9040605053306,
+            2778.5726939328015,
+            2820.634554605931
+          ],
+          "repeats": 3,
+          "requests": 12,
+          "throughput_tokens_per_s_mean": 11.460272536566384,
+          "tpot_ms_mean": 75.13055839746069,
+          "tpot_ms_repeat_cv_percent": 1.0611047095535038,
+          "tpot_ms_repeat_means": [
+            74.648306224375,
+            74.69262290866145,
+            76.05074605934563
+          ],
+          "ttft_ms_mean": 462.98979269340634,
+          "ttft_ms_repeat_cv_percent": 0.03454296289941164,
+          "ttft_ms_repeat_means": [
+            462.8065675497055,
+            463.10138376429677,
+            463.06142676621675
+          ]
+        }
+      },
+      "on": {
+        "p128-c1-o32": {
+          "e2e_ms_mean": 286.0097104373078,
+          "e2e_ms_repeat_cv_percent": 1.5901889867871666,
+          "e2e_ms_repeat_means": [
+            290.7459419220686,
+            285.60660127550364,
+            281.67658811435103
+          ],
+          "repeats": 3,
+          "requests": 12,
+          "throughput_tokens_per_s_mean": 111.78618553701205,
+          "tpot_ms_mean": 6.4618251016063075,
+          "tpot_ms_repeat_cv_percent": 0.9319889561574017,
+          "tpot_ms_repeat_means": [
+            6.531224255600284,
+            6.423293087150782,
+            6.430957962067858
+          ],
+          "ttft_ms_mean": 85.69313228751223,
+          "ttft_ms_repeat_cv_percent": 3.5689339110768374,
+          "ttft_ms_repeat_means": [
+            88.27798999845982,
+            86.48451557382941,
+            82.31689129024744
+          ]
+        },
+        "p512-c1-o32": {
+          "e2e_ms_mean": 680.2295496066412,
+          "e2e_ms_repeat_cv_percent": 0.24106593798481485,
+          "e2e_ms_repeat_means": [
+            680.4535910487175,
+            681.7458113655448,
+            678.4892464056611
+          ],
+          "repeats": 3,
+          "requests": 12,
+          "throughput_tokens_per_s_mean": 47.02035195542453,
+          "tpot_ms_mean": 6.988128887549524,
+          "tpot_ms_repeat_cv_percent": 0.5041343845618977,
+          "tpot_ms_repeat_means": [
+            7.021723134863762,
+            6.991198616883447,
+            6.951464910901362
+          ],
+          "ttft_ms_mean": 463.5975540926059,
+          "ttft_ms_repeat_cv_percent": 0.2664674883900237,
+          "ttft_ms_repeat_means": [
+            462.7801738679409,
+            465.01865424215794,
+            462.9938341677189
+          ]
+        }
+      }
+    },
+    "fused-triton": {
+      "off": {
+        "p128-c1-o32": {
+          "e2e_ms_mean": 2433.5876082380614,
+          "e2e_ms_repeat_cv_percent": 1.5523815976486106,
+          "e2e_ms_repeat_means": [
+            2477.0847405306995,
+            2414.7060397081077,
+            2408.9720444753766
+          ],
+          "repeats": 3,
+          "requests": 12,
+          "throughput_tokens_per_s_mean": 13.149616434501787,
+          "tpot_ms_mean": 75.78680725387669,
+          "tpot_ms_repeat_cv_percent": 1.6137729995615129,
+          "tpot_ms_repeat_means": [
+            77.19686034045392,
+            75.14966180127475,
+            75.01389961990137
+          ],
+          "ttft_ms_mean": 84.19658336788416,
+          "ttft_ms_repeat_cv_percent": 0.9323218854946729,
+          "ttft_ms_repeat_means": [
+            83.98206997662783,
+            85.0665238685906,
+            83.54115625843406
+          ]
+        },
+        "p512-c1-o32": {
+          "e2e_ms_mean": 2810.6316222498813,
+          "e2e_ms_repeat_cv_percent": 0.5700175919901349,
+          "e2e_ms_repeat_means": [
+            2817.794823553413,
+            2821.82134129107,
+            2792.278701905161
+          ],
+          "repeats": 3,
+          "requests": 12,
+          "throughput_tokens_per_s_mean": 11.384216665462565,
+          "tpot_ms_mean": 75.74178804693523,
+          "tpot_ms_repeat_cv_percent": 0.6592027000926706,
+          "tpot_ms_repeat_means": [
+            75.95397266108662,
+            76.09994317434968,
+            75.17144830536938
+          ],
+          "ttft_ms_mean": 462.6361927948892,
+          "ttft_ms_repeat_cv_percent": 0.1369155689165523,
+          "ttft_ms_repeat_means": [
+            463.22167105972767,
+            462.72310288622975,
+            461.9638044387102
+          ]
+        }
+      },
+      "on": {
+        "p128-c1-o32": {
+          "e2e_ms_mean": 278.7619323159258,
+          "e2e_ms_repeat_cv_percent": 0.5100025879394575,
+          "e2e_ms_repeat_means": [
+            280.33200604841113,
+            277.56172977387905,
+            278.3920611254871
+          ],
+          "repeats": 3,
+          "requests": 12,
+          "throughput_tokens_per_s_mean": 114.68077564865881,
+          "tpot_ms_mean": 6.238861845666041,
+          "tpot_ms_repeat_cv_percent": 0.16148322908305165,
+          "tpot_ms_repeat_means": [
+            6.249202205048453,
+            6.229075648251079,
+            6.238307683698593
+          ],
+          "ttft_ms_mean": 85.35721510027845,
+          "ttft_ms_repeat_cv_percent": 1.3072080827707264,
+          "ttft_ms_repeat_means": [
+            86.60673769190907,
+            84.46038467809558,
+            85.00452293083072
+          ]
+        },
+        "p512-c1-o32": {
+          "e2e_ms_mean": 671.920297977825,
+          "e2e_ms_repeat_cv_percent": 0.12362757028070573,
+          "e2e_ms_repeat_means": [
+            672.1929060295224,
+            670.9875701926649,
+            672.5804177112877
+          ],
+          "repeats": 3,
+          "requests": 12,
+          "throughput_tokens_per_s_mean": 47.60494276752607,
+          "tpot_ms_mean": 6.791118852874284,
+          "tpot_ms_repeat_cv_percent": 0.12542749561278116,
+          "tpot_ms_repeat_means": [
+            6.794013428471742,
+            6.781530851918843,
+            6.797812278232267
+          ],
+          "ttft_ms_mean": 461.3956135387222,
+          "ttft_ms_repeat_cv_percent": 0.12281096098138579,
+          "ttft_ms_repeat_means": [
+            461.5784897468984,
+            460.7601137831807,
+            461.84823708608747
+          ]
+        }
+      }
+    }
+  },
+  "comparisons_percent": {
+    "fusion_vs_baseline": {
+      "off": {
+        "p128-c1-o32": {
+          "e2e_ms": 0.586854417367744,
+          "tpot_ms": 0.6717952702659565,
+          "ttft_ms": -1.8433198394978878
+        },
+        "p512-c1-o32": {
+          "e2e_ms": -0.6659839589923928,
+          "tpot_ms": -0.8135566439436935,
+          "ttft_ms": 0.07637315208615993
+        }
+      },
+      "on": {
+        "p128-c1-o32": {
+          "e2e_ms": 2.5341021150296514,
+          "tpot_ms": 3.4504687520069397,
+          "ttft_ms": 0.3920001268091439
+        },
+        "p512-c1-o32": {
+          "e2e_ms": 1.221536411292504,
+          "tpot_ms": 2.819210089645673,
+          "ttft_ms": 0.4749681128481159
+        }
+      }
+    },
+    "graph_on_vs_off": {
+      "baseline": {
+        "p128-c1-o32": {
+          "e2e_ms": 88.31637501542984,
+          "tpot_ms": 91.53096020432695,
+          "ttft_ms": -3.6535299950714077
+        },
+        "p512-c1-o32": {
+          "e2e_ms": 75.63680121327303,
+          "tpot_ms": 90.6986863446689,
+          "ttft_ms": -0.1312688549058377
+        }
+      },
+      "fused-triton": {
+        "p128-c1-o32": {
+          "e2e_ms": 88.5452271628819,
+          "tpot_ms": 91.76787877503983,
+          "ttft_ms": -1.3784784203452645
+        },
+        "p512-c1-o32": {
+          "e2e_ms": 76.09361921858832,
+          "tpot_ms": 91.03385458940313,
+          "ttft_ms": 0.2681543890183726
+        }
+      }
+    },
+    "joint": {
+      "p128-c1-o32": {
+        "e2e_ms": 88.61245000327597,
+        "tpot_ms": 91.82318177607168,
+        "ttft_ms": -3.2472080260485736
+      },
+      "p512-c1-o32": {
+        "e2e_ms": 75.93440655740848,
+        "tpot_ms": 90.96090991770959,
+        "ttft_ms": 0.34432274314518185
+      }
+    }
+  },
+  "graph_counters": {
+    "baseline": {
+      "off": {
+        "formal_delta": {
+          "capture_attempts": 0,
+          "captures": 0,
+          "fallbacks": 0,
+          "replays": 0
+        },
+        "formal_end": {
+          "capture_attempts": 0,
+          "captures": 0,
+          "fallbacks": 0,
+          "replays": 0
+        },
+        "formal_start": {
+          "capture_attempts": 0,
+          "captures": 0,
+          "fallbacks": 0,
+          "replays": 0
+        }
+      },
+      "on": {
+        "formal_delta": {
+          "capture_attempts": 0,
+          "captures": 0,
+          "fallbacks": 0,
+          "replays": 930
+        },
+        "formal_end": {
+          "capture_attempts": 2,
+          "captures": 2,
+          "fallbacks": 0,
+          "replays": 992
+        },
+        "formal_start": {
+          "capture_attempts": 2,
+          "captures": 2,
+          "fallbacks": 0,
+          "replays": 62
+        }
+      }
+    },
+    "fused-triton": {
+      "off": {
+        "formal_delta": {
+          "capture_attempts": 0,
+          "captures": 0,
+          "fallbacks": 0,
+          "replays": 0
+        },
+        "formal_end": {
+          "capture_attempts": 0,
+          "captures": 0,
+          "fallbacks": 0,
+          "replays": 0
+        },
+        "formal_start": {
+          "capture_attempts": 0,
+          "captures": 0,
+          "fallbacks": 0,
+          "replays": 0
+        }
+      },
+      "on": {
+        "formal_delta": {
+          "capture_attempts": 0,
+          "captures": 0,
+          "fallbacks": 0,
+          "replays": 930
+        },
+        "formal_end": {
+          "capture_attempts": 2,
+          "captures": 2,
+          "fallbacks": 0,
+          "replays": 992
+        },
+        "formal_start": {
+          "capture_attempts": 2,
+          "captures": 2,
+          "fallbacks": 0,
+          "replays": 62
+        }
+      }
+    }
+  },
+  "output_parity": {
+    "p128-c1-o32": {
+      "baseline_graph_on_vs_off": {
+        "compared": 12,
+        "match_percent": 100.0,
+        "matched": 12
+      },
+      "fused_graph_on_vs_off": {
+        "compared": 12,
+        "match_percent": 100.0,
+        "matched": 12
+      },
+      "fused_vs_baseline_graph_off": {
+        "compared": 12,
+        "match_percent": 100.0,
+        "matched": 12
+      },
+      "fused_vs_baseline_graph_on": {
+        "compared": 12,
+        "match_percent": 100.0,
+        "matched": 12
+      }
+    },
+    "p512-c1-o32": {
+      "baseline_graph_on_vs_off": {
+        "compared": 12,
+        "match_percent": 100.0,
+        "matched": 12
+      },
+      "fused_graph_on_vs_off": {
+        "compared": 12,
+        "match_percent": 100.0,
+        "matched": 12
+      },
+      "fused_vs_baseline_graph_off": {
+        "compared": 12,
+        "match_percent": 75.0,
+        "matched": 9
+      },
+      "fused_vs_baseline_graph_on": {
+        "compared": 12,
+        "match_percent": 75.0,
+        "matched": 9
+      }
+    }
+  },
+  "profiler": {
+    "modes": {
+      "off": {
+        "device_ops": {
+          "count": 14796,
+          "total_time_us": 157094.71
+        },
+        "graph_delta": {
+          "capture_attempts": 0,
+          "captures": 0,
+          "fallbacks": 0,
+          "replays": 0
+        },
+        "profiled_request": {
+          "e2e_ms": 2886.4074237644672,
+          "tpot_ms": 89.83013105969275,
+          "ttft_ms": 101.67336091399193
+        },
+        "runtime_api": {
+          "ContextGetCurrent": {
+            "avg_us": 0.384,
+            "count": 1826,
+            "time_us": 701.36
+          },
+          "EventRecord": {
+            "avg_us": 9.003,
+            "count": 5478,
+            "time_us": 49316.71
+          },
+          "FftsPlusTaskLaunch": {
+            "avg_us": 8.983,
+            "count": 1826,
+            "time_us": 16403.59
+          }
+        }
+      },
+      "on": {
+        "device_ops": {
+          "count": 14425,
+          "total_time_us": 156157.62
+        },
+        "graph_delta": {
+          "capture_attempts": 0,
+          "captures": 0,
+          "fallbacks": 0,
+          "replays": 31
+        },
+        "profiled_request": {
+          "e2e_ms": 309.1556802392006,
+          "tpot_ms": 6.712939169618391,
+          "ttft_ms": 101.05456598103046
+        },
+        "runtime_api": {
+          "ContextGetCurrent": {
+            "avg_us": 0.346,
+            "count": 90,
+            "time_us": 31.1
+          },
+          "EventRecord": {
+            "avg_us": 9.754,
+            "count": 270,
+            "time_us": 2633.47
+          },
+          "FftsPlusTaskLaunch": {
+            "avg_us": 9.744,
+            "count": 90,
+            "time_us": 876.92
+          }
+        }
+      }
+    },
+    "runtime_api_reductions": {
+      "ContextGetCurrent": {
+        "count_reduction_percent": 95.07119386637459,
+        "time_reduction_percent": 95.56575795597125
+      },
+      "EventRecord": {
+        "count_reduction_percent": 95.07119386637459,
+        "time_reduction_percent": 94.66008580053293
+      },
+      "FftsPlusTaskLaunch": {
+        "count_reduction_percent": 95.07119386637459,
+        "time_reduction_percent": 94.65409706046054
+      }
+    },
+    "status": "pass"
+  },
+  "schema_version": 1
+}

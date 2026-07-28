@@ -1,0 +1,56 @@
+{
+  "metadata": {
+    "base_url": "http://127.0.0.1:8016",
+    "case_id": "prewarm-p128-c1-o32",
+    "client_branch": "feature/swiglu-fused-optimization",
+    "client_commit": "098f35ec305fd89ad60e23400ff6cee4af9c24c9",
+    "concurrency": 1,
+    "max_tokens": 32,
+    "model": "Qwen3-1.7B",
+    "repeat": 0,
+    "server_branch": "test/swiglu-unfused-baseline",
+    "server_commit": "ce55d4b08d179a84c2885432ff004ee202b6e324",
+    "submitted_requests": 1,
+    "warmup_requests": 0,
+    "workload": "/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/qwen3_32b_tp2_fp16/datasets/20260714_length_matrix/p128_n32-formal.jsonl",
+    "workload_sha256": "11b2c0d603619092f7d2a35eae53cafc5cb32d4e7d642a429e29a41758a428ba"
+  },
+  "requests": [
+    {
+      "e2e_ms": 1930.9016093611717,
+      "input_tokens": 128,
+      "output_sha256": "7a41353985671c3952b3607262e567dd6727397a2daca8790c288660ff874a5d",
+      "output_text": "<think>\nOkay, let's see what the user is trying to do here. They provided a bunch of random strings and code snippets, maybe some typos or",
+      "output_tokens": 32,
+      "request_id": 0,
+      "sse_events": 34,
+      "stream_content_events": 32,
+      "success": true,
+      "tpot_ms": 42.418234771297826,
+      "ttft_ms": 615.9363314509392
+    }
+  ],
+  "schema_version": 1,
+  "summary": {
+    "e2e_ms_max": 1930.9016093611717,
+    "e2e_ms_mean": 1930.9016093611717,
+    "e2e_ms_p50": 1930.9016093611717,
+    "e2e_ms_p90": 1930.9016093611717,
+    "failed_requests": 0,
+    "input_tokens_max": 128,
+    "input_tokens_min": 128,
+    "output_throughput_tokens_per_s": 16.565484103163115,
+    "output_tokens_max": 32,
+    "output_tokens_min": 32,
+    "requests": 1,
+    "tpot_ms_max": 42.418234771297826,
+    "tpot_ms_mean": 42.418234771297826,
+    "tpot_ms_p50": 42.418234771297826,
+    "tpot_ms_p90": 42.418234771297826,
+    "ttft_ms_max": 615.9363314509392,
+    "ttft_ms_mean": 615.9363314509392,
+    "ttft_ms_p50": 615.9363314509392,
+    "ttft_ms_p90": 615.9363314509392,
+    "wall_time_s": 1.9317274279892445
+  }
+}

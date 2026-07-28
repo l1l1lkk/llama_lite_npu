@@ -11,6 +11,20 @@ NPU_DEVICES=${NPU_DEVICES:-6,7}
 MAX_SEQ_LEN=${MAX_SEQ_LEN:-1024}
 MAX_BATCH_SIZE=${MAX_BATCH_SIZE:-8}
 BATCHING_MODE=${BATCHING_MODE:-continuous}
+NPU_GRAPH_MODE=${NPU_GRAPH_MODE:-off}
+
+case "$NPU_GRAPH_MODE" in
+  on)
+    NPU_GRAPH_FLAG=--compiled_model
+    ;;
+  off)
+    NPU_GRAPH_FLAG=--no_compiled_model
+    ;;
+  *)
+    echo "NPU_GRAPH_MODE must be on or off" >&2
+    exit 2
+    ;;
+esac
 
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 mkdir -p "$RESULT_ROOT"
@@ -37,7 +51,7 @@ COMMAND=(
   --port "$PORT"
   --max_seq_len "$MAX_SEQ_LEN"
   --page_size 16
-  --no_compiled_model
+  "$NPU_GRAPH_FLAG"
 )
 case "$BATCHING_MODE" in
   continuous)

@@ -13,6 +13,9 @@ The completed custom-Triton Atlas 910B3 report and raw evidence are stored in
 `20260728_swiglu_fusion_npu/` directory is the historical native-CANN candidate
 evaluation and is not the final Triton-vs-unfused comparison.
 
+The follow-up Dense decode NPU Graph ablation and full `msprof` evidence are in
+`benchmarks/results/20260728_swiglu_npu_graph_ablation/`.
+
 Run the latency and correctness matrix:
 
 ```bash
@@ -55,3 +58,20 @@ ASCEND_RT_VISIBLE_DEVICES=7 python -m benchmarks.swiglu.validate_model_path \
   --layer 0 \
   --output /data/swiglu-results/model-path-validation.json
 ```
+
+Run and analyze the unfused/fused x Graph off/on serving matrix:
+
+```bash
+bash benchmarks/swiglu/run_graph_ablation.sh /data/swiglu-graph-results
+python benchmarks/swiglu/analyze_graph_ablation.py /data/swiglu-graph-results
+```
+
+Capture matched Graph-off/on decode profiles:
+
+```bash
+bash benchmarks/swiglu/profile_graph_ablation.sh \
+  /data/swiglu-graph-results/profiler
+```
+
+`start_e2e_server.sh` accepts `NPU_GRAPH_MODE=off` (default) or
+`NPU_GRAPH_MODE=on`, so existing Graph-off benchmark commands remain unchanged.

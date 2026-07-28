@@ -1,0 +1,4 @@
+Device_id,OP Type,Count,Total Time(us),Min Time(us),Avg Time(us),Max Time(us),Ratio(%)
+6,hcom_allReduce_,1792,41338.312,17.08,23.068,4366.366,95.154
+6,hcom_allGather_,32,1343.75,15.24,41.992,563.97,3.093
+6,hcom_broadcast_,2,761.674,19.7,380.837,741.974,1.753
