@@ -55,7 +55,7 @@ def main() -> None:
     torch.manual_seed(20260728)
     device = torch.device(args.device)
     torch.npu.set_device(device)
-    state = torch.load(args.checkpoint, mmap=True, map_location="cpu")
+    state = torch.load(str(args.checkpoint), mmap=True, map_location="cpu")
     prefix = f"layers.{args.layer}.mlp"
     gate = state[f"{prefix}.gate_proj.weight"]
     up = state[f"{prefix}.up_proj.weight"]
