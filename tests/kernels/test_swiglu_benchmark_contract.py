@@ -14,13 +14,26 @@ class SwiGLUBenchmarkContractTest(unittest.TestCase):
             source,
         )
 
-    def test_fused_backend_uses_native_npu_swiglu(self):
+    def test_fused_backend_uses_triton_kernel(self):
         source = (ROOT / "lite_llama/kernels/swiglu_fused.py").read_text()
         tree = ast.parse(source)
+        imports = [
+            alias.name
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Import)
+            for alias in node.names
+        ]
         attributes = [
             node for node in ast.walk(tree) if isinstance(node, ast.Attribute)
         ]
-        self.assertTrue(any(node.attr == "npu_swiglu" for node in attributes))
+        functions = [
+            node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)
+        ]
+        self.assertIn("triton", imports)
+        self.assertTrue(
+            any(node.name == "_swiglu_packed_kernel" for node in functions)
+        )
+        self.assertFalse(any(node.attr == "npu_swiglu" for node in attributes))
 
     def test_shape_matrix_covers_requested_axes(self):
         source = (ROOT / "benchmarks/swiglu/benchmark.py").read_text()

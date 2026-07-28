@@ -9,7 +9,8 @@ from pathlib import Path
 
 import torch
 import torch.nn.functional as F
-import torch_npu
+
+from lite_llama.kernels import swiglu_packed_forward
 
 
 DEFAULT_SHAPES = ((1, 1, 2048), (4, 1, 2048), (1, 128, 2048))
@@ -84,7 +85,7 @@ def main() -> None:
         baseline_down = F.linear(baseline_activation, down)
 
         packed_projection = F.linear(x, packed_weight)
-        fused_activation = torch_npu.npu_swiglu(packed_projection, dim=-1)
+        fused_activation = swiglu_packed_forward(packed_projection)
         fused_down = F.linear(fused_activation, down)
         torch.npu.synchronize(device)
 

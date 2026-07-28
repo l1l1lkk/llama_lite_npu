@@ -1,8 +1,45 @@
-"""Packed-layout SwiGLU backed by the native Ascend CANN operator."""
+"""Packed-layout SwiGLU implemented as a two-dimensional Triton kernel."""
 
 from __future__ import annotations
 
 import torch
+import triton
+import triton.language as tl
+
+
+_MAX_BLOCK_SIZE = 4096
+
+
+@triton.jit
+def _swiglu_packed_kernel(
+    gate_up_ptr,
+    output_ptr,
+    gate_up_row_stride,
+    output_row_stride,
+    feature_width: tl.constexpr,
+    BLOCK_SIZE: tl.constexpr,
+):
+    """Fuse SiLU(gate) * up for a packed ``[gate, up]`` input row."""
+
+    row = tl.program_id(0).to(tl.int64)
+    column_block = tl.program_id(1).to(tl.int64)
+    offsets = column_block * BLOCK_SIZE + tl.arange(0, BLOCK_SIZE)
+    mask = offsets < feature_width
+
+    gate_row = gate_up_ptr + row * gate_up_row_stride
+    up_row = gate_row + feature_width
+    output_row = output_ptr + row * output_row_stride
+
+    gate = tl.load(gate_row + offsets, mask=mask, other=0.0).to(tl.float32)
+    up = tl.load(up_row + offsets, mask=mask, other=0.0)
+    output = gate * tl.sigmoid(gate) * up
+    tl.store(output_row + offsets, output, mask=mask)
+
+
+def _block_size(feature_width: int) -> int:
+    """Choose a UB-safe tile without padding a complete wide row."""
+
+    return min(_MAX_BLOCK_SIZE, triton.next_power_of_2(feature_width))
 
 
 def _validate_pair(a: torch.Tensor, b: torch.Tensor) -> None:
@@ -24,9 +61,29 @@ def swiglu_packed_forward(gate_up: torch.Tensor) -> torch.Tensor:
         raise ValueError(f"Packed SwiGLU width must be even, received {packed_width}")
 
     if gate_up.device.type == "npu":
-        import torch_npu
-
-        return torch_npu.npu_swiglu(gate_up, dim=-1)
+        if gate_up.stride(-1) != 1:
+            gate_up = gate_up.contiguous()
+        feature_width = packed_width // 2
+        gate_up_rows = gate_up.view(-1, packed_width)
+        output = torch.empty(
+            (gate_up_rows.shape[0], feature_width),
+            dtype=gate_up.dtype,
+            device=gate_up.device,
+        )
+        block_size = _block_size(feature_width)
+        grid = (
+            gate_up_rows.shape[0],
+            triton.cdiv(feature_width, block_size),
+        )
+        _swiglu_packed_kernel[grid](
+            gate_up_rows,
+            output,
+            gate_up_rows.stride(-2),
+            output.stride(-2),
+            feature_width=feature_width,
+            BLOCK_SIZE=block_size,
+        )
+        return output.view(*gate_up.shape[:-1], feature_width)
 
     gate, up = gate_up.chunk(2, dim=-1)
     gate_fp32 = gate.float()
@@ -37,8 +94,8 @@ def swiglu_forward(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
     """Compatibility path for callers that still produce separate tensors.
 
     Dense Qwen3 uses :func:`swiglu_packed_forward` directly so its packed linear
-    projection feeds the CANN kernel without a runtime copy. Other models keep a
-    correct two-input API and pay one explicit packing operation.
+    projection feeds the Triton kernel without a runtime copy. Other models keep
+    a correct two-input API and pay one explicit packing operation.
     """
 
     _validate_pair(a, b)
