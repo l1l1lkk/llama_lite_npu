@@ -129,7 +129,19 @@ def main() -> None:
             "cross_branch_outputs_identical": (
                 before["output_hashes"] == after["output_hashes"]
             ),
+            "cross_branch_exact_output_matches": sum(
+                baseline_hash == fused_hash
+                for baseline_hash, fused_hash in zip(
+                    before["output_hashes"],
+                    after["output_hashes"],
+                )
+            ),
+            "cross_branch_total_outputs": len(before["output_hashes"]),
         }
+        row["cross_branch_exact_output_rate"] = (
+            row["cross_branch_exact_output_matches"]
+            / row["cross_branch_total_outputs"]
+        )
         rows.append(row)
 
     report = {
