@@ -45,6 +45,11 @@ class SwiGLUBenchmarkContractTest(unittest.TestCase):
         }
         self.assertTrue({"batch", "sequence", "feature_dimension"} <= constants)
 
+    def test_triton_tile_policy_covers_decode_and_prefill(self):
+        source = (ROOT / "lite_llama/kernels/swiglu_fused.py").read_text()
+        self.assertIn("row_count <= 32", source)
+        self.assertIn("_MAX_BLOCK_SIZE = 8192", source)
+
 
 if __name__ == "__main__":
     unittest.main()
