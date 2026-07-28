@@ -33,8 +33,10 @@ D:\lite_llama_npu-artifacts\swiglu-fusion-20260728
 D:\lite_llama_npu-artifacts\swiglu-fusion-20260728.tar.gz
 ```
 
-压缩包 SHA256：
+压缩包 SHA256 以同级校验文件为准：
 
 ```text
-d311c2da88404a004fc058ee65bf0aa0cc1c21132c22da82a86c90014e5d7b5c
+D:\lite_llama_npu-artifacts\swiglu-fusion-20260728.tar.gz.sha256
 ```
+
+校验文件保存在归档外，避免归档内容与归档自身摘要形成循环依赖。
