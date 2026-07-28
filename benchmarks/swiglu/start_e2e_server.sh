@@ -10,6 +10,7 @@ MODEL_DIR=${MODEL_DIR:-/data/liuke/llama_lite_npu/my_weight/Qwen3-1.7B}
 NPU_DEVICES=${NPU_DEVICES:-6,7}
 MAX_SEQ_LEN=${MAX_SEQ_LEN:-1024}
 MAX_BATCH_SIZE=${MAX_BATCH_SIZE:-8}
+BATCHING_MODE=${BATCHING_MODE:-continuous}
 
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 mkdir -p "$RESULT_ROOT"
@@ -37,10 +38,19 @@ COMMAND=(
   --max_seq_len "$MAX_SEQ_LEN"
   --page_size 16
   --no_compiled_model
-  --continuous_batching
-  --max_batch_size "$MAX_BATCH_SIZE"
-  --no_decode_priority
 )
+case "$BATCHING_MODE" in
+  continuous)
+    COMMAND+=(--continuous_batching --max_batch_size "$MAX_BATCH_SIZE" --no_decode_priority)
+    ;;
+  legacy)
+    COMMAND+=(--no_continuous_batching)
+    ;;
+  *)
+    echo "BATCHING_MODE must be continuous or legacy" >&2
+    exit 2
+    ;;
+esac
 
 {
   printf 'ASCEND_RT_VISIBLE_DEVICES=%q ' "$NPU_DEVICES"

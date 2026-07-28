@@ -5,6 +5,8 @@ RESULT_ROOT=${1:?usage: stop_e2e_server.sh RESULT_ROOT PORT}
 PORT=${2:?usage: stop_e2e_server.sh RESULT_ROOT PORT}
 PID_FILE="$RESULT_ROOT/server.pid"
 
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+
 if [[ ! -f "$PID_FILE" ]]; then
   echo "missing PID file: $PID_FILE" >&2
   exit 1
