@@ -22,6 +22,8 @@ def load_results(root: Path) -> dict[str, list[dict]]:
     results: dict[str, list[dict]] = {}
     for path in sorted(root.rglob("result.json")):
         report = json.loads(path.read_text())
+        if int(report["metadata"]["repeat"]) <= 0:
+            continue
         case_id = report["metadata"]["case_id"]
         results.setdefault(case_id, []).append(report)
     if not results:
