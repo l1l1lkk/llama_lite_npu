@@ -7,7 +7,7 @@ import triton
 import triton.language as tl
 
 
-_MAX_BLOCK_SIZE = 4096
+_MAX_BLOCK_SIZE = 8192
 
 
 @triton.jit

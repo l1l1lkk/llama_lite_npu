@@ -106,7 +106,10 @@ def parse_args() -> argparse.Namespace:
         default=[],
         help="Repeatable BxSxD shape. Defaults cover decode and prefill.",
     )
-    parser.add_argument("--tiles", default="256,512,1024,2048,4096")
+    parser.add_argument(
+        "--tiles",
+        default="256,512,1024,2048,4096,8192,16384",
+    )
     parser.add_argument("--warmup", type=int, default=10)
     parser.add_argument("--samples", type=int, default=30)
     parser.add_argument("--output", type=Path, required=True)
