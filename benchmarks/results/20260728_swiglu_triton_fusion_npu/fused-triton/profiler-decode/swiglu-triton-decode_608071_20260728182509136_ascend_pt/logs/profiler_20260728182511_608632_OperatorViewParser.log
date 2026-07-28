@@ -1,0 +1,3 @@
+[2026-07-28-18:25:11.388] [INFO] [AscendProfiler_OperatorViewParser:97] Profiler logger initialized at: /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/logs/profiler_20260728182511_608632_OperatorViewParser.log
+[2026-07-28-18:25:11.388] [INFO] [AscendProfiler_OperatorViewParser:30] OperatorViewParser start.
+[2026-07-28-18:25:11.391] [INFO] [AscendProfiler_OperatorViewParser:39] OperatorViewParser finish.

@@ -1,0 +1,247 @@
+{
+  "device": "npu:0",
+  "physical_device": 7,
+  "rows": [
+    {
+      "allclose": true,
+      "batch": 16,
+      "cv_percent": 4.705045677702784,
+      "feature_dimension": 6144,
+      "max_abs_error": 0.000244140625,
+      "mean_ms": 0.24646023333333333,
+      "sequence_length": 1,
+      "stdev_ms": 0.011596066555706197,
+      "tile": 256
+    },
+    {
+      "allclose": true,
+      "batch": 16,
+      "cv_percent": 1.5554020378524176,
+      "feature_dimension": 6144,
+      "max_abs_error": 0.000244140625,
+      "mean_ms": 0.23721,
+      "sequence_length": 1,
+      "stdev_ms": 0.00368956917398972,
+      "tile": 512
+    },
+    {
+      "allclose": true,
+      "batch": 16,
+      "cv_percent": 1.582883378257789,
+      "feature_dimension": 6144,
+      "max_abs_error": 0.000244140625,
+      "mean_ms": 0.23929633333333333,
+      "sequence_length": 1,
+      "stdev_ms": 0.003787781885113686,
+      "tile": 1024
+    },
+    {
+      "allclose": true,
+      "batch": 16,
+      "cv_percent": 2.0866096821721936,
+      "feature_dimension": 6144,
+      "max_abs_error": 0.000244140625,
+      "mean_ms": 0.23988463333333332,
+      "sequence_length": 1,
+      "stdev_ms": 0.005005455985176598,
+      "tile": 2048
+    },
+    {
+      "allclose": true,
+      "batch": 16,
+      "cv_percent": 1.9164496573377505,
+      "feature_dimension": 6144,
+      "max_abs_error": 0.000244140625,
+      "mean_ms": 0.23719566666666667,
+      "sequence_length": 1,
+      "stdev_ms": 0.004545735541053326,
+      "tile": 4096
+    },
+    {
+      "allclose": true,
+      "batch": 16,
+      "cv_percent": 5.34971568496274,
+      "feature_dimension": 6144,
+      "max_abs_error": 0.000244140625,
+      "mean_ms": 0.2614185666666667,
+      "sequence_length": 1,
+      "stdev_ms": 0.013985150064371442,
+      "tile": 8192
+    },
+    {
+      "allclose": true,
+      "batch": 16,
+      "cv_percent": 2.151754627897873,
+      "feature_dimension": 6144,
+      "max_abs_error": 0.000244140625,
+      "mean_ms": 0.25831153333333334,
+      "sequence_length": 1,
+      "stdev_ms": 0.005558230372893957,
+      "tile": 16384
+    },
+    {
+      "allclose": true,
+      "batch": 4,
+      "cv_percent": 7.639274023632395,
+      "feature_dimension": 6144,
+      "max_abs_error": 0.001953125,
+      "mean_ms": 1.1153835,
+      "sequence_length": 128,
+      "stdev_ms": 0.08520720197938184,
+      "tile": 256
+    },
+    {
+      "allclose": true,
+      "batch": 4,
+      "cv_percent": 6.043101915219961,
+      "feature_dimension": 6144,
+      "max_abs_error": 0.001953125,
+      "mean_ms": 0.6431774,
+      "sequence_length": 128,
+      "stdev_ms": 0.03886786577766195,
+      "tile": 512
+    },
+    {
+      "allclose": true,
+      "batch": 4,
+      "cv_percent": 5.302105503827157,
+      "feature_dimension": 6144,
+      "max_abs_error": 0.001953125,
+      "mean_ms": 0.4407005,
+      "sequence_length": 128,
+      "stdev_ms": 0.0233664054658938,
+      "tile": 1024
+    },
+    {
+      "allclose": true,
+      "batch": 4,
+      "cv_percent": 4.004776457429121,
+      "feature_dimension": 6144,
+      "max_abs_error": 0.001953125,
+      "mean_ms": 0.3130312,
+      "sequence_length": 128,
+      "stdev_ms": 0.012536199802007868,
+      "tile": 2048
+    },
+    {
+      "allclose": true,
+      "batch": 4,
+      "cv_percent": 3.283556741978117,
+      "feature_dimension": 6144,
+      "max_abs_error": 0.001953125,
+      "mean_ms": 0.2779531,
+      "sequence_length": 128,
+      "stdev_ms": 0.009126747754587178,
+      "tile": 4096
+    },
+    {
+      "allclose": true,
+      "batch": 4,
+      "cv_percent": 2.1929478124342032,
+      "feature_dimension": 6144,
+      "max_abs_error": 0.001953125,
+      "mean_ms": 0.25542726666666665,
+      "sequence_length": 128,
+      "stdev_ms": 0.005601386656727145,
+      "tile": 8192
+    },
+    {
+      "allclose": true,
+      "batch": 4,
+      "cv_percent": 2.368514330429162,
+      "feature_dimension": 6144,
+      "max_abs_error": 0.001953125,
+      "mean_ms": 0.2570805666666667,
+      "sequence_length": 128,
+      "stdev_ms": 0.006088990062248496,
+      "tile": 16384
+    },
+    {
+      "allclose": true,
+      "batch": 1,
+      "cv_percent": 7.2558210395888,
+      "feature_dimension": 25600,
+      "max_abs_error": 0.0009765625,
+      "mean_ms": 1.1844457333333334,
+      "sequence_length": 128,
+      "stdev_ms": 0.08594126272171185,
+      "tile": 256
+    },
+    {
+      "allclose": true,
+      "batch": 1,
+      "cv_percent": 7.080116874269975,
+      "feature_dimension": 25600,
+      "max_abs_error": 0.0009765625,
+      "mean_ms": 0.6855709333333333,
+      "sequence_length": 128,
+      "stdev_ms": 0.04853922333602349,
+      "tile": 512
+    },
+    {
+      "allclose": true,
+      "batch": 1,
+      "cv_percent": 5.396480138996806,
+      "feature_dimension": 25600,
+      "max_abs_error": 0.0009765625,
+      "mean_ms": 0.43763313333333337,
+      "sequence_length": 128,
+      "stdev_ms": 0.023616785122002746,
+      "tile": 1024
+    },
+    {
+      "allclose": true,
+      "batch": 1,
+      "cv_percent": 4.233177066306842,
+      "feature_dimension": 25600,
+      "max_abs_error": 0.0009765625,
+      "mean_ms": 0.32369513333333333,
+      "sequence_length": 128,
+      "stdev_ms": 0.013702588149018022,
+      "tile": 2048
+    },
+    {
+      "allclose": true,
+      "batch": 1,
+      "cv_percent": 3.376906545947099,
+      "feature_dimension": 25600,
+      "max_abs_error": 0.0009765625,
+      "mean_ms": 0.26480519999999996,
+      "sequence_length": 128,
+      "stdev_ms": 0.008942224132808306,
+      "tile": 4096
+    },
+    {
+      "allclose": true,
+      "batch": 1,
+      "cv_percent": 2.3248323714523718,
+      "feature_dimension": 25600,
+      "max_abs_error": 0.0009765625,
+      "mean_ms": 0.25448686666666664,
+      "sequence_length": 128,
+      "stdev_ms": 0.005916393057361501,
+      "tile": 8192
+    },
+    {
+      "allclose": true,
+      "batch": 1,
+      "cv_percent": 2.5943117541186003,
+      "feature_dimension": 25600,
+      "max_abs_error": 0.0009765625,
+      "mean_ms": 0.25473593333333333,
+      "sequence_length": 128,
+      "stdev_ms": 0.0066086442604303885,
+      "tile": 16384
+    }
+  ],
+  "schema_version": 1,
+  "tiles": [
+    256,
+    512,
+    1024,
+    2048,
+    4096,
+    8192,
+    16384
+  ]
+}

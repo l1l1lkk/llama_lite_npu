@@ -1,0 +1,437 @@
+2026-07-28 18:25:11 [INFO] [608593] [608593] [export_manager.cpp:119] Start to load data!
+2026-07-28 18:25:11 [INFO] [608593] [608593] [data_processor.cpp:27] HASH_INIT Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [WARN] [608593] [608593] [data_processor.cpp:38] Can't find the db, the path is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/host/sqlite/ge_logic_stream_info.db.
+2026-07-28 18:25:11 [INFO] [608593] [608593] [hash_init_processor.cpp:55] Init Hash data, dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [INFO] [608593] [608593] [data_processor.cpp:54] Check /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/host/sqlite/ge_hash.db and GeHashInfo success.
+2026-07-28 18:25:11 [INFO] [608593] [608593] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608593] [db_runner.h:86] Query data success: SELECT hash_key, hash_value FROM GeHashInfo
+2026-07-28 18:25:11 [INFO] [608593] [608595] [data_processor.cpp:27] ACC_PMU Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [INFO] [608593] [608599] [data_processor.cpp:27] AICORE_FREQ Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [INFO] [608593] [608598] [data_processor.cpp:27] API Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [INFO] [608593] [608596] [data_processor.cpp:27] COMMUNICATION Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [INFO] [608593] [608594] [data_processor.cpp:27] COMMUNICATION_STATISTIC Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [INFO] [608593] [608597] [data_processor.cpp:27] COMPUTE_TASK_INFO Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [WARN] [608593] [608594] [data_processor.cpp:38] Can't find the db, the path is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/hccl_single_device.db.
+2026-07-28 18:25:11 [INFO] [608593] [608600] [data_processor.cpp:27] CPU_USAGE Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [INFO] [608593] [608594] [data_processor.h:72] Save COMMUNICATION_STATISTIC data into dataInventory
+2026-07-28 18:25:11 [INFO] [608593] [608602] [data_processor.cpp:27] DDR Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [WARN] [608593] [608594] [data_processor.h:74] COMMUNICATION_STATISTIC no data to inject to dataInventory
+2026-07-28 18:25:11 [INFO] [608593] [608600] [host_usage_processor.cpp:23] Start process CPU_USAGE.
+2026-07-28 18:25:11 [INFO] [608593] [608603] [data_processor.cpp:27] DEVICE_MSTX Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [INFO] [608593] [608594] [data_processor.cpp:27] FUSION_OP Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [INFO] [608593] [608601] [data_processor.cpp:27] DISK_USAGE Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [INFO] [608593] [608601] [host_usage_processor.cpp:23] Start process DISK_USAGE.
+2026-07-28 18:25:11 [WARN] [608593] [608594] [data_processor.cpp:38] Can't find the db, the path is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/host/sqlite/ge_model_info.db.
+2026-07-28 18:25:11 [INFO] [608593] [608594] [data_processor.cpp:27] HBM Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [WARN] [608593] [608596] [data_processor.cpp:38] Can't find the db, the path is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/hccl_single_device.db.
+2026-07-28 18:25:11 [WARN] [608593] [608596] [data_processor.cpp:38] Can't find the db, the path is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/hccl_single_device.db.
+2026-07-28 18:25:11 [INFO] [608593] [608596] [data_processor.h:61] There are 0 records before COMMUNICATION_TASK_INFO data filtering, filterTime is 1785234309239266000.
+2026-07-28 18:25:11 [WARN] [608593] [608600] [data_processor.cpp:38] Can't find the db, the path is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/host/sqlite/host_cpu_usage.db.
+2026-07-28 18:25:11 [INFO] [608593] [608596] [data_processor.h:65] There are 0 records after COMMUNICATION_TASK_INFO data filtering.
+2026-07-28 18:25:11 [INFO] [608593] [608596] [data_processor.h:61] There are 0 records before COMMUNICATION_TASK_INFO data filtering, filterTime is 1785234309239266000.
+2026-07-28 18:25:11 [INFO] [608593] [608600] [data_processor.cpp:27] HCCS Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [INFO] [608593] [608596] [data_processor.h:65] There are 0 records after COMMUNICATION_TASK_INFO data filtering.
+2026-07-28 18:25:11 [INFO] [608593] [608596] [data_processor.h:72] Save COMMUNICATION_TASK_INFO data into dataInventory
+2026-07-28 18:25:11 [WARN] [608593] [608596] [data_processor.h:74] COMMUNICATION_TASK_INFO no data to inject to dataInventory
+2026-07-28 18:25:11 [INFO] [608593] [608596] [data_processor.h:72] Save COMMUNICATION_OP data into dataInventory
+2026-07-28 18:25:11 [WARN] [608593] [608596] [data_processor.h:74] COMMUNICATION_OP no data to inject to dataInventory
+2026-07-28 18:25:11 [INFO] [608593] [608596] [data_processor.cpp:27] KFC_COMM Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [WARN] [608593] [608601] [data_processor.cpp:38] Can't find the db, the path is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/host/sqlite/host_disk_usage.db.
+2026-07-28 18:25:11 [INFO] [608593] [608601] [data_processor.cpp:27] KFC_TASK Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [INFO] [608593] [608598] [data_processor.cpp:54] Check /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/host/sqlite/api_event.db and ApiData success.
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [WARN] [608593] [608600] [data_processor.cpp:38] Can't find the db, the path is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/hccs.db.
+2026-07-28 18:25:11 [INFO] [608593] [608600] [data_processor.h:72] Save HCCS data into dataInventory
+2026-07-28 18:25:11 [WARN] [608593] [608600] [data_processor.h:74] HCCS no data to inject to dataInventory
+2026-07-28 18:25:11 [INFO] [608593] [608600] [data_processor.h:72] Save HCCS data into dataInventory
+2026-07-28 18:25:11 [WARN] [608593] [608600] [data_processor.h:74] HCCS no data to inject to dataInventory
+2026-07-28 18:25:11 [INFO] [608593] [608600] [data_processor.cpp:27] LLC Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [WARN] [608593] [608602] [data_processor.cpp:38] Can't find the db, the path is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/ddr.db.
+2026-07-28 18:25:11 [WARN] [608593] [608603] [data_processor.cpp:38] Can't find the db, the path is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/step_trace.db.
+2026-07-28 18:25:11 [WARN] [608593] [608596] [data_processor.cpp:38] Can't find the db, the path is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/hccl_single_device.db.
+2026-07-28 18:25:11 [INFO] [608593] [608603] [data_processor.h:72] Save TASK data into dataInventory
+2026-07-28 18:25:11 [INFO] [608593] [608602] [data_processor.h:72] Save DDR data into dataInventory
+2026-07-28 18:25:11 [WARN] [608593] [608596] [data_processor.cpp:38] Can't find the db, the path is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/hccl_single_device.db.
+2026-07-28 18:25:11 [WARN] [608593] [608603] [data_processor.h:74] TASK no data to inject to dataInventory
+2026-07-28 18:25:11 [INFO] [608593] [608596] [data_processor.h:72] Save KFC_COMM data into dataInventory
+2026-07-28 18:25:11 [WARN] [608593] [608602] [data_processor.h:74] DDR no data to inject to dataInventory
+2026-07-28 18:25:11 [WARN] [608593] [608596] [data_processor.h:74] KFC_COMM no data to inject to dataInventory
+2026-07-28 18:25:11 [INFO] [608593] [608603] [data_processor.cpp:27] MC2_COMM_INFO Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [INFO] [608593] [608602] [data_processor.cpp:27] MEMCPY_INFO Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [INFO] [608593] [608596] [data_processor.h:72] Save KFC_COMM data into dataInventory
+2026-07-28 18:25:11 [WARN] [608593] [608603] [data_processor.cpp:38] Can't find the db, the path is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/host/sqlite/mc2_comm_info.db.
+2026-07-28 18:25:11 [WARN] [608593] [608601] [data_processor.cpp:38] Can't find the db, the path is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/kfc_info.db.
+2026-07-28 18:25:11 [INFO] [608593] [608603] [data_processor.cpp:27] MEM_USAGE Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [INFO] [608593] [608597] [data_processor.cpp:54] Check /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/host/sqlite/ge_info.db and TaskInfo success.
+2026-07-28 18:25:11 [WARN] [608593] [608601] [data_processor.cpp:38] Can't find the db, the path is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/kfc_info.db.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608601] [data_processor.h:72] Save KFC_TASK data into dataInventory
+2026-07-28 18:25:11 [INFO] [608593] [608599] [data_processor.cpp:54] Check /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/freq.db and FreqParse success.
+2026-07-28 18:25:11 [INFO] [608593] [608600] [data_processor.cpp:54] Check /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/llc.db and LLCMetrics success.
+2026-07-28 18:25:11 [WARN] [608593] [608596] [data_processor.h:74] KFC_COMM no data to inject to dataInventory
+2026-07-28 18:25:11 [INFO] [608593] [608603] [host_usage_processor.cpp:23] Start process MEM_USAGE.
+2026-07-28 18:25:11 [INFO] [608593] [608595] [data_processor.cpp:54] Check /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/acc_pmu.db and AccPmu success.
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:86] Query data success: SELECT struct_type, id, level, thread_id, item_id, start, end, connection_id FROM ApiData
+2026-07-28 18:25:11 [INFO] [608593] [608594] [data_processor.cpp:54] Check /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/hbm.db and HBMbwData success.
+2026-07-28 18:25:11 [WARN] [608593] [608601] [data_processor.h:74] KFC_TASK no data to inject to dataInventory
+2026-07-28 18:25:11 [INFO] [608593] [608599] [aicore_freq_processor.cpp:97] AicoreFreqProcessor GetData, dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/freq.db
+2026-07-28 18:25:11 [INFO] [608593] [608596] [data_processor.cpp:27] MODEL_NAME Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [INFO] [608593] [608595] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608601] [data_processor.cpp:27] MSTX Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [INFO] [608593] [608599] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [WARN] [608593] [608596] [data_processor.cpp:38] Can't find the db, the path is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/host/sqlite/ge_model_info.db.
+2026-07-28 18:25:11 [INFO] [608593] [608596] [data_processor.cpp:27] NETDEV_STATS Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [WARN] [608593] [608603] [data_processor.cpp:38] Can't find the db, the path is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/host/sqlite/host_mem_usage.db.
+2026-07-28 18:25:11 [INFO] [608593] [608603] [data_processor.cpp:27] NETWORK_USAGE Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [INFO] [608593] [608603] [host_usage_processor.cpp:23] Start process NETWORK_USAGE.
+2026-07-28 18:25:11 [WARN] [608593] [608596] [data_processor.cpp:38] Can't find the db, the path is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/netdev_stats.db.
+2026-07-28 18:25:11 [INFO] [608593] [608596] [data_processor.h:72] Save NETDEV_STATS data into dataInventory
+2026-07-28 18:25:11 [WARN] [608593] [608596] [data_processor.h:74] NETDEV_STATS no data to inject to dataInventory
+2026-07-28 18:25:11 [INFO] [608593] [608596] [data_processor.cpp:27] NIC Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [INFO] [608593] [608594] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [WARN] [608593] [608603] [data_processor.cpp:38] Can't find the db, the path is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/host/sqlite/host_network_usage.db.
+2026-07-28 18:25:11 [WARN] [608593] [608601] [data_processor.cpp:38] Can't find the db, the path is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/host/sqlite/msproftx.db.
+2026-07-28 18:25:11 [INFO] [608593] [608603] [data_processor.cpp:27] NPU_MEM Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [WARN] [608593] [608601] [data_processor.cpp:38] Can't find the db, the path is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/host/sqlite/msproftx.db.
+2026-07-28 18:25:11 [WARN] [608593] [608601] [msproftx_host_processor.cpp:79] msprofTx in /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA is not exists, return
+2026-07-28 18:25:11 [INFO] [608593] [608601] [data_processor.cpp:27] NPU_MODULE_MEM Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [INFO] [608593] [608600] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [WARN] [608593] [608602] [connection.cpp:68] sqlite3_exec return 1, Failed to check: no such table: MemcpyInfo
+2026-07-28 18:25:11 [WARN] [608593] [608596] [data_processor.cpp:38] Can't find the db, the path is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/nic.db.
+2026-07-28 18:25:11 [WARN] [608593] [608596] [data_processor.cpp:38] Can't find the db, the path is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/nic.db.
+2026-07-28 18:25:11 [INFO] [608593] [608596] [data_processor.cpp:27] NPU_OP_MEM Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [WARN] [608593] [608596] [data_processor.cpp:38] Can't find the db, the path is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/host/sqlite/task_memory.db.
+2026-07-28 18:25:11 [INFO] [608593] [608596] [data_processor.cpp:27] OP_STATISTIC Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [INFO] [608593] [608598] [api_processor.cpp:35] There are 25 records before API data filtering, filterTime is 1785234309239313000.
+2026-07-28 18:25:11 [INFO] [608593] [608598] [api_processor.cpp:49] There are 21 records after API data filtering.
+2026-07-28 18:25:11 [INFO] [608593] [608598] [data_processor.h:72] Save API data into dataInventory
+2026-07-28 18:25:11 [INFO] [608593] [608598] [data_processor.cpp:27] OSRT_API Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [INFO] [608593] [608598] [host_usage_processor.cpp:23] Start process OSRT_API.
+2026-07-28 18:25:11 [WARN] [608593] [608602] [data_processor.cpp:50] Check MemcpyInfo not exists
+2026-07-28 18:25:11 [INFO] [608593] [608602] [data_processor.cpp:27] PCIE Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [INFO] [608593] [608602] [pcie_processor.cpp:47] PCIeProcessor Process, dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [INFO] [608593] [608599] [db_runner.h:86] Query data success: SELECT syscnt, freq FROM FreqParse
+2026-07-28 18:25:11 [WARN] [608593] [608598] [data_processor.cpp:38] Can't find the db, the path is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/host/sqlite/host_runtime_api.db.
+2026-07-28 18:25:11 [INFO] [608593] [608598] [data_processor.cpp:27] PMU Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [INFO] [608593] [608598] [metric_processor.cpp:79] TaskBasedProcess, dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [WARN] [608593] [608602] [data_processor.cpp:38] Can't find the db, the path is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/pcie.db.
+2026-07-28 18:25:11 [INFO] [608593] [608602] [data_processor.h:72] Save PCIE data into dataInventory
+2026-07-28 18:25:11 [WARN] [608593] [608602] [data_processor.h:74] PCIE no data to inject to dataInventory
+2026-07-28 18:25:11 [INFO] [608593] [608602] [data_processor.cpp:27] QOS Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [INFO] [608593] [608599] [aicore_freq_processor.cpp:116] AicoreFreqProcessor FormatData.
+2026-07-28 18:25:11 [INFO] [608593] [608595] [db_runner.h:86] Query data success: SELECT acc_id, read_bandwidth, write_bandwidth, read_ost, write_ost, timestamp FROM AccPmu ORDER BY timestamp ASC, acc_id ASC
+2026-07-28 18:25:11 [INFO] [608593] [608599] [data_processor.h:72] Save AICORE_FREQ data into dataInventory
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:86] Query data success: SELECT hashid, model_id, op_name, stream_id, task_id, block_dim, mix_block_dim, task_type, op_type, op_flag, batch_id, IFNULL(input_formats, 'NULL'), IFNULL(input_data_types, 'NULL'), IFNULL(input_shapes, 'NULL'), IFNULL(output_formats, 'NULL'), IFNULL(output_data_types, 'NULL'), IFNULL(output_shapes, 'NULL'), device_id, context_id, (case when op_state is 'N/A' then 'N/A' when op_state is '1' then 'dynamic' when op_state is '0' then 'static' end) FROM TaskInfo
+2026-07-28 18:25:11 [INFO] [608593] [608599] [data_processor.cpp:27] ROCE Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [INFO] [608593] [608594] [db_runner.h:86] Query data success: SELECT timestamp, bandwidth, hbmid, event_type FROM HBMbwData
+2026-07-28 18:25:11 [WARN] [608593] [608599] [data_processor.cpp:38] Can't find the db, the path is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/roce.db.
+2026-07-28 18:25:11 [WARN] [608593] [608599] [data_processor.cpp:38] Can't find the db, the path is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/roce.db.
+2026-07-28 18:25:11 [INFO] [608593] [608599] [data_processor.cpp:27] SIO Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [WARN] [608593] [608599] [data_processor.cpp:38] Can't find the db, the path is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/sio.db.
+2026-07-28 18:25:11 [INFO] [608593] [608599] [data_processor.h:72] Save SIO data into dataInventory
+2026-07-28 18:25:11 [WARN] [608593] [608599] [data_processor.h:74] SIO no data to inject to dataInventory
+2026-07-28 18:25:11 [INFO] [608593] [608599] [data_processor.cpp:27] SOC Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [INFO] [608593] [608594] [data_processor.h:61] There are 48 records before HBM data filtering, filterTime is 1785234309239266000.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [data_processor.h:72] Save COMPUTE_TASK_INFO data into dataInventory
+2026-07-28 18:25:11 [INFO] [608593] [608594] [data_processor.h:65] There are 0 records after HBM data filtering.
+2026-07-28 18:25:11 [INFO] [608593] [608594] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [data_processor.cpp:27] STEP_TRACE Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [INFO] [608593] [608603] [data_processor.cpp:54] Check /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/npu_mem.db and NpuMem success.
+2026-07-28 18:25:11 [INFO] [608593] [608603] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [WARN] [608593] [608597] [data_processor.cpp:38] Can't find the db, the path is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/trace.db.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [data_processor.h:61] There are 0 records before STEP_TRACE data filtering, filterTime is 1785234309239266000.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [data_processor.h:65] There are 0 records after STEP_TRACE data filtering.
+2026-07-28 18:25:11 [INFO] [608593] [608601] [data_processor.cpp:54] Check /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/npu_module_mem.db and NpuModuleMem success.
+2026-07-28 18:25:11 [INFO] [608593] [608596] [data_processor.cpp:54] Check /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/op_counter.db and op_report success.
+2026-07-28 18:25:11 [INFO] [608593] [608601] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608596] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608595] [data_processor.h:61] There are 344 records before ACC_PMU data filtering, filterTime is 1785234309239266000.
+2026-07-28 18:25:11 [INFO] [608593] [608595] [data_processor.h:65] There are 301 records after ACC_PMU data filtering.
+2026-07-28 18:25:11 [INFO] [608593] [608595] [data_processor.h:72] Save ACC_PMU data into dataInventory
+2026-07-28 18:25:11 [INFO] [608593] [608595] [data_processor.cpp:27] TASK Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [WARN] [608593] [608597] [data_processor.cpp:38] Can't find the db, the path is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/trace.db.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [data_processor.h:61] There are 0 records before STEP_TRACE data filtering, filterTime is 1785234309239266000.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [data_processor.h:65] There are 0 records after STEP_TRACE data filtering.
+2026-07-28 18:25:11 [WARN] [608593] [608597] [data_processor.cpp:38] Can't find the db, the path is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/trace.db.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [data_processor.h:61] There are 0 records before STEP_TRACE data filtering, filterTime is 1785234309239266000.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [data_processor.h:65] There are 0 records after STEP_TRACE data filtering.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [data_processor.h:72] Save STEP_TRACE data into dataInventory
+2026-07-28 18:25:11 [WARN] [608593] [608597] [data_processor.h:74] STEP_TRACE no data to inject to dataInventory
+2026-07-28 18:25:11 [INFO] [608593] [608597] [data_processor.h:72] Save STEP_TRACE data into dataInventory
+2026-07-28 18:25:11 [WARN] [608593] [608597] [data_processor.h:74] STEP_TRACE no data to inject to dataInventory
+2026-07-28 18:25:11 [INFO] [608593] [608597] [data_processor.h:72] Save STEP_TRACE data into dataInventory
+2026-07-28 18:25:11 [WARN] [608593] [608597] [data_processor.h:74] STEP_TRACE no data to inject to dataInventory
+2026-07-28 18:25:11 [INFO] [608593] [608597] [data_processor.cpp:27] UNIFIED_PMU Run. Dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:81] TaskBasedProcess, dir is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA
+2026-07-28 18:25:11 [INFO] [608593] [608598] [data_processor.cpp:54] Check /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/metric_summary.db and MetricSummary success.
+2026-07-28 18:25:11 [INFO] [608593] [608598] [metric_processor.cpp:127] GetAndCheckTableColumns.
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.cpp:148] Start get MetricSummary headers
+2026-07-28 18:25:11 [INFO] [608593] [608602] [data_processor.cpp:54] Check /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/qos.db and QosBwData success.
+2026-07-28 18:25:11 [INFO] [608593] [608602] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608599] [data_processor.cpp:54] Check /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/soc_profiler.db and InterSoc success.
+2026-07-28 18:25:11 [INFO] [608593] [608599] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608594] [db_runner.h:86] Query data success: SELECT AVG(CASE WHEN event_type = 'read' THEN bandwidth END) AS read_bandwidth, AVG(CASE WHEN event_type = 'write' THEN bandwidth END) AS write_bandwidth FROM HBMbwData
+2026-07-28 18:25:11 [INFO] [608593] [608603] [db_runner.h:86] Query data success: SELECT event, ddr, hbm, timestamp, memory FROM NpuMem
+2026-07-28 18:25:11 [INFO] [608593] [608601] [db_runner.h:86] Query data success: SELECT module_id, syscnt, total_size, device_type FROM NpuModuleMem
+2026-07-28 18:25:11 [INFO] [608593] [608594] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608603] [data_processor.h:61] There are 13 records before NPU_MEM data filtering, filterTime is 1785234309239266000.
+2026-07-28 18:25:11 [INFO] [608593] [608603] [data_processor.h:65] There are 2 records after NPU_MEM data filtering.
+2026-07-28 18:25:11 [INFO] [608593] [608603] [data_processor.h:72] Save NPU_MEM data into dataInventory
+2026-07-28 18:25:11 [INFO] [608593] [608595] [data_processor.cpp:54] Check /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/ascend_task.db and AscendTask success.
+2026-07-28 18:25:11 [INFO] [608593] [608596] [db_runner.h:86] Query data success: SELECT op_type, core_type, occurrences,  round(total_time/1000.0, 3), round(min/1000.0, 3), round(avg/1000.0, 3), round(max/1000.0, 3), round(ratio, 3) FROM op_report WHERE op_type != 'N/A' and core_type not in ('WRITE_BACK', 'INVALID')
+2026-07-28 18:25:11 [INFO] [608593] [608595] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.cpp:161] Get MetricSummary columns success
+2026-07-28 18:25:11 [INFO] [608593] [608599] [db_runner.h:86] Query data success: SELECT l2_buffer_bw_level, mata_bw_level, sys_time FROM InterSoc
+2026-07-28 18:25:11 [INFO] [608593] [608597] [data_processor.cpp:54] Check /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/metric_summary.db and MetricSummary success.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:126] GetAndCheckTableColumns.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.cpp:148] Start get MetricSummary headers
+2026-07-28 18:25:11 [INFO] [608593] [608596] [data_processor.h:72] Save OP_STATISTIC data into dataInventory
+2026-07-28 18:25:11 [INFO] [608593] [608599] [data_processor.h:61] There are 8 records before SOC data filtering, filterTime is 1785234309239266000.
+2026-07-28 18:25:11 [INFO] [608593] [608599] [data_processor.h:65] There are 7 records after SOC data filtering.
+2026-07-28 18:25:11 [INFO] [608593] [608599] [data_processor.h:72] Save SOC data into dataInventory
+2026-07-28 18:25:11 [INFO] [608593] [608602] [db_runner.h:86] Query data success: SELECT timestamp, bw1, bw2, bw3, bw4, bw5, bw6, bw7, bw8, bw9, bw10 FROM QosBwData
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608594] [db_runner.h:86] Query data success: SELECT hbmid, AVG(CASE WHEN event_type = 'read' THEN bandwidth END) AS read_bandwidth,AVG(CASE WHEN event_type = 'write' THEN bandwidth END) AS write_bandwidth FROM HBMbwData GROUP BY hbmid
+2026-07-28 18:25:11 [INFO] [608593] [608595] [db_runner.h:86] Query data success: SELECT a.start_time, a.duration, a.model_id, a.index_id, a.stream_id, a.task_id, a.context_id,a.batch_id, a.connection_id, a.host_task_type, a.device_task_type FROM AscendTask a WHERE a.device_task_type != 'UNKNOWN'
+2026-07-28 18:25:11 [INFO] [608593] [608594] [data_processor.h:72] Save HBM data into dataInventory
+2026-07-28 18:25:11 [WARN] [608593] [608594] [data_processor.h:74] HBM no data to inject to dataInventory
+2026-07-28 18:25:11 [INFO] [608593] [608594] [data_processor.h:72] Save HBM data into dataInventory
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.cpp:161] Get MetricSummary columns success
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:172] This column[task_id] does not need to be processed.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:172] This column[stream_id] does not need to be processed.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:172] This column[subtask_id] does not need to be processed.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:172] This column[batch_id] does not need to be processed.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:186] GetTaskBasedData, dbPath is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/metric_summary.db, column name is aic_total_time.
+2026-07-28 18:25:11 [INFO] [608593] [608595] [data_processor.h:61] There are 8 records before TASK data filtering, filterTime is 1785234309239266000.
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:86] Query data success: SELECT ROUND(aic_total_time, 3) FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608601] [data_processor.h:61] There are 462 records before NPU_MODULE_MEM data filtering, filterTime is 1785234309239266000.
+2026-07-28 18:25:11 [INFO] [608593] [608595] [data_processor.h:65] There are 6 records after TASK data filtering.
+2026-07-28 18:25:11 [INFO] [608593] [608601] [data_processor.h:65] There are 308 records after NPU_MODULE_MEM data filtering.
+2026-07-28 18:25:11 [INFO] [608593] [608595] [data_processor.h:72] Save TASK data into dataInventory
+2026-07-28 18:25:11 [INFO] [608593] [608601] [data_processor.h:72] Save NPU_MODULE_MEM data into dataInventory
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:86] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aic_total_time FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:86] Query data success: SELECT aic_total_cycles FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:235] FormatTaskBasedData.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:186] GetTaskBasedData, dbPath is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/metric_summary.db, column name is aic_total_cycles.
+2026-07-28 18:25:11 [INFO] [608593] [608602] [data_processor.h:61] There are 629 records before QOS data filtering, filterTime is 1785234309239266000.
+2026-07-28 18:25:11 [INFO] [608593] [608602] [data_processor.h:65] There are 402 records after QOS data filtering.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608602] [data_processor.h:72] Save QOS data into dataInventory
+2026-07-28 18:25:11 [INFO] [608593] [608600] [db_runner.h:86] Query data success: SELECT l3tid, timestamp, hitrate, throughput FROM LLCMetrics
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:86] Query data success: SELECT ROUND(aic_mac_time, 3) FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:86] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aic_total_cycles FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608600] [data_processor.h:61] There are 10 records before LLC data filtering, filterTime is 1785234309239266000.
+2026-07-28 18:25:11 [INFO] [608593] [608600] [data_processor.h:65] There are 0 records after LLC data filtering.
+2026-07-28 18:25:11 [INFO] [608593] [608600] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:235] FormatTaskBasedData.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:186] GetTaskBasedData, dbPath is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/metric_summary.db, column name is aic_mac_time.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:86] Query data success: SELECT ROUND(aic_mac_ratio_extra, 3) FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:86] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aic_mac_time FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:235] FormatTaskBasedData.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:186] GetTaskBasedData, dbPath is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/metric_summary.db, column name is aic_mac_ratio_extra.
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:86] Query data success: SELECT ROUND(aic_scalar_time, 3) FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:86] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aic_mac_ratio_extra FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:86] Query data success: SELECT ROUND(aic_scalar_ratio, 3) FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:235] FormatTaskBasedData.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:186] GetTaskBasedData, dbPath is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/metric_summary.db, column name is aic_scalar_time.
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:86] Query data success: SELECT ROUND(aic_mte1_time, 3) FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:86] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aic_scalar_time FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:235] FormatTaskBasedData.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:186] GetTaskBasedData, dbPath is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/metric_summary.db, column name is aic_scalar_ratio.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:86] Query data success: SELECT ROUND(aic_mte1_ratio_extra, 3) FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:86] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aic_scalar_ratio FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608600] [db_runner.h:86] Query data success: SELECT AVG(hitrate), AVG(throughput) FROM LLCMetrics
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:235] FormatTaskBasedData.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:186] GetTaskBasedData, dbPath is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/metric_summary.db, column name is aic_mte1_time.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608600] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:86] Query data success: SELECT ROUND(aic_mte2_time, 3) FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:86] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aic_mte1_time FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:235] FormatTaskBasedData.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:186] GetTaskBasedData, dbPath is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/metric_summary.db, column name is aic_mte1_ratio_extra.
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:86] Query data success: SELECT ROUND(aic_mte2_ratio, 3) FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:86] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aic_mte1_ratio_extra FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:86] Query data success: SELECT ROUND(aic_fixpipe_time, 3) FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:235] FormatTaskBasedData.
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:186] GetTaskBasedData, dbPath is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/metric_summary.db, column name is aic_mte2_time.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:86] Query data success: SELECT ROUND(aic_fixpipe_ratio, 3) FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:86] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aic_mte2_time FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:235] FormatTaskBasedData.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:186] GetTaskBasedData, dbPath is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/metric_summary.db, column name is aic_mte2_ratio.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:86] Query data success: SELECT ROUND(aic_icache_miss_rate, 3) FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608600] [db_runner.h:86] Query data success: SELECT l3tid, AVG(hitrate), AVG(throughput) FROM LLCMetrics GROUP BY l3tid
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:86] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aic_mte2_ratio FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:235] FormatTaskBasedData.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:186] GetTaskBasedData, dbPath is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/metric_summary.db, column name is aic_fixpipe_time.
+2026-07-28 18:25:11 [INFO] [608593] [608600] [data_processor.h:72] Save LLC data into dataInventory
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [WARN] [608593] [608600] [data_processor.h:74] LLC no data to inject to dataInventory
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:86] Query data success: SELECT ROUND(aiv_total_time, 3) FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608600] [data_processor.h:72] Save LLC data into dataInventory
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:86] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aic_fixpipe_time FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:86] Query data success: SELECT aiv_total_cycles FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:235] FormatTaskBasedData.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:186] GetTaskBasedData, dbPath is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/metric_summary.db, column name is aic_fixpipe_ratio.
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:86] Query data success: SELECT ROUND(aiv_vec_time, 3) FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:86] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aic_fixpipe_ratio FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:235] FormatTaskBasedData.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:186] GetTaskBasedData, dbPath is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/metric_summary.db, column name is aic_icache_miss_rate.
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:86] Query data success: SELECT ROUND(aiv_vec_ratio, 3) FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:86] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aic_icache_miss_rate FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:86] Query data success: SELECT ROUND(aiv_scalar_time, 3) FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:235] FormatTaskBasedData.
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:186] GetTaskBasedData, dbPath is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/metric_summary.db, column name is aiv_total_time.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:86] Query data success: SELECT ROUND(aiv_scalar_ratio, 3) FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:86] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aiv_total_time FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:235] FormatTaskBasedData.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:186] GetTaskBasedData, dbPath is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/metric_summary.db, column name is aiv_total_cycles.
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:86] Query data success: SELECT ROUND(aiv_mte2_time, 3) FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:86] Query data success: SELECT ROUND(aiv_mte2_ratio, 3) FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:86] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aiv_total_cycles FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:235] FormatTaskBasedData.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:186] GetTaskBasedData, dbPath is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/metric_summary.db, column name is aiv_vec_time.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:86] Query data success: SELECT ROUND(aiv_mte3_time, 3) FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:86] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aiv_vec_time FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:235] FormatTaskBasedData.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:186] GetTaskBasedData, dbPath is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/metric_summary.db, column name is aiv_vec_ratio.
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:86] Query data success: SELECT ROUND(aiv_mte3_ratio, 3) FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:86] Query data success: SELECT ROUND(aiv_icache_miss_rate, 3) FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:86] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aiv_vec_ratio FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:235] FormatTaskBasedData.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:186] GetTaskBasedData, dbPath is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/metric_summary.db, column name is aiv_mac_time.
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:86] Query data success: SELECT subtask_id FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:86] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aiv_mac_time FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:86] Query data success: SELECT stream_id FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:235] FormatTaskBasedData.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:186] GetTaskBasedData, dbPath is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/metric_summary.db, column name is aiv_mac_ratio.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:86] Query data success: SELECT task_id FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:86] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aiv_mac_ratio FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:235] FormatTaskBasedData.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:186] GetTaskBasedData, dbPath is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/metric_summary.db, column name is aiv_scalar_time.
+2026-07-28 18:25:11 [INFO] [608593] [608598] [db_runner.h:86] Query data success: SELECT batch_id FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608598] [metric_processor.cpp:291] FormatTaskBasedData.
+2026-07-28 18:25:11 [INFO] [608593] [608598] [metric_processor.cpp:348] Calculating memory bound...
+2026-07-28 18:25:11 [INFO] [608593] [608598] [metric_processor.cpp:351] can't find memory bound needed column, no memory bound data added.
+2026-07-28 18:25:11 [INFO] [608593] [608598] [metric_processor.cpp:456] Add cube usage
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:86] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aiv_scalar_time FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:235] FormatTaskBasedData.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:186] GetTaskBasedData, dbPath is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/metric_summary.db, column name is aiv_scalar_ratio.
+2026-07-28 18:25:11 [INFO] [608593] [608598] [metric_processor.cpp:447] Get freq (1800) and coreNum (20), path is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA, deviceId is 7.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:86] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aiv_scalar_ratio FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:235] FormatTaskBasedData.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:186] GetTaskBasedData, dbPath is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/metric_summary.db, column name is aiv_mte1_time.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:86] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aiv_mte1_time FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:235] FormatTaskBasedData.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:186] GetTaskBasedData, dbPath is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/metric_summary.db, column name is aiv_mte1_ratio.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:86] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aiv_mte1_ratio FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:235] FormatTaskBasedData.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:186] GetTaskBasedData, dbPath is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/metric_summary.db, column name is aiv_mte2_time.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:86] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aiv_mte2_time FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:235] FormatTaskBasedData.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:186] GetTaskBasedData, dbPath is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/metric_summary.db, column name is aiv_mte2_ratio.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:86] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aiv_mte2_ratio FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:235] FormatTaskBasedData.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:186] GetTaskBasedData, dbPath is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/metric_summary.db, column name is aiv_mte3_time.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:86] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aiv_mte3_time FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:235] FormatTaskBasedData.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:186] GetTaskBasedData, dbPath is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/metric_summary.db, column name is aiv_mte3_ratio.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:86] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aiv_mte3_ratio FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:235] FormatTaskBasedData.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:186] GetTaskBasedData, dbPath is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/device_7/sqlite/metric_summary.db, column name is aiv_icache_miss_rate.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:75] Start query data
+2026-07-28 18:25:11 [INFO] [608593] [608597] [db_runner.h:86] Query data success: SELECT stream_id, task_id, subtask_id,  batch_id, aiv_icache_miss_rate FROM MetricSummary
+2026-07-28 18:25:11 [INFO] [608593] [608597] [unified_pmu_processor.cpp:235] FormatTaskBasedData.
+2026-07-28 18:25:11 [INFO] [608593] [608597] [data_processor.h:72] Save TASK_PMU_INFO data into dataInventory
+2026-07-28 18:25:11 [INFO] [608593] [608606] [summary_manager.cpp:53] Start exporting summary!
+2026-07-28 18:25:11 [INFO] [608593] [608604] [db_assembler.cpp:1231] Start exporting db!
+2026-07-28 18:25:11 [INFO] [608593] [608609] [summary_assembler.h:33] Begin to Assemble OP_SUMMARY data
+2026-07-28 18:25:11 [INFO] [608593] [608607] [summary_assembler.h:33] Begin to Assemble OP_STATISTIC data
+2026-07-28 18:25:11 [INFO] [608593] [608611] [summary_assembler.h:33] Begin to Assemble NPU_MEM data
+2026-07-28 18:25:11 [INFO] [608593] [608608] [summary_assembler.h:33] Begin to Assemble NPU_MODULE_MEM data
+2026-07-28 18:25:11 [INFO] [608593] [608610] [summary_assembler.h:33] Begin to Assemble COMMUNICATION_STATISTIC data
+2026-07-28 18:25:11 [INFO] [608593] [608611] [csv_writer.cpp:77] Start dump /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/mindstudio_profiler_output/npu_mem.csv, timestamp is 20260728182511.
+2026-07-28 18:25:11 [INFO] [608593] [608611] [file.cpp:416] The file not exists: /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/mindstudio_profiler_output/npu_mem_20260728182511.csv.
+2026-07-28 18:25:11 [INFO] [608593] [608611] [csv_writer.cpp:84] Generate /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/mindstudio_profiler_output/npu_mem.csv finished, timestamp is 20260728182511.
+2026-07-28 18:25:11 [INFO] [608593] [608604] [db_assembler.cpp:1164] Find completed msprof db, /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/msprof_20260728182510.db.
+2026-07-28 18:25:11 [INFO] [608593] [608611] [summary_assembler.h:36] Assemble and export NPU_MEM data success
+2026-07-28 18:25:11 [INFO] [608593] [608611] [summary_assembler.h:33] Begin to Assemble API data
+2026-07-28 18:25:11 [INFO] [608593] [608607] [csv_writer.cpp:77] Start dump /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/mindstudio_profiler_output/op_statistic.csv, timestamp is 20260728182511.
+2026-07-28 18:25:11 [WARN] [608593] [608610] [comm_statistic_assembler.cpp:56] Communication Statistic data not exist.
+2026-07-28 18:25:11 [INFO] [608593] [608607] [file.cpp:416] The file not exists: /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/mindstudio_profiler_output/op_statistic_20260728182511.csv.
+2026-07-28 18:25:11 [INFO] [608593] [608611] [csv_writer.cpp:77] Start dump /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/mindstudio_profiler_output/api_statistic.csv, timestamp is 20260728182511.
+2026-07-28 18:25:11 [INFO] [608593] [608609] [csv_writer.cpp:77] Start dump /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/mindstudio_profiler_output/op_summary.csv, timestamp is 20260728182511.
+2026-07-28 18:25:11 [WARN] [608593] [608610] [summary_assembler.h:39] No need to Export COMMUNICATION_STATISTIC data
+2026-07-28 18:25:11 [INFO] [608593] [608608] [csv_writer.cpp:77] Start dump /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/mindstudio_profiler_output/npu_module_mem.csv, timestamp is 20260728182511.
+2026-07-28 18:25:11 [INFO] [608593] [608610] [summary_assembler.h:33] Begin to Assemble FUSION_OP data
+2026-07-28 18:25:11 [INFO] [608593] [608611] [file.cpp:416] The file not exists: /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/mindstudio_profiler_output/api_statistic_20260728182511.csv.
+2026-07-28 18:25:11 [INFO] [608593] [608607] [csv_writer.cpp:84] Generate /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/mindstudio_profiler_output/op_statistic.csv finished, timestamp is 20260728182511.
+2026-07-28 18:25:11 [WARN] [608593] [608610] [fusion_op_assembler.cpp:69] fusion op data not exist.
+2026-07-28 18:25:11 [INFO] [608593] [608607] [summary_assembler.h:36] Assemble and export OP_STATISTIC data success
+2026-07-28 18:25:11 [WARN] [608593] [608610] [summary_assembler.h:39] No need to Export FUSION_OP data
+2026-07-28 18:25:11 [INFO] [608593] [608607] [summary_assembler.h:33] Begin to Assemble TASK_TIME_SUMMARY data
+2026-07-28 18:25:11 [INFO] [608593] [608609] [file.cpp:416] The file not exists: /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/mindstudio_profiler_output/op_summary_20260728182511.csv.
+2026-07-28 18:25:11 [INFO] [608593] [608611] [csv_writer.cpp:84] Generate /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/mindstudio_profiler_output/api_statistic.csv finished, timestamp is 20260728182511.
+2026-07-28 18:25:11 [INFO] [608593] [608610] [summary_assembler.h:33] Begin to Assemble STEP_TRACE data
+2026-07-28 18:25:11 [INFO] [608593] [608611] [summary_assembler.h:36] Assemble and export API data success
+2026-07-28 18:25:11 [INFO] [608593] [608607] [csv_writer.cpp:77] Start dump /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/mindstudio_profiler_output/task_time.csv, timestamp is 20260728182511.
+2026-07-28 18:25:11 [WARN] [608593] [608610] [summary_step_trace_assembler.cpp:59] trainTraceData not exists, can't export step trace data.
+2026-07-28 18:25:11 [WARN] [608593] [608610] [summary_assembler.h:39] No need to Export STEP_TRACE data
+2026-07-28 18:25:11 [INFO] [608593] [608608] [file.cpp:416] The file not exists: /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/mindstudio_profiler_output/npu_module_mem_20260728182511.csv.
+2026-07-28 18:25:11 [INFO] [608593] [608607] [file.cpp:416] The file not exists: /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/mindstudio_profiler_output/task_time_20260728182511.csv.
+2026-07-28 18:25:11 [INFO] [608593] [608609] [csv_writer.cpp:84] Generate /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/mindstudio_profiler_output/op_summary.csv finished, timestamp is 20260728182511.
+2026-07-28 18:25:11 [INFO] [608593] [608609] [summary_assembler.h:36] Assemble and export OP_SUMMARY data success
+2026-07-28 18:25:11 [INFO] [608593] [608607] [csv_writer.cpp:84] Generate /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/mindstudio_profiler_output/task_time.csv finished, timestamp is 20260728182511.
+2026-07-28 18:25:11 [INFO] [608593] [608608] [csv_writer.cpp:84] Generate /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/PROF_000001_20260728182509137_GHHQKKINRAKLMIBA/mindstudio_profiler_output/npu_module_mem.csv finished, timestamp is 20260728182511.
+2026-07-28 18:25:11 [INFO] [608593] [608607] [summary_assembler.h:36] Assemble and export TASK_TIME_SUMMARY data success
+2026-07-28 18:25:11 [INFO] [608593] [608608] [summary_assembler.h:36] Assemble and export NPU_MODULE_MEM data success

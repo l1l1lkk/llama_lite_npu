@@ -1,0 +1,3 @@
+[2026-07-28-18:24:07.166] [INFO] [AscendProfiler_IntegrateParser:97] Profiler logger initialized at: /data/liuke/swiglu-triton-fusion-20260728/baseline/profiler-decode/swiglu-unfused-decode_606822_20260728182404450_ascend_pt/logs/profiler_20260728182407_607387_IntegrateParser.log
+[2026-07-28-18:24:07.170] [INFO] [AscendProfiler_IntegrateParser:33] IntegrateParser start.
+[2026-07-28-18:24:07.184] [INFO] [AscendProfiler_IntegrateParser:40] IntegrateParser finish.

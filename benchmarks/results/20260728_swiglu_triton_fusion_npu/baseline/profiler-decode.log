@@ -1,0 +1,11 @@
+/data/liuke/llama_lite_npu-worktrees/swiglu-unfused-baseline/lite_llama/kernels/flashattention.py:159: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  @custom_fwd(cast_inputs=torch.float16)
+/data/liuke/llama_lite_npu-worktrees/swiglu-unfused-baseline/lite_llama/kernels/flashattention2_nopad.py:170: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  @custom_fwd(cast_inputs=torch.float16)
+/data/liuke/llama_lite_npu-worktrees/swiglu-unfused-baseline/lite_llama/kernels/paged_chunk_flashattention.py:226: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  @custom_fwd(cast_inputs=torch.float16)
+[2026-07-28 18:24:04] [WARNING] [606822] profiler.py: Invalid parameter export_type: None, reset it to text.
+[2026-07-28 18:24:04] [INFO] [607137] profiler.py: Start parsing profiling data: /data/liuke/swiglu-triton-fusion-20260728/baseline/profiler-decode/swiglu-unfused-decode_606822_20260728182404450_ascend_pt
+|/-[2026-07-28 18:24:07] [INFO] [607146] profiler.py: CANN profiling data parsed in a total time of 0:00:02.026711
+\[2026-07-28 18:24:08] [INFO] [607137] profiler.py: All profiling data parsed in a total time of 0:00:03.225070
+{"status": "pass", "output_dir": "/data/liuke/swiglu-triton-fusion-20260728/baseline/profiler-decode"}

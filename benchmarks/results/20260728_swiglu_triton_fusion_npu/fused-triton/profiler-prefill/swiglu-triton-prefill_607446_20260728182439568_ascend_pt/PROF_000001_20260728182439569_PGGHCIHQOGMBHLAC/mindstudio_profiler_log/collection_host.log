@@ -1,0 +1,33 @@
+2026-07-28 18:24:40 [INFO] [ms_multi_process.py:64] - CpuUsageAnalysis process data finished, execute time is 0.004 s
+2026-07-28 18:24:40 [INFO] [ms_multi_process.py:64] - MemUsageAnalysis process data finished, execute time is 0.004 s
+2026-07-28 18:24:40 [INFO] [ms_multi_process.py:64] - DiskUsageAnalysis process data finished, execute time is 0.004 s
+2026-07-28 18:24:40 [INFO] [ms_multi_process.py:64] - NetworkUsageAnalysis process data finished, execute time is 0.004 s
+2026-07-28 18:24:40 [INFO] [ms_multi_process.py:64] - HostSyscallAnalysis process data finished, execute time is 0.004 s
+2026-07-28 18:24:40 [INFO] [collection_engine.py:84] - Database process finished.
+2026-07-28 18:24:40 [INFO] [collection_engine.py:85] - Analysis finished.
+2026-07-28 18:24:40 [INFO] [ms_multi_process.py:64] - GeLogicStreamParser process data finished, execute time is 0.004 s
+2026-07-28 18:24:40 [INFO] [ms_multi_process.py:64] - ParsingMemoryData process data finished, execute time is 0.003 s
+2026-07-28 18:24:40 [INFO] [ms_multi_process.py:64] - ParsingCpuUsageData process data finished, execute time is 0.004 s
+2026-07-28 18:24:40 [INFO] [ms_time_parser.py:104] - Start parsing sync data ...
+2026-07-28 18:24:40 [INFO] [ms_time_parser.py:107] - Parsing sync data finished...
+2026-07-28 18:24:40 [WARNING] [data_preparation_parser.py:92] - No data preparation data, data list is empty!
+2026-07-28 18:24:40 [INFO] [data_preparation_parser.py:105] - Parsing data preparation has finished.
+2026-07-28 18:24:40 [INFO] [ms_multi_process.py:64] - DataPreparationParser process data finished, execute time is 0.004 s
+2026-07-28 18:24:40 [INFO] [ms_multi_process.py:64] - NpuOpMemParser process data finished, execute time is 0.004 s
+2026-07-28 18:24:40 [INFO] [ms_multi_process.py:64] - Mc2CommInfoParser process data finished, execute time is 0.003 s
+2026-07-28 18:24:40 [INFO] [ms_multi_process.py:64] - MsTimeParser process data finished, execute time is 0.008 s
+2026-07-28 18:24:40 [INFO] [stream_expand_spec_parser.py:92] - start parsing Stream expand info data file: unaging.compact.expand_stream_spec.slice_0
+2026-07-28 18:24:40 [INFO] [stream_expand_spec_parser.py:97] - Create Stream expand info data finished!
+2026-07-28 18:24:40 [INFO] [ms_multi_process.py:64] - StreamExpandSpecParser process data finished, execute time is 0.009 s
+2026-07-28 18:24:40 [INFO] [ms_multi_process.py:64] - RuntimeOpInfoParser process data finished, execute time is 0.004 s
+2026-07-28 18:24:40 [INFO] [ms_multi_process.py:64] - HCCLOperatiorParser process data finished, execute time is 0.004 s
+2026-07-28 18:24:40 [INFO] [cann_calculator.py:69] - start to analysis cann software callstack
+2026-07-28 18:24:40 [INFO] [msprof_c_interface.py:21] - Data will be parsed by msprof_analysis.so!
+2026-07-28 18:24:40 [INFO] [ms_multi_process.py:64] - CANNCalculator process data finished, execute time is 0.045 s
+2026-07-28 18:24:40 [INFO] [ms_multi_process.py:64] - CaptureStreamInfoParser process data finished, execute time is 0.005 s
+2026-07-28 18:24:40 [INFO] [ms_multi_process.py:64] - MsprofTxParser process data finished, execute time is 0.005 s
+2026-07-28 18:24:40 [INFO] [ms_multi_process.py:64] - StaticOpMemParser process data finished, execute time is 0.004 s
+2026-07-28 18:24:40 [INFO] [ms_multi_process.py:64] - NpuOpMemCalculator process data finished, execute time is 0.005 s
+2026-07-28 18:24:41 [WARNING] [file_manager.py:86] - Data has been analyzed, path is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-prefill/swiglu-triton-prefill_607446_20260728182439568_ascend_pt/PROF_000001_20260728182439569_PGGHCIHQOGMBHLAC/host, there are ['ge_info.db', 'ge_hash.db', 'time.db', 'api_event.db', 'stream_expand_spec.db', 'runtime.db'] in sqlite.
+2026-07-28 18:24:41 [WARNING] [msprof_export.py:445] - File all_file.complete already exists. All data will be exported from db in sqlite. Path is /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-prefill/swiglu-triton-prefill_607446_20260728182439568_ascend_pt/PROF_000001_20260728182439569_PGGHCIHQOGMBHLAC/host 
+2026-07-28 18:24:41 [INFO] [ms_multi_process.py:64] - NpuOpMemCalculator process data finished, execute time is 0.005 s

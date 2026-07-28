@@ -1,0 +1,3 @@
+[2026-07-28-18:24:42.310] [INFO] [AscendProfiler_MemoryViewParser:97] Profiler logger initialized at: /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-prefill/swiglu-triton-prefill_607446_20260728182439568_ascend_pt/logs/profiler_20260728182442_608012_MemoryViewParser.log
+[2026-07-28-18:24:42.310] [INFO] [AscendProfiler_MemoryViewParser:78] MemoryViewParser start.
+[2026-07-28-18:24:42.316] [INFO] [AscendProfiler_MemoryViewParser:89] MemoryViewParser finish.

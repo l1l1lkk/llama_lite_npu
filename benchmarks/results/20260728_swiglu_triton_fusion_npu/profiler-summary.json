@@ -1,0 +1,105 @@
+{
+  "captures": {
+    "decode": {
+      "baseline": {
+        "active_steps": 5,
+        "capture_root": "/data/liuke/swiglu-triton-fusion-20260728/baseline/profiler-decode",
+        "classification": "scalar_compute",
+        "device_time_per_step_us": 16.008,
+        "dominant_pipe": "aiv_scalar_ratio",
+        "kernel_count": 30,
+        "kernel_details": "/data/liuke/swiglu-triton-fusion-20260728/baseline/profiler-decode/swiglu-unfused-decode_606822_20260728182404450_ascend_pt/ASCEND_PROFILER_OUTPUT/kernel_details.csv",
+        "kernel_duration_mean_us": 2.668,
+        "kernel_types": {
+          "Cast": 15,
+          "Mul": 10,
+          "Sigmoid": 5
+        },
+        "kernels_per_step": 6.0,
+        "weighted_pipe_ratios": {
+          "aiv_mte2_ratio": 0.1986117740232313,
+          "aiv_mte3_ratio": 0.14395464625131996,
+          "aiv_scalar_ratio": 0.5755543030623023,
+          "aiv_vec_ratio": 0.05689680570221753
+        }
+      },
+      "fused": {
+        "active_steps": 5,
+        "capture_root": "/data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode",
+        "classification": "vector_compute",
+        "device_time_per_step_us": 2.9720000000000004,
+        "dominant_pipe": "aiv_vec_ratio",
+        "kernel_count": 5,
+        "kernel_details": "/data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/ASCEND_PROFILER_OUTPUT/kernel_details.csv",
+        "kernel_duration_mean_us": 2.972,
+        "kernel_types": {
+          "_swiglu_packed_kernel": 5
+        },
+        "kernels_per_step": 1.0,
+        "weighted_pipe_ratios": {
+          "aiv_mte2_ratio": 0.1523624678663239,
+          "aiv_mte3_ratio": 0.08158038362665612,
+          "aiv_scalar_ratio": 0.2490019774569903,
+          "aiv_vec_ratio": 0.5948505042515325
+        }
+      }
+    },
+    "prefill": {
+      "baseline": {
+        "active_steps": 5,
+        "capture_root": "/data/liuke/swiglu-triton-fusion-20260728/baseline/profiler-prefill",
+        "classification": "memory_access",
+        "device_time_per_step_us": 43.568799999999996,
+        "dominant_pipe": "aiv_mte2_ratio",
+        "kernel_count": 30,
+        "kernel_details": "/data/liuke/swiglu-triton-fusion-20260728/baseline/profiler-prefill/swiglu-unfused-prefill_606198_20260728182334405_ascend_pt/ASCEND_PROFILER_OUTPUT/kernel_details.csv",
+        "kernel_duration_mean_us": 7.261466666666666,
+        "kernel_types": {
+          "Cast": 15,
+          "Mul": 10,
+          "Sigmoid": 5
+        },
+        "kernels_per_step": 6.0,
+        "weighted_pipe_ratios": {
+          "aiv_mte2_ratio": 0.6217376774935324,
+          "aiv_mte3_ratio": 0.5318788559931015,
+          "aiv_scalar_ratio": 0.17214001724633513,
+          "aiv_vec_ratio": 0.26670970968669167
+        }
+      },
+      "fused": {
+        "active_steps": 5,
+        "capture_root": "/data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-prefill",
+        "classification": "vector_compute",
+        "device_time_per_step_us": 24.1124,
+        "dominant_pipe": "aiv_vec_ratio",
+        "kernel_count": 5,
+        "kernel_details": "/data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-prefill/swiglu-triton-prefill_607446_20260728182439568_ascend_pt/ASCEND_PROFILER_OUTPUT/kernel_details.csv",
+        "kernel_duration_mean_us": 24.1124,
+        "kernel_types": {
+          "_swiglu_packed_kernel": 5
+        },
+        "kernels_per_step": 1.0,
+        "weighted_pipe_ratios": {
+          "aiv_mte2_ratio": 0.17920433222475055,
+          "aiv_mte3_ratio": 0.09479939611412569,
+          "aiv_scalar_ratio": 0.15281312795378962,
+          "aiv_vec_ratio": 0.6845867057587958
+        }
+      }
+    }
+  },
+  "comparisons": {
+    "decode": {
+      "device_time_reduction_percent": 81.43428285857071,
+      "kernel_count_reduction_percent": 83.33333333333334,
+      "speedup": 5.386271870794077
+    },
+    "prefill": {
+      "device_time_reduction_percent": 44.656726832044946,
+      "kernel_count_reduction_percent": 83.33333333333334,
+      "speedup": 1.8069043313813637
+    }
+  },
+  "schema_version": 1
+}

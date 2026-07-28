@@ -1,0 +1,3 @@
+[2026-07-28-18:25:11.828] [INFO] [AscendProfiler_KernelViewParser:97] Profiler logger initialized at: /data/liuke/swiglu-triton-fusion-20260728/fused-triton/profiler-decode/swiglu-triton-decode_608071_20260728182509136_ascend_pt/logs/profiler_20260728182511_608635_KernelViewParser.log
+[2026-07-28-18:25:11.829] [INFO] [AscendProfiler_KernelViewParser:38] KernelViewParser start.
+[2026-07-28-18:25:11.835] [INFO] [AscendProfiler_KernelViewParser:46] KernelViewParser finish.

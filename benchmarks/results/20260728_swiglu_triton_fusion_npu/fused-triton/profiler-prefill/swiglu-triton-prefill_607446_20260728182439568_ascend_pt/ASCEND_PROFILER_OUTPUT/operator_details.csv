@@ -1,0 +1,201 @@
+Name,Input Shapes,Call Stack,Host Self Duration(us),Host Total Duration(us),Device Self Duration(us),Device Total Duration(us),Device Self Duration With AICore(us),Device Total Duration With AICore(us)
+aten::view,"4,128,12288;
+","/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/lite_llama/kernels/swiglu_fused.py(67): swiglu_packed_forward;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(67): <lambda>;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(108): main;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(135): <module>;
+/usr/lib/python3.10/runpy.py(86): _run_code;
+/usr/lib/python3.10/runpy.py(196): _run_module_as_main",86.91,86.91,0,0,0,0
+aten::empty,";
+;
+;
+;
+;
+","/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/lite_llama/kernels/swiglu_fused.py(68): swiglu_packed_forward;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(67): <lambda>;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(108): main;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(135): <module>;
+/usr/lib/python3.10/runpy.py(86): _run_code;
+/usr/lib/python3.10/runpy.py(196): _run_module_as_main",32.04,68.64,0,0,0,0
+empty_tensor,,"/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/lite_llama/kernels/swiglu_fused.py(68): swiglu_packed_forward;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(67): <lambda>;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(108): main;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(135): <module>;
+/usr/lib/python3.10/runpy.py(86): _run_code;
+/usr/lib/python3.10/runpy.py(196): _run_module_as_main",36.6,36.6,0,0,0,0
+_swiglu_packed_kernel,,"/usr/local/lib/python3.10/dist-packages/triton/backends/ascend/driver.py(156): __call__;
+/usr/local/lib/python3.10/dist-packages/triton/runtime/jit.py(697): run;
+/usr/local/lib/python3.10/dist-packages/triton/runtime/jit.py(353): <lambda>;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/lite_llama/kernels/swiglu_fused.py(78): swiglu_packed_forward;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(67): <lambda>;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(108): main;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(135): <module>;
+/usr/lib/python3.10/runpy.py(86): _run_code;
+/usr/lib/python3.10/runpy.py(196): _run_module_as_main",60.73,60.73,24.202,24.202,0,0
+aten::view,"512,6144;
+","/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/lite_llama/kernels/swiglu_fused.py(86): swiglu_packed_forward;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(67): <lambda>;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(108): main;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(135): <module>;
+/usr/lib/python3.10/runpy.py(86): _run_code;
+/usr/lib/python3.10/runpy.py(196): _run_module_as_main",37.06,37.06,0,0,0,0
+aten::view,"4,128,12288;
+","/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/lite_llama/kernels/swiglu_fused.py(67): swiglu_packed_forward;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(67): <lambda>;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(108): main;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(135): <module>;
+/usr/lib/python3.10/runpy.py(86): _run_code;
+/usr/lib/python3.10/runpy.py(196): _run_module_as_main",38.65,38.65,0,0,0,0
+aten::empty,";
+;
+;
+;
+;
+","/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/lite_llama/kernels/swiglu_fused.py(68): swiglu_packed_forward;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(67): <lambda>;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(108): main;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(135): <module>;
+/usr/lib/python3.10/runpy.py(86): _run_code;
+/usr/lib/python3.10/runpy.py(196): _run_module_as_main",22.51,56.31,0,0,0,0
+empty_tensor,,"/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/lite_llama/kernels/swiglu_fused.py(68): swiglu_packed_forward;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(67): <lambda>;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(108): main;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(135): <module>;
+/usr/lib/python3.10/runpy.py(86): _run_code;
+/usr/lib/python3.10/runpy.py(196): _run_module_as_main",33.8,33.8,0,0,0,0
+_swiglu_packed_kernel,,"/usr/local/lib/python3.10/dist-packages/triton/backends/ascend/driver.py(156): __call__;
+/usr/local/lib/python3.10/dist-packages/triton/runtime/jit.py(697): run;
+/usr/local/lib/python3.10/dist-packages/triton/runtime/jit.py(353): <lambda>;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/lite_llama/kernels/swiglu_fused.py(78): swiglu_packed_forward;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(67): <lambda>;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(108): main;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(135): <module>;
+/usr/lib/python3.10/runpy.py(86): _run_code;
+/usr/lib/python3.10/runpy.py(196): _run_module_as_main",57.24,57.24,24.02,24.02,0,0
+aten::view,"512,6144;
+","/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/lite_llama/kernels/swiglu_fused.py(86): swiglu_packed_forward;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(67): <lambda>;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(108): main;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(135): <module>;
+/usr/lib/python3.10/runpy.py(86): _run_code;
+/usr/lib/python3.10/runpy.py(196): _run_module_as_main",50.92,50.92,0,0,0,0
+aten::view,"4,128,12288;
+","/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/lite_llama/kernels/swiglu_fused.py(67): swiglu_packed_forward;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(67): <lambda>;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(108): main;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(135): <module>;
+/usr/lib/python3.10/runpy.py(86): _run_code;
+/usr/lib/python3.10/runpy.py(196): _run_module_as_main",33.08,33.08,0,0,0,0
+aten::empty,";
+;
+;
+;
+;
+","/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/lite_llama/kernels/swiglu_fused.py(68): swiglu_packed_forward;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(67): <lambda>;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(108): main;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(135): <module>;
+/usr/lib/python3.10/runpy.py(86): _run_code;
+/usr/lib/python3.10/runpy.py(196): _run_module_as_main",26.6,60.92,0,0,0,0
+empty_tensor,,"/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/lite_llama/kernels/swiglu_fused.py(68): swiglu_packed_forward;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(67): <lambda>;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(108): main;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(135): <module>;
+/usr/lib/python3.10/runpy.py(86): _run_code;
+/usr/lib/python3.10/runpy.py(196): _run_module_as_main",34.32,34.32,0,0,0,0
+_swiglu_packed_kernel,,"/usr/local/lib/python3.10/dist-packages/triton/backends/ascend/driver.py(156): __call__;
+/usr/local/lib/python3.10/dist-packages/triton/runtime/jit.py(697): run;
+/usr/local/lib/python3.10/dist-packages/triton/runtime/jit.py(353): <lambda>;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/lite_llama/kernels/swiglu_fused.py(78): swiglu_packed_forward;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(67): <lambda>;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(108): main;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(135): <module>;
+/usr/lib/python3.10/runpy.py(86): _run_code;
+/usr/lib/python3.10/runpy.py(196): _run_module_as_main",56.75,56.75,23.94,23.94,0,0
+aten::view,"512,6144;
+","/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/lite_llama/kernels/swiglu_fused.py(86): swiglu_packed_forward;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(67): <lambda>;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(108): main;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(135): <module>;
+/usr/lib/python3.10/runpy.py(86): _run_code;
+/usr/lib/python3.10/runpy.py(196): _run_module_as_main",35.4,35.4,0,0,0,0
+aten::view,"4,128,12288;
+","/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/lite_llama/kernels/swiglu_fused.py(67): swiglu_packed_forward;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(67): <lambda>;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(108): main;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(135): <module>;
+/usr/lib/python3.10/runpy.py(86): _run_code;
+/usr/lib/python3.10/runpy.py(196): _run_module_as_main",37.61,37.61,0,0,0,0
+aten::empty,";
+;
+;
+;
+;
+","/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/lite_llama/kernels/swiglu_fused.py(68): swiglu_packed_forward;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(67): <lambda>;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(108): main;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(135): <module>;
+/usr/lib/python3.10/runpy.py(86): _run_code;
+/usr/lib/python3.10/runpy.py(196): _run_module_as_main",21.4,55.08,0,0,0,0
+empty_tensor,,"/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/lite_llama/kernels/swiglu_fused.py(68): swiglu_packed_forward;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(67): <lambda>;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(108): main;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(135): <module>;
+/usr/lib/python3.10/runpy.py(86): _run_code;
+/usr/lib/python3.10/runpy.py(196): _run_module_as_main",33.68,33.68,0,0,0,0
+_swiglu_packed_kernel,,"/usr/local/lib/python3.10/dist-packages/triton/backends/ascend/driver.py(156): __call__;
+/usr/local/lib/python3.10/dist-packages/triton/runtime/jit.py(697): run;
+/usr/local/lib/python3.10/dist-packages/triton/runtime/jit.py(353): <lambda>;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/lite_llama/kernels/swiglu_fused.py(78): swiglu_packed_forward;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(67): <lambda>;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(108): main;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(135): <module>;
+/usr/lib/python3.10/runpy.py(86): _run_code;
+/usr/lib/python3.10/runpy.py(196): _run_module_as_main",55.19,55.19,24.2,24.2,0,0
+aten::view,"512,6144;
+","/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/lite_llama/kernels/swiglu_fused.py(86): swiglu_packed_forward;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(67): <lambda>;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(108): main;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(135): <module>;
+/usr/lib/python3.10/runpy.py(86): _run_code;
+/usr/lib/python3.10/runpy.py(196): _run_module_as_main",35.88,35.88,0,0,0,0
+aten::view,"4,128,12288;
+","/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/lite_llama/kernels/swiglu_fused.py(67): swiglu_packed_forward;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(67): <lambda>;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(108): main;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(135): <module>;
+/usr/lib/python3.10/runpy.py(86): _run_code;
+/usr/lib/python3.10/runpy.py(196): _run_module_as_main",31.31,31.31,0,0,0,0
+aten::empty,";
+;
+;
+;
+;
+","/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/lite_llama/kernels/swiglu_fused.py(68): swiglu_packed_forward;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(67): <lambda>;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(108): main;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(135): <module>;
+/usr/lib/python3.10/runpy.py(86): _run_code;
+/usr/lib/python3.10/runpy.py(196): _run_module_as_main",27.89,61.94,0,0,0,0
+empty_tensor,,"/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/lite_llama/kernels/swiglu_fused.py(68): swiglu_packed_forward;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(67): <lambda>;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(108): main;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(135): <module>;
+/usr/lib/python3.10/runpy.py(86): _run_code;
+/usr/lib/python3.10/runpy.py(196): _run_module_as_main",34.05,34.05,0,0,0,0
+_swiglu_packed_kernel,,"/usr/local/lib/python3.10/dist-packages/triton/backends/ascend/driver.py(156): __call__;
+/usr/local/lib/python3.10/dist-packages/triton/runtime/jit.py(697): run;
+/usr/local/lib/python3.10/dist-packages/triton/runtime/jit.py(353): <lambda>;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/lite_llama/kernels/swiglu_fused.py(78): swiglu_packed_forward;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(67): <lambda>;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(108): main;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(135): <module>;
+/usr/lib/python3.10/runpy.py(86): _run_code;
+/usr/lib/python3.10/runpy.py(196): _run_module_as_main",54.24,54.24,24.2,24.2,0,0
+aten::view,"512,6144;
+","/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/lite_llama/kernels/swiglu_fused.py(86): swiglu_packed_forward;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(67): <lambda>;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(108): main;
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/swiglu/profile.py(135): <module>;
+/usr/lib/python3.10/runpy.py(86): _run_code;
+/usr/lib/python3.10/runpy.py(196): _run_module_as_main",35.49,35.49,0,0,0,0

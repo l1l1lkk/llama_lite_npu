@@ -1,0 +1,19 @@
+{
+  "active_steps": 5,
+  "aic_metrics": "PipeUtilization",
+  "backend_module": "lite_llama.kernels.swiglu_unfused",
+  "device": "npu:0",
+  "dtype": "float16",
+  "git_branch": "test/swiglu-unfused-baseline",
+  "git_commit": "ce55d4b08d179a84c2885432ff004ee202b6e324",
+  "l2_cache": true,
+  "physical_device": 7,
+  "profiler_level": "Level1",
+  "schema_version": 1,
+  "shape": [
+    4,
+    128,
+    6144
+  ],
+  "warmup": 10
+}

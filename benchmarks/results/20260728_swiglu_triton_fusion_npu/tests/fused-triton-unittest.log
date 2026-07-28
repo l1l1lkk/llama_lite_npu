@@ -1,0 +1,11 @@
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/lite_llama/kernels/flashattention.py:159: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  @custom_fwd(cast_inputs=torch.float16)
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/lite_llama/kernels/flashattention2_nopad.py:170: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  @custom_fwd(cast_inputs=torch.float16)
+/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/lite_llama/kernels/paged_chunk_flashattention.py:226: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  @custom_fwd(cast_inputs=torch.float16)
+............................................................
+----------------------------------------------------------------------
+Ran 60 tests in 0.279s
+
+OK

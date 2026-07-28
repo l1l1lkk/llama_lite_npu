@@ -1,0 +1,3 @@
+[2026-07-28-18:23:37.574] [INFO] [AscendProfiler_CommunicationParser:97] Profiler logger initialized at: /data/liuke/swiglu-triton-fusion-20260728/baseline/profiler-prefill/swiglu-unfused-prefill_606198_20260728182334405_ascend_pt/logs/profiler_20260728182337_606769_CommunicationParser.log
+[2026-07-28-18:23:37.574] [INFO] [AscendProfiler_CommunicationParser:66] CommunicationParser start.
+[2026-07-28-18:23:37.577] [INFO] [AscendProfiler_CommunicationParser:73] CommunicationParser finish.
