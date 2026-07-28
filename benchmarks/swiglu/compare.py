@@ -42,6 +42,7 @@ def main() -> None:
         before = baseline_rows[case_key]
         after = fused_rows[case_key]
         speedup = before["mean_ms"] / after["mean_ms"]
+        p50_speedup = before["p50_ms"] / after["p50_ms"]
         rows.append(
             {
                 **{field: before[field] for field in KEY_FIELDS},
@@ -49,6 +50,13 @@ def main() -> None:
                 "fused_mean_ms": after["mean_ms"],
                 "latency_reduction_percent": (1.0 - 1.0 / speedup) * 100.0,
                 "speedup": speedup,
+                "baseline_p50_ms": before["p50_ms"],
+                "fused_p50_ms": after["p50_ms"],
+                "p50_latency_reduction_percent": (
+                    1.0 - 1.0 / p50_speedup
+                )
+                * 100.0,
+                "p50_speedup": p50_speedup,
                 "baseline_cv_percent": before["cv_percent"],
                 "fused_cv_percent": after["cv_percent"],
                 "fused_max_abs_error": after["max_abs_error"],
@@ -66,6 +74,12 @@ def main() -> None:
             __import__("math").prod(row["speedup"] for row in rows) ** (1.0 / len(rows))
         ),
         "max_speedup": max(row["speedup"] for row in rows),
+        "min_p50_speedup": min(row["p50_speedup"] for row in rows),
+        "geometric_mean_p50_speedup": (
+            __import__("math").prod(row["p50_speedup"] for row in rows)
+            ** (1.0 / len(rows))
+        ),
+        "max_p50_speedup": max(row["p50_speedup"] for row in rows),
         "rows": rows,
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
