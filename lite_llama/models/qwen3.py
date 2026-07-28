@@ -172,18 +172,18 @@ class FusedMLP(nn.Module):
         self.hidden_size = config.hidden_size
         self.intermediate_size = config.intermediate_size // tp_w
 
-        self.gate_proj = nn.Linear(
-            self.hidden_size, self.intermediate_size, bias=False, dtype=torch.float16
-        )
-        self.up_proj = nn.Linear(
-            self.hidden_size, self.intermediate_size, bias=False, dtype=torch.float16
+        self.gate_up_proj = nn.Linear(
+            self.hidden_size,
+            2 * self.intermediate_size,
+            bias=False,
+            dtype=torch.float16,
         )
         self.down_proj = nn.Linear(
             self.intermediate_size, self.hidden_size, bias=False, dtype=torch.float16
         )
 
     def forward(self, x):
-        h = swiglu_forward(self.gate_proj(x), self.up_proj(x))
+        h = swiglu_packed_forward(self.gate_up_proj(x))
         out = self.down_proj(h)
         # TP: all-reduce partial results from row-sharded down projection
         out = tp_all_reduce(out)

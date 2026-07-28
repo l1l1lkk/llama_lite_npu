@@ -20,6 +20,11 @@ import torch_npu
 
 from lite_llama.kernels import swiglu_forward
 
+try:
+    from lite_llama.kernels import swiglu_packed_forward
+except ImportError:
+    swiglu_packed_forward = None
+
 
 @dataclass(frozen=True)
 class ShapeCase:
@@ -125,8 +130,14 @@ def run(args: argparse.Namespace) -> dict:
     for case in DEFAULT_CASES:
         a = torch.randn(case.shape, device=device, dtype=dtype)
         b = torch.randn(case.shape, device=device, dtype=dtype)
+        packed = torch.cat((a, b), dim=-1) if swiglu_packed_forward else None
+        operation = (
+            (lambda: swiglu_packed_forward(packed))
+            if swiglu_packed_forward
+            else (lambda: swiglu_forward(a, b))
+        )
         expected = reference(a, b)
-        actual = swiglu_forward(a, b)
+        actual = operation()
         synchronize(device)
 
         difference = (actual.float() - expected.float()).abs()
@@ -153,7 +164,7 @@ def run(args: argparse.Namespace) -> dict:
             min(args.max_inner_iterations, args.target_elements_per_sample // numel),
         )
         timings_ms = time_samples(
-            lambda: swiglu_forward(a, b),
+            operation,
             device=device,
             warmup=args.warmup,
             samples=args.samples,
@@ -180,7 +191,7 @@ def run(args: argparse.Namespace) -> dict:
         }
         results.append(row)
         print(json.dumps(row, sort_keys=True))
-        del a, b, actual, expected, difference, expected_abs
+        del a, b, packed, actual, expected, difference, expected_abs
 
     failures = [row for row in results if not row["allclose"]]
     report = {
@@ -189,6 +200,7 @@ def run(args: argparse.Namespace) -> dict:
             "git_branch": git_value("branch", "--show-current"),
             "git_commit": git_value("rev-parse", "HEAD"),
             "backend_module": swiglu_forward.__module__,
+            "input_layout": "packed_gate_up" if swiglu_packed_forward else "separate_gate_up",
             "device": args.device,
             "physical_device": args.physical_device,
             "dtype": args.dtype,

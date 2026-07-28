@@ -13,6 +13,11 @@ import torch_npu
 
 from lite_llama.kernels import swiglu_forward
 
+try:
+    from lite_llama.kernels import swiglu_packed_forward
+except ImportError:
+    swiglu_packed_forward = None
+
 
 def git_value(*args: str) -> str:
     completed = subprocess.run(
@@ -57,9 +62,15 @@ def main() -> None:
     torch.manual_seed(args.seed)
     a = torch.randn(args.shape, device=device, dtype=dtype)
     b = torch.randn(args.shape, device=device, dtype=dtype)
+    packed = torch.cat((a, b), dim=-1) if swiglu_packed_forward else None
+    operation = (
+        (lambda: swiglu_packed_forward(packed))
+        if swiglu_packed_forward
+        else (lambda: swiglu_forward(a, b))
+    )
 
     for _ in range(args.warmup):
-        swiglu_forward(a, b)
+        operation()
     torch.npu.synchronize(device)
 
     experimental_config = torch_npu.profiler._ExperimentalConfig(
@@ -94,7 +105,7 @@ def main() -> None:
         experimental_config=experimental_config,
     ) as profiler:
         for _ in range(total_steps):
-            swiglu_forward(a, b)
+            operation()
             profiler.step()
     torch.npu.synchronize(device)
 
@@ -103,6 +114,7 @@ def main() -> None:
         "git_branch": git_value("branch", "--show-current"),
         "git_commit": git_value("rev-parse", "HEAD"),
         "backend_module": swiglu_forward.__module__,
+        "input_layout": "packed_gate_up" if swiglu_packed_forward else "separate_gate_up",
         "device": args.device,
         "physical_device": args.physical_device,
         "shape": args.shape,

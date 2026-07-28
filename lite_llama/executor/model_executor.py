@@ -185,6 +185,9 @@ class ModelExecutor:
             num_layers = _get_num_layers_from_config(model_config)
             state_dict = _shard_state_dict(state_dict, num_layers, tp, model_config)
 
+        if model_config.model_type.lower() in {"qwen3", "qwen3_vl"}:
+            state_dict = _pack_dense_swiglu_state_dict(state_dict)
+
         # Load sharded weights into model (from CPU → NPU via assign=True)
         model.load_state_dict(state_dict, strict=True, assign=True)
         model.to(device).half()
@@ -996,6 +999,27 @@ def _get_num_layers_from_config(model_config) -> int:
     if hasattr(model_config, "text_config"):
         return model_config.text_config.num_layers
     return 0
+
+
+def _pack_dense_swiglu_state_dict(state_dict: dict) -> dict:
+    """Pack dense Qwen3 gate/up weights in the CANN SwiGLU split order."""
+
+    gate_suffix = ".mlp.gate_proj.weight"
+    for gate_key in [key for key in state_dict if key.endswith(gate_suffix)]:
+        prefix = gate_key[: -len(gate_suffix)]
+        up_key = f"{prefix}.mlp.up_proj.weight"
+        packed_key = f"{prefix}.mlp.gate_up_proj.weight"
+        if up_key not in state_dict:
+            raise KeyError(f"Missing SwiGLU up projection for {gate_key}")
+        gate_weight = state_dict.pop(gate_key)
+        up_weight = state_dict.pop(up_key)
+        if gate_weight.shape != up_weight.shape:
+            raise ValueError(
+                f"SwiGLU gate/up weight shapes differ for {prefix}: "
+                f"{gate_weight.shape} != {up_weight.shape}"
+            )
+        state_dict[packed_key] = torch.cat((gate_weight, up_weight), dim=0)
+    return state_dict
 
 
 def _shard_state_dict(

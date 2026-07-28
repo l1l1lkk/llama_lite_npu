@@ -7,7 +7,7 @@ from .flashdecoding import flash_decoding
 from .paged_chunk_flashattention import paged_chunk_flash_attention
 
 from .skip_rmsnorm import skip_rmsnorm
-from .swiglu_unfused import swiglu_forward
+from .swiglu_fused import swiglu_forward, swiglu_packed_forward
 from .moe_routing import finalize_moe_routing, prepare_moe_routing
 from .moe_routed_gemv import routed_expert_matmul
 from .rope_emb import rope_emb_forward
