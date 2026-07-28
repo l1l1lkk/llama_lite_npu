@@ -16,12 +16,16 @@ CASES = ("p128-c1-o32", "p512-c1-o32")
 METRICS = ("ttft_ms", "tpot_ms", "e2e_ms")
 
 
+def stable(value: float, digits: int = 9) -> float:
+    return round(float(value), digits)
+
+
 def read_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
 def improvement_percent(reference: float, candidate: float) -> float:
-    return (reference - candidate) / reference * 100.0
+    return stable((reference - candidate) / reference * 100.0)
 
 
 def aggregate_cell(root: Path, implementation: str, graph_mode: str, case: str) -> dict:
@@ -39,9 +43,11 @@ def aggregate_cell(root: Path, implementation: str, graph_mode: str, case: str) 
     result = {
         "repeats": len(reports),
         "requests": len(rows),
-        "throughput_tokens_per_s_mean": statistics.fmean(
-            report["summary"]["output_throughput_tokens_per_s"]
-            for report in reports
+        "throughput_tokens_per_s_mean": stable(
+            statistics.fmean(
+                report["summary"]["output_throughput_tokens_per_s"]
+                for report in reports
+            )
         ),
     }
     for metric in METRICS:
@@ -49,10 +55,12 @@ def aggregate_cell(root: Path, implementation: str, graph_mode: str, case: str) 
         repeat_means = [
             float(report["summary"][f"{metric}_mean"]) for report in reports
         ]
-        result[f"{metric}_mean"] = statistics.fmean(request_values)
-        result[f"{metric}_repeat_means"] = repeat_means
-        result[f"{metric}_repeat_cv_percent"] = (
-            statistics.stdev(repeat_means) / statistics.fmean(repeat_means) * 100.0
+        result[f"{metric}_mean"] = stable(statistics.fmean(request_values))
+        result[f"{metric}_repeat_means"] = [stable(value) for value in repeat_means]
+        result[f"{metric}_repeat_cv_percent"] = stable(
+            statistics.stdev(repeat_means)
+            / statistics.fmean(repeat_means)
+            * 100.0
             if len(repeat_means) > 1
             else 0.0
         )
@@ -134,7 +142,9 @@ def summarize_profiler(root: Path) -> dict:
             },
             "device_ops": {
                 "count": sum(int(row["Count"]) for row in op_rows),
-                "total_time_us": sum(float(row["Total Time(us)"]) for row in op_rows),
+                "total_time_us": stable(
+                    sum(float(row["Total Time(us)"]) for row in op_rows), digits=6
+                ),
             },
         }
 
@@ -229,9 +239,10 @@ def main() -> None:
         "output_parity": parity_results,
         "profiler": summarize_profiler(root),
     }
-    (root / "comparison.json").write_text(
-        json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    with (root / "comparison.json").open(
+        "w", encoding="utf-8", newline="\n"
+    ) as handle:
+        handle.write(json.dumps(report, indent=2, sort_keys=True) + "\n")
 
     with (root / "comparison.csv").open("w", encoding="utf-8", newline="") as handle:
         writer = csv.writer(handle)

@@ -328,8 +328,8 @@
     },
     {
       "path": "comparison.json",
-      "sha256": "22e6461f391db9d05e1564fedd42c085a11ecc5917282102388207f59903ff58",
-      "size_bytes": 14698
+      "sha256": "e8bbd4a8d4452f434bd872805dcc76187d1768f054d5c6c4fad70a3710db490f",
+      "size_bytes": 13289
     },
     {
       "path": "environment.txt",
