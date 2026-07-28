@@ -8,8 +8,10 @@ attention-head axis; the `feature_dimension` sweep at 64/128/256/512 is the
 requested head-dimension-sized proxy, while 6144 and 25600 are real Qwen3
 intermediate widths.
 
-The completed Atlas 910B3 report and raw evidence are stored in
-`benchmarks/results/20260728_swiglu_fusion_npu/`.
+The completed custom-Triton Atlas 910B3 report and raw evidence are stored in
+`benchmarks/results/20260728_swiglu_triton_fusion_npu/`. The earlier
+`20260728_swiglu_fusion_npu/` directory is the historical native-CANN candidate
+evaluation and is not the final Triton-vs-unfused comparison.
 
 Run the latency and correctness matrix:
 

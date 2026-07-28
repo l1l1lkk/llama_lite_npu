@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "capture_date": "2026-07-28",
+  "server": "218.106.157.54:10013",
+  "container": "triton-llama-lite",
+  "source_base_commit": "e0582807c40d59bafdc1fd76ec3e1a68631e8efd",
+  "baseline_branch": "test/swiglu-unfused-baseline",
+  "baseline_commit": "ce55d4b08d179a84c2885432ff004ee202b6e324",
+  "fused_branch": "feature/swiglu-fused-optimization",
+  "fused_operator_commit": "2063714e19197f5d6af2e7862f980492784cb80f",
+  "e2e_equivalent_operator_commit": "5735a4c1826772824e490f93e22685d38992ae15",
+  "hardware": {
+    "accelerator": "Ascend Atlas 910B3",
+    "operator_and_profiler_physical_device": 7,
+    "e2e_physical_devices": [
+      6,
+      7
+    ]
+  },
+  "software": {
+    "python": "3.10",
+    "torch": "2.7.1",
+    "torch_npu": "2.7.1",
+    "triton": "3.2.0"
+  },
+  "model": {
+    "name": "Qwen3-1.7B",
+    "dtype": "float16",
+    "tensor_parallel_size": 2,
+    "num_layers": 28,
+    "hidden_size": 2048,
+    "intermediate_size": 6144,
+    "num_heads": 16,
+    "head_dimension": 128
+  },
+  "microbenchmark": {
+    "warmup": 10,
+    "samples": 30,
+    "dtype_matrix": [
+      "float16",
+      "bfloat16"
+    ],
+    "physical_device": 7
+  },
+  "e2e": {
+    "batching_mode": "legacy",
+    "compiled_model": false,
+    "concurrency": 1,
+    "formal_requests_per_case_per_branch": 12,
+    "output_tokens": 32,
+    "cases": [
+      "p128-c1-o32",
+      "p512-c1-o32"
+    ]
+  }
+}
