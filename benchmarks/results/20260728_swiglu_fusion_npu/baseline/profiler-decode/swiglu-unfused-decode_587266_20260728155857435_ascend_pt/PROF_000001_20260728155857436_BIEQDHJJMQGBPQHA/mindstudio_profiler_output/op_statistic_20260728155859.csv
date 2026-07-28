@@ -1,0 +1,4 @@
+Device_id,OP Type,Core Type,Count,Total Time(us),Min Time(us),Avg Time(us),Max Time(us),Ratio(%)
+7,Cast,AI_VECTOR_CORE,16,41.646,2.34,2.602,2.82,49.633
+7,Mul,AI_VECTOR_CORE,10,28.022,2.48,2.802,3.302,33.396
+7,Sigmoid,AI_VECTOR_CORE,5,14.24,2.54,2.848,3.3,16.971

@@ -8,6 +8,9 @@ attention-head axis; the `feature_dimension` sweep at 64/128/256/512 is the
 requested head-dimension-sized proxy, while 6144 and 25600 are real Qwen3
 intermediate widths.
 
+The completed Atlas 910B3 report and raw evidence are stored in
+`benchmarks/results/20260728_swiglu_fusion_npu/`.
+
 Run the latency and correctness matrix:
 
 ```bash
@@ -36,4 +39,17 @@ python -m benchmarks.swiglu.compare \
   --baseline /data/swiglu-results/unfused.json \
   --fused /data/swiglu-results/fused.json \
   --output /data/swiglu-results/comparison.json
+```
+
+Validate the packed projection with real Qwen3 weights:
+
+```bash
+ASCEND_RT_VISIBLE_DEVICES=7 python -m benchmarks.swiglu.validate_model_path \
+  --checkpoint /data/liuke/llama_lite_npu/my_weight/Qwen3-1.7B/Qwen3-1.7B.pth \
+  --device npu:0 \
+  --physical-device 7 \
+  --tp-size 2 \
+  --tp-rank 0 \
+  --layer 0 \
+  --output /data/swiglu-results/model-path-validation.json
 ```

@@ -1,0 +1,179 @@
+{
+  "device": "npu:0",
+  "physical_device": 7,
+  "rows": [
+    {
+      "allclose": true,
+      "batch": 16,
+      "cv_percent": 1.7293381784348865,
+      "feature_dimension": 6144,
+      "max_abs_error": 0.0001220703125,
+      "mean_ms": 0.2388897,
+      "sequence_length": 1,
+      "stdev_ms": 0.004131210786448565,
+      "tile": 256
+    },
+    {
+      "allclose": true,
+      "batch": 16,
+      "cv_percent": 1.5532177974301795,
+      "feature_dimension": 6144,
+      "max_abs_error": 0.0001220703125,
+      "mean_ms": 0.23295396666666665,
+      "sequence_length": 1,
+      "stdev_ms": 0.0036182824700862343,
+      "tile": 512
+    },
+    {
+      "allclose": true,
+      "batch": 16,
+      "cv_percent": 23.014147766511268,
+      "feature_dimension": 6144,
+      "max_abs_error": 0.0001220703125,
+      "mean_ms": 0.24414313333333335,
+      "sequence_length": 1,
+      "stdev_ms": 0.056187461467123966,
+      "tile": 1024
+    },
+    {
+      "allclose": true,
+      "batch": 16,
+      "cv_percent": 2.3425194661324134,
+      "feature_dimension": 6144,
+      "max_abs_error": 0.0001220703125,
+      "mean_ms": 0.23204753333333333,
+      "sequence_length": 1,
+      "stdev_ms": 0.005435758639013434,
+      "tile": 2048
+    },
+    {
+      "allclose": true,
+      "batch": 16,
+      "cv_percent": 2.202794238836641,
+      "feature_dimension": 6144,
+      "max_abs_error": 0.0001220703125,
+      "mean_ms": 0.23407793333333332,
+      "sequence_length": 1,
+      "stdev_ms": 0.00515625522985454,
+      "tile": 4096
+    },
+    {
+      "allclose": true,
+      "batch": 4,
+      "cv_percent": 7.213047835557214,
+      "feature_dimension": 6144,
+      "max_abs_error": 0.001953125,
+      "mean_ms": 1.0766941,
+      "sequence_length": 128,
+      "stdev_ms": 0.07766246047562222,
+      "tile": 256
+    },
+    {
+      "allclose": true,
+      "batch": 4,
+      "cv_percent": 6.754203596728428,
+      "feature_dimension": 6144,
+      "max_abs_error": 0.001953125,
+      "mean_ms": 0.6422496666666666,
+      "sequence_length": 128,
+      "stdev_ms": 0.043378850085976334,
+      "tile": 512
+    },
+    {
+      "allclose": true,
+      "batch": 4,
+      "cv_percent": 5.461862989616863,
+      "feature_dimension": 6144,
+      "max_abs_error": 0.001953125,
+      "mean_ms": 0.41290166666666667,
+      "sequence_length": 128,
+      "stdev_ms": 0.022552123315177853,
+      "tile": 1024
+    },
+    {
+      "allclose": true,
+      "batch": 4,
+      "cv_percent": 56.44459207482131,
+      "feature_dimension": 6144,
+      "max_abs_error": 0.001953125,
+      "mean_ms": 0.33695020000000003,
+      "sequence_length": 128,
+      "stdev_ms": 0.19019016588529455,
+      "tile": 2048
+    },
+    {
+      "allclose": true,
+      "batch": 4,
+      "cv_percent": 2.6837445804570663,
+      "feature_dimension": 6144,
+      "max_abs_error": 0.001953125,
+      "mean_ms": 0.26551426666666667,
+      "sequence_length": 128,
+      "stdev_ms": 0.007125724742006989,
+      "tile": 4096
+    },
+    {
+      "allclose": true,
+      "batch": 1,
+      "cv_percent": 8.929245650722178,
+      "feature_dimension": 25600,
+      "max_abs_error": 0.001953125,
+      "mean_ms": 1.1390686,
+      "sequence_length": 128,
+      "stdev_ms": 0.10171023342424201,
+      "tile": 256
+    },
+    {
+      "allclose": true,
+      "batch": 1,
+      "cv_percent": 7.15381497650104,
+      "feature_dimension": 25600,
+      "max_abs_error": 0.001953125,
+      "mean_ms": 0.6600708333333334,
+      "sequence_length": 128,
+      "stdev_ms": 0.047220246130515224,
+      "tile": 512
+    },
+    {
+      "allclose": true,
+      "batch": 1,
+      "cv_percent": 5.603142990235021,
+      "feature_dimension": 25600,
+      "max_abs_error": 0.001953125,
+      "mean_ms": 0.4263912,
+      "sequence_length": 128,
+      "stdev_ms": 0.02389130863377899,
+      "tile": 1024
+    },
+    {
+      "allclose": true,
+      "batch": 1,
+      "cv_percent": 187.8616879648325,
+      "feature_dimension": 25600,
+      "max_abs_error": 0.001953125,
+      "mean_ms": 0.4790649,
+      "sequence_length": 128,
+      "stdev_ms": 0.8999794075870369,
+      "tile": 2048
+    },
+    {
+      "allclose": true,
+      "batch": 1,
+      "cv_percent": 7.221726458759726,
+      "feature_dimension": 25600,
+      "max_abs_error": 0.001953125,
+      "mean_ms": 0.2625132,
+      "sequence_length": 128,
+      "stdev_ms": 0.018957985222136837,
+      "tile": 4096
+    }
+  ],
+  "schema_version": 1,
+  "tiles": [
+    256,
+    512,
+    1024,
+    2048,
+    4096
+  ]
+}

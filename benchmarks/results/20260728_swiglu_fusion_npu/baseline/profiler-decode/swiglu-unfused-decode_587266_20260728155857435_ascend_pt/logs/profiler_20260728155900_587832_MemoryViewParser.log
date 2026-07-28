@@ -1,0 +1,3 @@
+[2026-07-28-15:59:00.225] [INFO] [AscendProfiler_MemoryViewParser:97] Profiler logger initialized at: /data/liuke/swiglu-fusion-20260728/baseline/profiler-decode/swiglu-unfused-decode_587266_20260728155857435_ascend_pt/logs/profiler_20260728155900_587832_MemoryViewParser.log
+[2026-07-28-15:59:00.225] [INFO] [AscendProfiler_MemoryViewParser:78] MemoryViewParser start.
+[2026-07-28-15:59:00.233] [INFO] [AscendProfiler_MemoryViewParser:89] MemoryViewParser finish.

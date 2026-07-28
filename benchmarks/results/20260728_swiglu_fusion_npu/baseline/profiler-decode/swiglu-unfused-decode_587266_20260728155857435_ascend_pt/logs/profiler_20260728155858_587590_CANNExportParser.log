@@ -1,0 +1,3 @@
+[2026-07-28-15:58:58.082] [INFO] [AscendProfiler_CANNExportParser:97] Profiler logger initialized at: /data/liuke/swiglu-fusion-20260728/baseline/profiler-decode/swiglu-unfused-decode_587266_20260728155857435_ascend_pt/logs/profiler_20260728155858_587590_CANNExportParser.log
+[2026-07-28-15:58:58.087] [INFO] [AscendProfiler_CANNExportParser:51] CANNExportParser start.
+[2026-07-28-15:59:00.118] [INFO] [AscendProfiler_CANNExportParser:79] CANNExportParser finish.

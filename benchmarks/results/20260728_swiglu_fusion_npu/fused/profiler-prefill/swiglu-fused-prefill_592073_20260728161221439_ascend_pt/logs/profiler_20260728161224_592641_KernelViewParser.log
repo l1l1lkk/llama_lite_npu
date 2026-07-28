@@ -1,0 +1,3 @@
+[2026-07-28-16:12:24.241] [INFO] [AscendProfiler_KernelViewParser:97] Profiler logger initialized at: /data/liuke/swiglu-fusion-20260728/fused/profiler-prefill/swiglu-fused-prefill_592073_20260728161221439_ascend_pt/logs/profiler_20260728161224_592641_KernelViewParser.log
+[2026-07-28-16:12:24.242] [INFO] [AscendProfiler_KernelViewParser:38] KernelViewParser start.
+[2026-07-28-16:12:24.249] [INFO] [AscendProfiler_KernelViewParser:46] KernelViewParser finish.

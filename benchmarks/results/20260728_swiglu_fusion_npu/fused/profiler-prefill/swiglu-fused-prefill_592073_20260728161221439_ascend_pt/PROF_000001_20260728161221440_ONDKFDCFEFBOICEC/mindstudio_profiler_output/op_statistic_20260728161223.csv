@@ -1,0 +1,2 @@
+Device_id,OP Type,Core Type,Count,Total Time(us),Min Time(us),Avg Time(us),Max Time(us),Ratio(%)
+7,SwiGlu,AI_VECTOR_CORE,5,89.964,17.36,17.992,18.92,100

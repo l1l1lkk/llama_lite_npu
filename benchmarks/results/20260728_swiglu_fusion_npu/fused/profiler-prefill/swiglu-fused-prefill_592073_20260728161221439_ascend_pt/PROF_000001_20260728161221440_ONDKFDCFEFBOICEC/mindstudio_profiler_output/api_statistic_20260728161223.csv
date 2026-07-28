@@ -1,0 +1,9 @@
+Device_id,Level,API Name,Time(us),Count,Avg(us),Min(us),Max(us),Variance
+host,acl,aclnnSwiGlu,89.49,5,17.898,14.34,24.68,13.357
+host,acl,aclnnSwiGluGetWorkspaceSize,64.08,5,12.816,12.2,14.84,1.03
+host,acl,aclrtGetResInCurrentThread,9.81,10,0.981,0.43,1.7,0.298
+host,acl,aclrtGetStreamAttribute,3.28,5,0.656,0.56,0.81,0.007
+host,acl,aclrtLaunchKernelWithHostArgs,37.54,5,7.508,5.92,10.55,2.549
+host,acl,aclrtStreamGetId,21.13,30,0.704,0.33,2.01,0.175
+host,acl,aclrtSynchronizeDeviceWithTimeout,26.67,1,26.67,26.67,26.67,0
+host,node,launch,54.38,5,10.876,8.5,15.12,5.178

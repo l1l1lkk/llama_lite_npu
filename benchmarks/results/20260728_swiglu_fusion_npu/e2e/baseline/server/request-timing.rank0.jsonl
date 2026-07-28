@@ -1,0 +1,2 @@
+{"e2e_ms": 5616.872016340494, "endpoint": "chat", "queue_wait_ms": 0.5263723433017731, "service_to_first_token_ms": 306.1285261064768, "status": "success", "submission_order": 1, "ttft_ms": 306.65489844977856}
+{"e2e_ms": 5277.080433443189, "endpoint": "chat", "queue_wait_ms": 0.16270019114017487, "service_to_first_token_ms": 80.06205409765244, "status": "success", "submission_order": 2, "ttft_ms": 80.22475428879261}

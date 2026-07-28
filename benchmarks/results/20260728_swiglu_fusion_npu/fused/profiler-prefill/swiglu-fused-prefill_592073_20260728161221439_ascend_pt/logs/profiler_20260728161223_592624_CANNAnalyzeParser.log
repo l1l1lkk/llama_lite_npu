@@ -1,0 +1,3 @@
+[2026-07-28-16:12:23.610] [INFO] [AscendProfiler_CANNAnalyzeParser:97] Profiler logger initialized at: /data/liuke/swiglu-fusion-20260728/fused/profiler-prefill/swiglu-fused-prefill_592073_20260728161221439_ascend_pt/logs/profiler_20260728161223_592624_CANNAnalyzeParser.log
+[2026-07-28-16:12:23.610] [INFO] [AscendProfiler_CANNAnalyzeParser:41] CANNAnalyzeParser start.
+[2026-07-28-16:12:24.639] [INFO] [AscendProfiler_CANNAnalyzeParser:67] CANNAnalyzeParser finish.

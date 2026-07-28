@@ -1,0 +1,56 @@
+{
+  "metadata": {
+    "base_url": "http://127.0.0.1:8228",
+    "case_id": "smoke-p128-o8",
+    "client_branch": "feature/swiglu-fused-optimization",
+    "client_commit": "e063294796bdadf08b7c6f0834c7601da233c264",
+    "concurrency": 1,
+    "max_tokens": 8,
+    "model": "Qwen3-1.7B",
+    "repeat": 0,
+    "server_branch": "test/swiglu-unfused-baseline",
+    "server_commit": "ce55d4b08d179a84c2885432ff004ee202b6e324",
+    "submitted_requests": 1,
+    "warmup_requests": 0,
+    "workload": "/data/liuke/llama_lite_npu-worktrees/swiglu-fused-optimization/benchmarks/qwen3_32b_tp2_fp16/datasets/20260714_length_matrix/p128_n32-formal.jsonl",
+    "workload_sha256": "11b2c0d603619092f7d2a35eae53cafc5cb32d4e7d642a429e29a41758a428ba"
+  },
+  "requests": [
+    {
+      "e2e_ms": 1143.576081842184,
+      "input_tokens": 128,
+      "output_sha256": "22237fb737a25a370df2bcbfc1cb3a19df3a3a90c1bd61486e4b1a10eb685a2a",
+      "output_text": "<think>\nOkay, let's see what",
+      "output_tokens": 8,
+      "request_id": 0,
+      "sse_events": 10,
+      "stream_content_events": 8,
+      "success": true,
+      "tpot_ms": 83.85931886732578,
+      "ttft_ms": 556.5608497709036
+    }
+  ],
+  "schema_version": 1,
+  "summary": {
+    "e2e_ms_max": 1143.576081842184,
+    "e2e_ms_mean": 1143.576081842184,
+    "e2e_ms_p50": 1143.576081842184,
+    "e2e_ms_p90": 1143.576081842184,
+    "failed_requests": 0,
+    "input_tokens_max": 128,
+    "input_tokens_min": 128,
+    "output_throughput_tokens_per_s": 6.990375892935362,
+    "output_tokens_max": 8,
+    "output_tokens_min": 8,
+    "requests": 1,
+    "tpot_ms_max": 83.85931886732578,
+    "tpot_ms_mean": 83.85931886732578,
+    "tpot_ms_p50": 83.85931886732578,
+    "tpot_ms_p90": 83.85931886732578,
+    "ttft_ms_max": 556.5608497709036,
+    "ttft_ms_mean": 556.5608497709036,
+    "ttft_ms_p50": 556.5608497709036,
+    "ttft_ms_p90": 556.5608497709036,
+    "wall_time_s": 1.1444305889308453
+  }
+}

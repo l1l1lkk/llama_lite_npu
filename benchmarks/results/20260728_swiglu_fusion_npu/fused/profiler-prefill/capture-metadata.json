@@ -1,0 +1,20 @@
+{
+  "active_steps": 5,
+  "aic_metrics": "PipeUtilization",
+  "backend_module": "lite_llama.kernels.swiglu_fused",
+  "device": "npu:0",
+  "dtype": "float16",
+  "git_branch": "feature/swiglu-fused-optimization",
+  "git_commit": "c95ed1d7db8d0fd500185b659caba223989b86ed",
+  "input_layout": "packed_gate_up",
+  "l2_cache": true,
+  "physical_device": 7,
+  "profiler_level": "Level1",
+  "schema_version": 1,
+  "shape": [
+    4,
+    128,
+    6144
+  ],
+  "warmup": 10
+}

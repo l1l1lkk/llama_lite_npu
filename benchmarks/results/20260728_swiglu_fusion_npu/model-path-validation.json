@@ -1,0 +1,77 @@
+{
+  "atol": 0.02,
+  "checkpoint": "/data/liuke/llama_lite_npu/my_weight/Qwen3-1.7B/Qwen3-1.7B.pth",
+  "device": "npu:0",
+  "layer": 0,
+  "passed": true,
+  "physical_device": 7,
+  "rows": [
+    {
+      "activation": {
+        "cosine_similarity": 1.0,
+        "max_abs_error": 0.0,
+        "max_relative_error_above_1e-2": 0.0,
+        "mean_abs_error": 0.0
+      },
+      "activation_allclose": true,
+      "down_projection": {
+        "cosine_similarity": 0.9999998807907104,
+        "max_abs_error": 0.0,
+        "max_relative_error_above_1e-2": 0.0,
+        "mean_abs_error": 0.0
+      },
+      "down_projection_allclose": true,
+      "shape": [
+        1,
+        1,
+        2048
+      ]
+    },
+    {
+      "activation": {
+        "cosine_similarity": 1.0,
+        "max_abs_error": 0.000244140625,
+        "max_relative_error_above_1e-2": 0.0006381620769388974,
+        "mean_abs_error": 1.9868215517249155e-08
+      },
+      "activation_allclose": true,
+      "down_projection": {
+        "cosine_similarity": 1.0,
+        "max_abs_error": 0.00390625,
+        "max_relative_error_above_1e-2": 0.0009416195680387318,
+        "mean_abs_error": 1.4811521396040916e-06
+      },
+      "down_projection_allclose": true,
+      "shape": [
+        4,
+        1,
+        2048
+      ]
+    },
+    {
+      "activation": {
+        "cosine_similarity": 1.0,
+        "max_abs_error": 0.00390625,
+        "max_relative_error_above_1e-2": 0.0007235889788717031,
+        "mean_abs_error": 1.27862840315629e-08
+      },
+      "activation_allclose": true,
+      "down_projection": {
+        "cosine_similarity": 1.0,
+        "max_abs_error": 0.00390625,
+        "max_relative_error_above_1e-2": 0.015616865828633308,
+        "mean_abs_error": 1.1064298632845748e-06
+      },
+      "down_projection_allclose": true,
+      "shape": [
+        1,
+        128,
+        2048
+      ]
+    }
+  ],
+  "rtol": 0.02,
+  "schema_version": 1,
+  "tp_rank": 0,
+  "tp_size": 2
+}

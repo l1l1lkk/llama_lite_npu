@@ -1,0 +1,151 @@
+{
+  "device": "npu:0",
+  "physical_device": 7,
+  "rows": [
+    {
+      "allclose": true,
+      "backend": "unfused",
+      "batch": 16,
+      "cv_percent": 4.49061432367787,
+      "feature_dimension": 6144,
+      "max_abs_error": 0.0,
+      "mean_abs_error": 0.0,
+      "mean_ms": 0.17911683333333334,
+      "sequence_length": 1,
+      "stdev_ms": 0.008043446173784885
+    },
+    {
+      "allclose": true,
+      "backend": "triton_tile_4096",
+      "batch": 16,
+      "cv_percent": 3.1373240419154005,
+      "feature_dimension": 6144,
+      "max_abs_error": 0.000244140625,
+      "mean_abs_error": 4.384977270177615e-09,
+      "mean_ms": 0.24253783333333334,
+      "sequence_length": 1,
+      "stdev_ms": 0.007609197755907371
+    },
+    {
+      "allclose": true,
+      "backend": "cat_cann",
+      "batch": 16,
+      "cv_percent": 5.034274101997624,
+      "feature_dimension": 6144,
+      "max_abs_error": 0.000244140625,
+      "mean_abs_error": 4.384977270177615e-09,
+      "mean_ms": 0.1446127,
+      "sequence_length": 1,
+      "stdev_ms": 0.007280199704299518
+    },
+    {
+      "allclose": true,
+      "backend": "packed_cann",
+      "batch": 16,
+      "cv_percent": 7.613402727620879,
+      "feature_dimension": 6144,
+      "max_abs_error": 0.000244140625,
+      "mean_abs_error": 4.384977270177615e-09,
+      "mean_ms": 0.09839033333333333,
+      "sequence_length": 1,
+      "stdev_ms": 0.007490852321715274
+    },
+    {
+      "allclose": true,
+      "backend": "unfused",
+      "batch": 4,
+      "cv_percent": 4.467059233322151,
+      "feature_dimension": 6144,
+      "max_abs_error": 0.0,
+      "mean_abs_error": 0.0,
+      "mean_ms": 0.18154346666666665,
+      "sequence_length": 128,
+      "stdev_ms": 0.008109654190226454
+    },
+    {
+      "allclose": true,
+      "backend": "triton_tile_4096",
+      "batch": 4,
+      "cv_percent": 2.43016794299089,
+      "feature_dimension": 6144,
+      "max_abs_error": 0.0009765625,
+      "mean_abs_error": 4.147902465945208e-09,
+      "mean_ms": 0.2744105333333334,
+      "sequence_length": 128,
+      "stdev_ms": 0.0066686368132569986
+    },
+    {
+      "allclose": true,
+      "backend": "cat_cann",
+      "batch": 4,
+      "cv_percent": 5.6121709782142295,
+      "feature_dimension": 6144,
+      "max_abs_error": 0.0009765625,
+      "mean_abs_error": 4.147902465945208e-09,
+      "mean_ms": 0.14842673333333334,
+      "sequence_length": 128,
+      "stdev_ms": 0.008329962052044759
+    },
+    {
+      "allclose": true,
+      "backend": "packed_cann",
+      "batch": 4,
+      "cv_percent": 4.060732965233742,
+      "feature_dimension": 6144,
+      "max_abs_error": 0.0009765625,
+      "mean_abs_error": 4.147902465945208e-09,
+      "mean_ms": 0.10727,
+      "sequence_length": 128,
+      "stdev_ms": 0.004355948251806235
+    },
+    {
+      "allclose": true,
+      "backend": "unfused",
+      "batch": 1,
+      "cv_percent": 4.725521580874843,
+      "feature_dimension": 25600,
+      "max_abs_error": 0.0,
+      "mean_abs_error": 0.0,
+      "mean_ms": 0.1799124,
+      "sequence_length": 128,
+      "stdev_ms": 0.008501799288669872
+    },
+    {
+      "allclose": true,
+      "backend": "triton_tile_4096",
+      "batch": 1,
+      "cv_percent": 3.2944688422349313,
+      "feature_dimension": 25600,
+      "max_abs_error": 0.001953125,
+      "mean_abs_error": 6.783738459859023e-09,
+      "mean_ms": 0.25878216666666665,
+      "sequence_length": 128,
+      "stdev_ms": 0.008525497850093804
+    },
+    {
+      "allclose": true,
+      "backend": "cat_cann",
+      "batch": 1,
+      "cv_percent": 4.678673998899209,
+      "feature_dimension": 25600,
+      "max_abs_error": 0.001953125,
+      "mean_abs_error": 6.783738459859023e-09,
+      "mean_ms": 0.1454037333333333,
+      "sequence_length": 128,
+      "stdev_ms": 0.006802966664895409
+    },
+    {
+      "allclose": true,
+      "backend": "packed_cann",
+      "batch": 1,
+      "cv_percent": 5.242400578014384,
+      "feature_dimension": 25600,
+      "max_abs_error": 0.001953125,
+      "mean_abs_error": 6.783738459859023e-09,
+      "mean_ms": 0.1075357,
+      "sequence_length": 128,
+      "stdev_ms": 0.005637452158371814
+    }
+  ],
+  "schema_version": 1
+}

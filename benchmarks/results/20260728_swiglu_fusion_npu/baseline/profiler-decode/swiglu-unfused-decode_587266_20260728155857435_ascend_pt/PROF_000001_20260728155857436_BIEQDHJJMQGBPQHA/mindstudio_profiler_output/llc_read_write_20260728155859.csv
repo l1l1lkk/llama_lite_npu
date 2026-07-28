@@ -1,0 +1,4 @@
+Device_id,Mode,Task,Hit Rate(%),Throughput(MB/s)
+7,read,Average,41.117,7182.465
+7,read,0,76.133,14173.876
+7,read,1,6.1,191.055

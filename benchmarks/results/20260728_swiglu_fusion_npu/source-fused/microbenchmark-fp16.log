@@ -1,0 +1,71 @@
+/data/liuke/llama_lite_npu/lite_llama/kernels/flashattention.py:159: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  @custom_fwd(cast_inputs=torch.float16)
+/data/liuke/llama_lite_npu/lite_llama/kernels/flashattention2_nopad.py:170: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  @custom_fwd(cast_inputs=torch.float16)
+/data/liuke/llama_lite_npu/lite_llama/kernels/paged_chunk_flashattention.py:226: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  @custom_fwd(cast_inputs=torch.float16)
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.10/dist-packages/triton/compiler/compiler.py", line 310, in compile
+    next_module = compile_ir(module, metadata)
+  File "/usr/local/lib/python3.10/dist-packages/triton/backends/ascend/compiler.py", line 778, in <lambda>
+    lambda src, metadata: linalg_to_bin_enable_npu_compile_A2_A3(
+  File "/usr/local/lib/python3.10/dist-packages/triton/backends/ascend/compiler.py", line 549, in linalg_to_bin_enable_npu_compile_A2_A3
+    ret = subprocess.run(cmd_list, capture_output=True, check=True)
+  File "/usr/lib/python3.10/subprocess.py", line 526, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/usr/local/Ascend/cann-8.5.0/bin/bishengir-compile', '/tmp/tmprka_qcvm/kernel.ttadapter.mlir', '--target=Ascend910B3', '--enable-auto-multi-buffer=True', '--enable-auto-bind-sub-block=True', '--enable-hfusion-compile=true', '--enable-hivm-compile=true', '--enable-triton-kernel-compile=true', '-o', '/tmp/tmprka_qcvm/kernel']' returned non-zero exit status 1.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "benchmark.py", line 259, in <module>
+  File "benchmark.py", line 245, in main
+  File "benchmark.py", line 129, in run
+  File "/data/liuke/llama_lite_npu/lite_llama/kernels/swiglu.py", line 91, in swiglu_forward
+    _swiglu_forward_kernel[(n_rows,)](
+  File "/usr/local/lib/python3.10/dist-packages/triton/runtime/jit.py", line 353, in <lambda>
+    return lambda *args, **kwargs: self.run(grid=grid, warmup=False, *args, **kwargs)
+  File "/usr/local/lib/python3.10/dist-packages/triton/runtime/jit.py", line 660, in run
+    kernel = self.compile(
+  File "/usr/local/lib/python3.10/dist-packages/triton/compiler/compiler.py", line 320, in compile
+    raise MLIRCompilationError(stage_name, error_detail)
+triton.compiler.errors.MLIRCompilationError: 
+///------------------[ERROR][Triton][BEG]------------------
+[ConvertLinalgRToBinary] encounters error:
+loc("/tmp/tmprka_qcvm/kernel.ttadapter.mlir":1:1): error: Failed to run BiShengHIR pipeline
+
+loc("/tmp/tmprka_qcvm/kernel.ttadapter.mlir":2:3): error: ub overflow, requires 2621440 bits while 1572864 bits available! (possible reason: tiling basic block is too large or block number is more than what user expect due to multi-buffer feature is enabled and some ops need extra local buffer.)
+loc("/tmp/tmprka_qcvm/kernel.ttadapter.mlir":1:1): error: Failed to run BiShengHIR pipeline
+
+loc("/tmp/tmprka_qcvm/kernel.ttadapter.mlir":2:3): error: ub overflow, requires 2621440 bits while 1572864 bits available! (possible reason: tiling basic block is too large or block number is more than what user expect due to multi-buffer feature is enabled and some ops need extra local buffer.)
+loc("/tmp/tmprka_qcvm/kernel.ttadapter.mlir":1:1): error: Failed to run BiShengHIR pipeline
+
+loc("/tmp/tmprka_qcvm/kernel.ttadapter.mlir":2:3): error: ub overflow, requires 2621440 bits while 1572864 bits available! (possible reason: tiling basic block is too large or block number is more than what user expect due to multi-buffer feature is enabled and some ops need extra local buffer.)
+loc("/tmp/tmprka_qcvm/kernel.ttadapter.mlir":1:1): error: Failed to run BiShengHIR pipeline
+
+loc("/tmp/tmprka_qcvm/kernel.ttadapter.mlir":2:3): error: ub overflow, requires 2621440 bits while 1572864 bits available! (possible reason: tiling basic block is too large or block number is more than what user expect due to multi-buffer feature is enabled and some ops need extra local buffer.)
+loc("/tmp/tmprka_qcvm/kernel.ttadapter.mlir":1:1): error: Failed to run BiShengHIR pipeline
+
+loc("/tmp/tmprka_qcvm/kernel.ttadapter.mlir":2:3): error: ub overflow, requires 2621440 bits while 1572864 bits available! (possible reason: tiling basic block is too large or block number is more than what user expect due to multi-buffer feature is enabled and some ops need extra local buffer.)
+[ERROR] Failed to run BiShengIR pipeline
+
+
+[INFO]: The compiled kernel cache is in /root/.triton/cache/Z2WC_Ia8PONGB1UJClkXN6ltZrZ2tJ50h1WQnAUtV_I
+
+///------------------[ERROR][Triton][END]------------------
+
+{"allclose": true, "batch": 1, "cv_percent": 18.040618592780262, "dtype": "float16", "family": "batch", "feature_dimension": 6144, "inner_iterations": 20, "max_abs_error": 6.103515625e-05, "max_relative_error": 0.0007194244535639882, "mean_abs_error": 9.934107758624577e-09, "mean_ms": 0.18430733666666665, "numel": 6144, "p50_ms": 0.179643675, "p90_ms": 0.181027105, "p99_ms": 0.30808338650000017, "samples": 30, "sequence_length": 1, "stdev_ms": 0.03325018364654478}
+{"allclose": true, "batch": 4, "cv_percent": 0.8418103077593725, "dtype": "float16", "family": "batch", "feature_dimension": 6144, "inner_iterations": 20, "max_abs_error": 0.0, "max_relative_error": 0.0, "mean_abs_error": 0.0, "mean_ms": 0.17966342166666666, "numel": 24576, "p50_ms": 0.179496675, "p90_ms": 0.18129979999999998, "p99_ms": 0.18326864050000002, "samples": 30, "sequence_length": 1, "stdev_ms": 0.0015124252028631856}
+{"allclose": true, "batch": 16, "cv_percent": 0.40770677025014557, "dtype": "float16", "family": "batch", "feature_dimension": 6144, "inner_iterations": 20, "max_abs_error": 0.0001220703125, "max_relative_error": 0.000866551126819104, "mean_abs_error": 2.017865652348405e-09, "mean_ms": 0.17804629333333333, "numel": 98304, "p50_ms": 0.17789062500000002, "p90_ms": 0.178880855, "p99_ms": 0.1796360155, "samples": 30, "sequence_length": 1, "stdev_ms": 0.0007259067920994336}
+{"allclose": true, "batch": 32, "cv_percent": 1.5958222025731483, "dtype": "float16", "family": "batch", "feature_dimension": 6144, "inner_iterations": 10, "max_abs_error": 0.00048828125, "max_relative_error": 0.0008673027041368186, "mean_abs_error": 6.3640377412355065e-09, "mean_ms": 0.18331027000000003, "numel": 196608, "p50_ms": 0.1828887, "p90_ms": 0.18474401, "p99_ms": 0.19385209199999998, "samples": 30, "sequence_length": 1, "stdev_ms": 0.002925305988256786}
+{"allclose": true, "batch": 1, "cv_percent": 1.4418071775649366, "dtype": "float16", "family": "sequence", "feature_dimension": 6144, "inner_iterations": 20, "max_abs_error": 0.00390625, "max_relative_error": 0.0009233610471710563, "mean_abs_error": 4.9748148711614704e-08, "mean_ms": 0.17610246000000002, "numel": 98304, "p50_ms": 0.1757961, "p90_ms": 0.1766576, "p99_ms": 0.1855791115, "samples": 30, "sequence_length": 16, "stdev_ms": 0.002539057908148422}
+{"allclose": true, "batch": 1, "cv_percent": 1.6949054418404694, "dtype": "float16", "family": "sequence", "feature_dimension": 6144, "inner_iterations": 2, "max_abs_error": 0.0009765625, "max_relative_error": 0.0009345794096589088, "mean_abs_error": 8.26063750736239e-09, "mean_ms": 0.21348236666666667, "numel": 786432, "p50_ms": 0.212488, "p90_ms": 0.21724705, "p99_ms": 0.223030905, "samples": 30, "sequence_length": 128, "stdev_ms": 0.003618324250003158}
+{"allclose": true, "batch": 1, "cv_percent": 2.136792914748251, "dtype": "float16", "family": "sequence", "feature_dimension": 6144, "inner_iterations": 1, "max_abs_error": 0.001953125, "max_relative_error": 0.0009737098589539528, "mean_abs_error": 6.14689588118722e-09, "mean_ms": 0.2488713, "numel": 3145728, "p50_ms": 0.247724, "p90_ms": 0.256697, "p99_ms": 0.261731, "samples": 30, "sequence_length": 512, "stdev_ms": 0.005317864305241863}
+{"allclose": true, "batch": 1, "cv_percent": 4.423405523713019, "dtype": "float16", "family": "sequence", "feature_dimension": 6144, "inner_iterations": 1, "max_abs_error": 0.001953125, "max_relative_error": 0.0009661836083978415, "mean_abs_error": 5.760233179330498e-09, "mean_ms": 0.3543802333333333, "numel": 12582912, "p50_ms": 0.35506000000000004, "p90_ms": 0.378069, "p99_ms": 0.3825503, "samples": 30, "sequence_length": 2048, "stdev_ms": 0.01567567481621375}
+{"allclose": true, "batch": 4, "cv_percent": 1.2540063616813124, "dtype": "float16", "family": "feature_dimension", "feature_dimension": 64, "inner_iterations": 20, "max_abs_error": 0.000244140625, "max_relative_error": 0.0007262164144776762, "mean_abs_error": 7.450580596923828e-09, "mean_ms": 0.16943191666666665, "numel": 32768, "p50_ms": 0.16892524999999997, "p90_ms": 0.17041469999999997, "p99_ms": 0.1766981, "samples": 30, "sequence_length": 128, "stdev_ms": 0.0021246870137185798}
+{"allclose": true, "batch": 4, "cv_percent": 1.2438356225992506, "dtype": "float16", "family": "feature_dimension", "feature_dimension": 128, "inner_iterations": 20, "max_abs_error": 0.0009765625, "max_relative_error": 0.0009165902738459408, "mean_abs_error": 1.5366822481155396e-08, "mean_ms": 0.16872834, "numel": 65536, "p50_ms": 0.16807822500000003, "p90_ms": 0.171183845, "p99_ms": 0.17354137999999997, "samples": 30, "sequence_length": 128, "stdev_ms": 0.0020987031983403805}
+{"allclose": true, "batch": 4, "cv_percent": 1.163793858623569, "dtype": "float16", "family": "feature_dimension", "feature_dimension": 256, "inner_iterations": 15, "max_abs_error": 0.0009765625, "max_relative_error": 0.000953288865275681, "mean_abs_error": 1.1757947504520416e-08, "mean_ms": 0.17019274888888888, "numel": 131072, "p50_ms": 0.16967883333333333, "p90_ms": 0.17203126666666665, "p99_ms": 0.176816014, "samples": 30, "sequence_length": 128, "stdev_ms": 0.001980692759391521}
+{"allclose": true, "batch": 4, "cv_percent": 3.489552568134574, "dtype": "float16", "family": "feature_dimension", "feature_dimension": 512, "inner_iterations": 7, "max_abs_error": 0.001953125, "max_relative_error": 0.0009191176504828036, "mean_abs_error": 1.0099029168486595e-08, "mean_ms": 0.1793326761904762, "numel": 262144, "p50_ms": 0.17797764285714285, "p90_ms": 0.18080387142857143, "p99_ms": 0.2028489042857143, "samples": 30, "sequence_length": 128, "stdev_ms": 0.006257908007509221}
+{"allclose": true, "batch": 4, "cv_percent": 1.2721063114634625, "dtype": "float16", "family": "model_width", "feature_dimension": 6144, "inner_iterations": 1, "max_abs_error": 0.0009765625, "max_relative_error": 0.0009756097570061684, "mean_abs_error": 5.333883557057106e-09, "mean_ms": 0.23707053333333333, "numel": 3145728, "p50_ms": 0.2363785, "p90_ms": 0.24119, "p99_ms": 0.24485250000000003, "samples": 30, "sequence_length": 128, "stdev_ms": 0.003015789217153425}
+[ERROR] 2026-07-28-16:00:39 (PID:588042, Device:0, RankID:-1) ERR99999 UNKNOWN applicaiton exception

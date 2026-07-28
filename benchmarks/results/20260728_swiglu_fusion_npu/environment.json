@@ -1,0 +1,59 @@
+{
+  "baseline": {
+    "branch": "test/swiglu-unfused-baseline",
+    "commit": "ce55d4b08d179a84c2885432ff004ee202b6e324"
+  },
+  "capture_date": "2026-07-28",
+  "container": "triton-llama-lite",
+  "container_image": "triton-ascend-image-a2:latest",
+  "end_to_end": {
+    "concurrency": 1,
+    "graph": false,
+    "mode": "legacy request-at-a-time",
+    "output_tokens": 32,
+    "prompt_tokens": [
+      128,
+      512
+    ],
+    "repeats": 3,
+    "requests_per_repeat": 4,
+    "tp_size": 2
+  },
+  "fused": {
+    "branch": "feature/swiglu-fused-optimization",
+    "commit": "fdf206aee6cf0ebce4e8ae0771d90496aa579160"
+  },
+  "hardware": "2 x Atlas 910B3 for end-to-end; physical NPU 7 for operator/profile",
+  "hostname": "bms-ubuntu13",
+  "model": {
+    "checkpoint": "/data/liuke/llama_lite_npu/my_weight/Qwen3-1.7B/Qwen3-1.7B.pth",
+    "config": "/data/liuke/llama_lite_npu/my_weight/Qwen3-1.7B/config.json",
+    "config_sha256": "1ddb5b89ebc90dcb417a45c213d818577e65976454d29385c8f6140771d95197",
+    "name": "Qwen3-1.7B"
+  },
+  "operator_contract": {
+    "dtype": [
+      "float16",
+      "bfloat16"
+    ],
+    "samples": 30,
+    "seed": 20260728,
+    "warmup": 10
+  },
+  "physical_npu_devices": [
+    6,
+    7
+  ],
+  "profiler": {
+    "active_steps": 5,
+    "aic_metrics": "PipeUtilization",
+    "l2_cache": true,
+    "level": "Level1"
+  },
+  "python": "3.10.12",
+  "schema_version": 1,
+  "server": "218.106.157.54:10013",
+  "torch": "2.7.1+cpu",
+  "torch_npu": "2.7.1",
+  "triton": "3.2.0"
+}
