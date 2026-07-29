@@ -122,11 +122,18 @@ class Qwen3Attention(nn.Module):
         xk = xk.view(batch_size * seq_len, self.num_kv_heads, self.head_dim)
         xv = xv.view(batch_size * seq_len, self.num_kv_heads, self.head_dim)
 
-        xq, _ = skip_rmsnorm(xq, None, self.q_norm_weight.data, self.rmsnorm_eps)
-        xk, _ = skip_rmsnorm(xk, None, self.k_norm_weight.data, self.rmsnorm_eps)
-
         cos, sin = position_embeddings
-        xq, xk = rope_emb_forward(xq, xk, cos, sin, batch_size, seq_len)
+        xq, xk = qk_rmsnorm_rope_forward(
+            xq,
+            xk,
+            self.q_norm_weight.data,
+            self.k_norm_weight.data,
+            cos,
+            sin,
+            batch_size,
+            seq_len,
+            self.rmsnorm_eps,
+        )
         return xq, xk, xv
 
     def forward(

@@ -11,6 +11,7 @@ from .swiglu import swiglu_forward
 from .moe_routing import finalize_moe_routing, prepare_moe_routing
 from .moe_routed_gemv import routed_expert_matmul
 from .rope_emb import rope_emb_forward
+from .rmsnorm_rope_unfused import qk_rmsnorm_rope_forward
 from .softmax_split import softmax_split
 from .update_kv_buffer import update_kv_buffer
 from .update_kv_index import update_kv_index
