@@ -68,17 +68,17 @@ def _qk_rmsnorm_rope_kernel(
     q_variance = tl.sum(q_first * q_first + q_second * q_second, axis=1) / head_dim
     q_rrms = 1.0 / tl.sqrt(q_variance + eps)
     q_weight_first = tl.load(
-        q_weight_ptr + q_dim_offsets, mask=q_mask, other=0.0
+        q_weight_ptr + half_offsets, mask=half_mask, other=0.0
     )
     q_weight_second = tl.load(
-        q_weight_ptr + q_dim_offsets + head_dim // 2,
-        mask=q_mask,
+        q_weight_ptr + half_offsets + head_dim // 2,
+        mask=half_mask,
         other=0.0,
     )
     q_first = (q_first * q_rrms[:, None]).to(q_ptr.dtype.element_ty)
     q_second = (q_second * q_rrms[:, None]).to(q_ptr.dtype.element_ty)
-    q_first = q_first * q_weight_first
-    q_second = q_second * q_weight_second
+    q_first = q_first * q_weight_first[None, :]
+    q_second = q_second * q_weight_second[None, :]
     q_rotated_first = q_first * cos_row[None, :] - q_second * sin_row[None, :]
     q_rotated_second = q_second * cos_row[None, :] + q_first * sin_row[None, :]
     tl.store(q_base + q_first_offsets, q_rotated_first, mask=q_mask)
@@ -99,17 +99,17 @@ def _qk_rmsnorm_rope_kernel(
     k_variance = tl.sum(k_first * k_first + k_second * k_second, axis=1) / head_dim
     k_rrms = 1.0 / tl.sqrt(k_variance + eps)
     k_weight_first = tl.load(
-        k_weight_ptr + k_dim_offsets, mask=k_mask, other=0.0
+        k_weight_ptr + half_offsets, mask=half_mask, other=0.0
     )
     k_weight_second = tl.load(
-        k_weight_ptr + k_dim_offsets + head_dim // 2,
-        mask=k_mask,
+        k_weight_ptr + half_offsets + head_dim // 2,
+        mask=half_mask,
         other=0.0,
     )
     k_first = (k_first * k_rrms[:, None]).to(k_ptr.dtype.element_ty)
     k_second = (k_second * k_rrms[:, None]).to(k_ptr.dtype.element_ty)
-    k_first = k_first * k_weight_first
-    k_second = k_second * k_weight_second
+    k_first = k_first * k_weight_first[None, :]
+    k_second = k_second * k_weight_second[None, :]
     k_rotated_first = k_first * cos_row[None, :] - k_second * sin_row[None, :]
     k_rotated_second = k_second * cos_row[None, :] + k_first * sin_row[None, :]
     tl.store(k_base + k_first_offsets, k_rotated_first, mask=k_mask)

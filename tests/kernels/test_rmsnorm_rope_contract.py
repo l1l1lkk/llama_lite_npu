@@ -59,6 +59,16 @@ class RMSNormRoPEContractTest(unittest.TestCase):
         }
         self.assertTrue({"batch", "sequence", "head_dimension"} <= constants)
 
+    def test_fused_grid_limit_is_per_token(self):
+        source = (
+            ROOT / "lite_llama/executor/model_executor.py"
+        ).read_text(encoding="utf-8")
+        method = source.split("def _infer_safe_prefill_tokens", 1)[1].split(
+            "def _get_max_avaliable_tokens", 1
+        )[0]
+        self.assertIn("return safe_grid_rows", method)
+        self.assertNotIn("safe_grid_rows // local_q_heads", method)
+
 
 if __name__ == "__main__":
     unittest.main()
