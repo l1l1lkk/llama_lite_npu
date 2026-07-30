@@ -189,6 +189,15 @@ class FusedMLP(nn.Module):
         out = tp_all_reduce(out)
         return out
 
+    def forward_with_rmsnorm(self, x, residual, weight, eps):
+        h, residual = rmsnorm_matmul_swiglu_forward(
+            x, residual, weight, self.gate_up_proj.weight.data, eps
+        )
+        out = self.down_proj(h)
+        # TP: all-reduce partial results from row-sharded down projection
+        out = tp_all_reduce(out)
+        return out, residual
+
 
 class Qwen3DecoderLayer(nn.Module):
     def __init__(self, config: Qwen3Config, tp_config: TPConfig = None):
@@ -225,10 +234,12 @@ class Qwen3DecoderLayer(nn.Module):
         hidden_states = self.self_attn(
             hidden_states, atten_info, layer_index, position_embeddings, qk_scale
         )
-        hidden_states, residual = skip_rmsnorm(
-            hidden_states, residual, self.post_attention_layernorm_weight.data, self.rmsnorm_eps,
+        hidden_states, residual = self.mlp.forward_with_rmsnorm(
+            hidden_states,
+            residual,
+            self.post_attention_layernorm_weight.data,
+            self.rmsnorm_eps,
         )
-        hidden_states = self.mlp.forward(hidden_states)
         return hidden_states, residual
 
 
