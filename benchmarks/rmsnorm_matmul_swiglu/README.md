@@ -23,3 +23,10 @@ bash benchmarks/rmsnorm_matmul_swiglu/run_e2e_matrix.sh \
 python -m benchmarks.rmsnorm_matmul_swiglu.analyze_e2e \
   /data/liuke/rmsnorm_matmul_swiglu_20260730/e2e
 ```
+
+Capture matched dynamic `msprof` traces for fused Graph off/on:
+
+```bash
+bash benchmarks/rmsnorm_matmul_swiglu/profile_graph.sh \
+  /data/liuke/rmsnorm_matmul_swiglu_20260730/e2e/profiler
+```
