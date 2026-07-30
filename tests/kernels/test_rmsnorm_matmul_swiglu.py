@@ -1,3 +1,6 @@
+import ast
+from pathlib import Path
+
 import torch
 import torch.nn.functional as F
 
@@ -62,3 +65,27 @@ def test_unfused_reference_rejects_odd_packed_width():
         assert "must be even" in str(error)
     else:
         raise AssertionError("odd packed width must be rejected")
+
+
+def test_decode_path_is_one_triton_kernel():
+    source_path = (
+        Path(__file__).parents[2]
+        / "lite_llama"
+        / "kernels"
+        / "rmsnorm_matmul_swiglu.py"
+    )
+    module = ast.parse(source_path.read_text(encoding="utf-8"))
+    functions = {
+        node.name: node for node in module.body if isinstance(node, ast.FunctionDef)
+    }
+
+    assert "_rmsnorm_matmul_swiglu_decode_kernel" in functions
+    kernel = functions["_rmsnorm_matmul_swiglu_decode_kernel"]
+    calls = [
+        node
+        for node in ast.walk(kernel)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+    ]
+    assert sum(call.func.attr == "dot" for call in calls) == 2
+    assert any(call.func.attr == "sigmoid" for call in calls)
