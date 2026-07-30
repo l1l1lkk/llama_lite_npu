@@ -218,8 +218,8 @@ def rmsnorm_matmul_swiglu_forward(
             (rows, intermediate_size), dtype=x.dtype, device=x.device
         )
         new_residual = torch.empty_like(x_2d)
-        block_m = 8
-        block_n = 64
+        block_m = min(8, triton.next_power_of_2(rows))
+        block_n = 256
         block_k = 32
         block_rms = triton.next_power_of_2(x.shape[-1])
         grid = (
