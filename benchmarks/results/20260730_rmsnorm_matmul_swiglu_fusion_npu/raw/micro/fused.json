@@ -1,0 +1,94 @@
+{
+  "device": "Ascend910B3",
+  "shapes": [
+    {
+      "batch": 1,
+      "hidden_size": 2048,
+      "intermediate_size": 3072,
+      "latency_ms": {
+        "mean": 3.273288831114769,
+        "median": 3.2259300351142883,
+        "min": 3.1889230012893677,
+        "p95": 3.306005150079727
+      },
+      "output_error": {
+        "allclose_atol_5e-2_rtol_5e-2": true,
+        "max_abs": 0.00390625,
+        "max_rel": 0.001243008067831397
+      },
+      "residual_error": {
+        "allclose_atol_5e-2_rtol_5e-2": true,
+        "max_abs": 0.0,
+        "max_rel": 0.0
+      },
+      "sequence_length": 1
+    },
+    {
+      "batch": 2,
+      "hidden_size": 2048,
+      "intermediate_size": 3072,
+      "latency_ms": {
+        "mean": 3.2292992249131203,
+        "median": 3.20502370595932,
+        "min": 3.172295168042183,
+        "p95": 3.287253901362419
+      },
+      "output_error": {
+        "allclose_atol_5e-2_rtol_5e-2": true,
+        "max_abs": 0.00390625,
+        "max_rel": 0.0023255813866853714
+      },
+      "residual_error": {
+        "allclose_atol_5e-2_rtol_5e-2": true,
+        "max_abs": 0.0,
+        "max_rel": 0.0
+      },
+      "sequence_length": 1
+    },
+    {
+      "batch": 4,
+      "hidden_size": 2048,
+      "intermediate_size": 3072,
+      "latency_ms": {
+        "mean": 3.2749417424201965,
+        "median": 3.2073641195893288,
+        "min": 3.1598731875419617,
+        "p95": 3.310753032565117
+      },
+      "output_error": {
+        "allclose_atol_5e-2_rtol_5e-2": true,
+        "max_abs": 0.00390625,
+        "max_rel": 0.002577319508418441
+      },
+      "residual_error": {
+        "allclose_atol_5e-2_rtol_5e-2": true,
+        "max_abs": 0.0,
+        "max_rel": 0.0
+      },
+      "sequence_length": 1
+    },
+    {
+      "batch": 8,
+      "hidden_size": 2048,
+      "intermediate_size": 3072,
+      "latency_ms": {
+        "mean": 3.216787800192833,
+        "median": 3.2112179324030876,
+        "min": 3.158021718263626,
+        "p95": 3.2707545906305313
+      },
+      "output_error": {
+        "allclose_atol_5e-2_rtol_5e-2": true,
+        "max_abs": 0.00390625,
+        "max_rel": 0.001923076924867928
+      },
+      "residual_error": {
+        "allclose_atol_5e-2_rtol_5e-2": true,
+        "max_abs": 0.0,
+        "max_rel": 0.0
+      },
+      "sequence_length": 1
+    }
+  ],
+  "torch_version": "2.7.1+cpu"
+}

@@ -1,0 +1,94 @@
+{
+  "device": "Ascend910B3",
+  "shapes": [
+    {
+      "batch": 1,
+      "hidden_size": 2048,
+      "intermediate_size": 3072,
+      "latency_ms": {
+        "mean": 0.6304676085710526,
+        "median": 0.6203902885317802,
+        "min": 0.6046239286661148,
+        "p95": 0.6527453660964966
+      },
+      "output_error": {
+        "allclose_atol_5e-2_rtol_5e-2": true,
+        "max_abs": 0.005859375,
+        "max_rel": 2.5841476917266846
+      },
+      "residual_error": {
+        "allclose_atol_5e-2_rtol_5e-2": true,
+        "max_abs": 0.0,
+        "max_rel": 0.0
+      },
+      "sequence_length": 1
+    },
+    {
+      "batch": 2,
+      "hidden_size": 2048,
+      "intermediate_size": 3072,
+      "latency_ms": {
+        "mean": 0.6128962710499763,
+        "median": 0.6127534434199333,
+        "min": 0.5988646298646927,
+        "p95": 0.6284434348344803
+      },
+      "output_error": {
+        "allclose_atol_5e-2_rtol_5e-2": true,
+        "max_abs": 0.005859375,
+        "max_rel": 1.600000023841858
+      },
+      "residual_error": {
+        "allclose_atol_5e-2_rtol_5e-2": true,
+        "max_abs": 0.0,
+        "max_rel": 0.0
+      },
+      "sequence_length": 1
+    },
+    {
+      "batch": 4,
+      "hidden_size": 2048,
+      "intermediate_size": 3072,
+      "latency_ms": {
+        "mean": 0.6088896840810776,
+        "median": 0.6069764494895935,
+        "min": 0.5933437496423721,
+        "p95": 0.6295349448919296
+      },
+      "output_error": {
+        "allclose_atol_5e-2_rtol_5e-2": true,
+        "max_abs": 0.0078125,
+        "max_rel": 10.302325248718262
+      },
+      "residual_error": {
+        "allclose_atol_5e-2_rtol_5e-2": true,
+        "max_abs": 0.0,
+        "max_rel": 0.0
+      },
+      "sequence_length": 1
+    },
+    {
+      "batch": 8,
+      "hidden_size": 2048,
+      "intermediate_size": 3072,
+      "latency_ms": {
+        "mean": 0.6137228384613991,
+        "median": 0.6079785525798798,
+        "min": 0.5937833338975906,
+        "p95": 0.6291251629590988
+      },
+      "output_error": {
+        "allclose_atol_5e-2_rtol_5e-2": true,
+        "max_abs": 0.0078125,
+        "max_rel": 8.349397659301758
+      },
+      "residual_error": {
+        "allclose_atol_5e-2_rtol_5e-2": true,
+        "max_abs": 0.0,
+        "max_rel": 0.0
+      },
+      "sequence_length": 1
+    }
+  ],
+  "torch_version": "2.7.1+cpu"
+}

@@ -1,0 +1,74 @@
+{
+  "fused_triton": {
+    "capture_metadata": {
+      "active_steps": 5,
+      "aic_metrics": "PipeUtilization",
+      "batch": 1,
+      "git_branch": "feature/matmul-swiglu-rmsnorm-fused-optimization",
+      "git_commit": "809e9b7ac79a25f6db9fddc9667aca631a2c9764",
+      "hidden_size": 2048,
+      "intermediate_size": 3072,
+      "l2_cache": true,
+      "physical_device": 7,
+      "profiler_level": "Level1",
+      "sequence_length": 1
+    },
+    "kernel_count": 5,
+    "kernels": {
+      "_rmsnorm_matmul_swiglu_decode_kernel": {
+        "aic_mac_ratio_mean": 0.005,
+        "aiv_mte2_ratio_mean": 0.8917999999999999,
+        "aiv_scalar_ratio_mean": 0.718,
+        "count": 5,
+        "cube_utilization_percent_mean": 80.701,
+        "duration_us_mean": 2982.8476,
+        "duration_us_median": 2982.24
+      }
+    }
+  },
+  "separated": {
+    "capture_metadata": {
+      "active_steps": 5,
+      "aic_metrics": "PipeUtilization",
+      "batch": 1,
+      "git_branch": "test/matmul-swiglu-rmsnorm-unfused-baseline",
+      "git_commit": "5b6604cc210648efdcb68e10a5ef9377b4f8f32e",
+      "hidden_size": 2048,
+      "intermediate_size": 3072,
+      "l2_cache": true,
+      "physical_device": 7,
+      "profiler_level": "Level1",
+      "sequence_length": 1
+    },
+    "kernel_count": 15,
+    "kernels": {
+      "_swiglu_packed_kernel": {
+        "aic_mac_ratio_mean": 0.0,
+        "aiv_mte2_ratio_mean": 0.19619999999999999,
+        "aiv_scalar_ratio_mean": 0.24900000000000003,
+        "count": 5,
+        "cube_utilization_percent_mean": 0.0,
+        "duration_us_mean": 1.8559999999999999,
+        "duration_us_median": 1.84
+      },
+      "aclnnMatmul_MatMulCommon_MatMulV2": {
+        "aic_mac_ratio_mean": 0.2272,
+        "aiv_mte2_ratio_mean": 0.0,
+        "aiv_scalar_ratio_mean": 0.0,
+        "count": 5,
+        "cube_utilization_percent_mean": 87.0196,
+        "duration_us_mean": 20.404,
+        "duration_us_median": 20.54
+      },
+      "skip_rms_norm_kernel": {
+        "aic_mac_ratio_mean": 0.0,
+        "aiv_mte2_ratio_mean": 0.27080000000000004,
+        "aiv_scalar_ratio_mean": 0.438,
+        "count": 5,
+        "cube_utilization_percent_mean": 0.0,
+        "duration_us_mean": 2.008,
+        "duration_us_median": 2.0
+      }
+    }
+  }
+}
